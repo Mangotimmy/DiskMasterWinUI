@@ -416,6 +416,110 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabViewItem>
+
+            <!-- ── Tab 5: TPM 2.0 & Win11 Security LabConfig Bypass ── -->
+            <TabViewItem x:Name="TabTpm" Header="🛡️ TPM 2.0 與系統安全" IsClosable="False">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                    <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
+                        <!-- TPM Hardware Status Card -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="🛡️ TPM (Trusted Platform Module) 安全晶片診斷" Style="{StaticResource SubtitleTextBlockStyle}" />
+                                        <TextBlock Text="檢測主機板是否已啟用 TPM 2.0 模組，提供 Windows 11 安全開機與 BitLocker 加密支援。"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                        <Button Content="🔄 重新整理 TPM" Command="{x:Bind ViewModel.LoadTpmStatusCommand}" />
+                                        <Button Content="⚙️ 開啟 tpm.msc" Command="{x:Bind ViewModel.OpenTpmMscCommand}" Style="{StaticResource AccentButtonStyle}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid ColumnSpacing="16" RowSpacing="12" Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <Border Grid.Row="0" Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="晶片存在狀態" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                            <TextBlock Text="{x:Bind ViewModel.TpmStatus.IsPresent, Mode=OneWay}" FontWeight="SemiBold" FontSize="16" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Grid.Row="0" Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="規範版本 (Spec Version)" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                            <TextBlock Text="{x:Bind ViewModel.TpmStatus.SpecVersion, Mode=OneWay}" FontWeight="SemiBold" FontSize="16" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Grid.Row="1" Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="製造廠商 (Manufacturer)" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                            <TextBlock Text="{x:Bind ViewModel.TpmStatus.ManufacturerName, Mode=OneWay}" FontWeight="SemiBold" FontSize="16" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Grid.Row="1" Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="製造商韌體版本" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                            <TextBlock Text="{x:Bind ViewModel.TpmStatus.ManufacturerVersion, Mode=OneWay}" FontWeight="SemiBold" FontSize="16" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Grid.Row="2" Grid.ColumnSpan="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="綜合運行狀態" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                            <TextBlock Text="{x:Bind ViewModel.TpmOperationStatus, Mode=OneWay}" FontWeight="SemiBold" FontSize="14" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Windows 11 LabConfig Bypass Card -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="🚀 Windows 11 安裝與升級限制一鍵繞過 (LabConfig)" Style="{StaticResource SubtitleTextBlockStyle}" />
+                                <TextBlock Text="透過微軟官方安裝程式認可之 LabConfig 登錄檔，免硬體限制安裝或升級 Win11（包含 TPM 2.0、安全開機、處理器支援、RAM 與儲存空間）。"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4">
+                                        <TextBlock Text="LabConfig 繞過狀態: BypassTPMCheck, BypassSecureBootCheck, BypassCPUCheck, BypassRAMCheck" FontWeight="SemiBold" />
+                                        <TextBlock Text="一鍵寫入或清除 HKLM\SYSTEM\Setup\LabConfig 與 MoSetup 參數。"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1"
+                                            Content="切換 Win11 限制繞過開關"
+                                            Command="{x:Bind ViewModel.ToggleWin11BypassCommand}"
+                                            Style="{StaticResource AccentButtonStyle}" MinWidth="160" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabViewItem>
             </TabView.TabItems>
         </TabView>
     </Grid>

@@ -101,6 +101,7 @@ public partial class NtfsPermissionsViewModel : ObservableObject
             _cts = new CancellationTokenSource();
             await _ntfsService.ApplyPresetAsync(TargetPath, NtfsPresetType.TakeOwnershipAndUnlock, AppendOutput, _cts.Token);
             StatusMessage = "Take Ownership complete.";
+            AudioFeedbackService.PlaySuccess();
         }
         finally { IsRunning = false; }
     }
@@ -116,6 +117,7 @@ public partial class NtfsPermissionsViewModel : ObservableObject
             _cts = new CancellationTokenSource();
             await _ntfsService.ApplyPresetAsync(TargetPath, NtfsPresetType.GrantEveryoneFullControl, AppendOutput, _cts.Token);
             StatusMessage = "Grant Everyone complete.";
+            AudioFeedbackService.PlaySuccess();
         }
         finally { IsRunning = false; }
     }
@@ -131,6 +133,7 @@ public partial class NtfsPermissionsViewModel : ObservableObject
             _cts = new CancellationTokenSource();
             await _ntfsService.ApplyPresetAsync(TargetPath, NtfsPresetType.ResetToDefaultInheritance, AppendOutput, _cts.Token);
             StatusMessage = "Reset permissions complete.";
+            AudioFeedbackService.PlaySuccess();
         }
         finally { IsRunning = false; }
     }
@@ -146,6 +149,7 @@ public partial class NtfsPermissionsViewModel : ObservableObject
             _cts = new CancellationTokenSource();
             await _ntfsService.ApplyPresetAsync(TargetPath, NtfsPresetType.StrictAdministratorsOnly, AppendOutput, _cts.Token);
             StatusMessage = "Strict Admin Only complete.";
+            AudioFeedbackService.PlaySuccess();
         }
         finally { IsRunning = false; }
     }
@@ -169,6 +173,7 @@ public partial class NtfsPermissionsViewModel : ObservableObject
                 AppendOutput,
                 _cts.Token);
             StatusMessage = "Custom batch apply complete.";
+            AudioFeedbackService.PlaySuccess();
         }
         finally { IsRunning = false; }
     }

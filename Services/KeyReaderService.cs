@@ -212,7 +212,15 @@ public class KeyReaderService
                 formatted.Append(keyResult[i]);
                 if ((i % 5) == 4 && i != 24) formatted.Append('-');
             }
-            return formatted.ToString();
+
+            var result = formatted.ToString();
+            // If the key is all B's (digital license placeholder), report as Digital License Active
+            if (result.Replace("-", "").All(c => c == 'B') || result.StartsWith("BBBBB-BBBBB-BBBBB"))
+            {
+                return LocalizationService.Instance["DigitalLicenseActive"];
+            }
+
+            return result;
         }
         catch
         {

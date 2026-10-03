@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DiskMasterWinUI.Helpers;
+using DiskMasterWinUI.Services;
 
 namespace DiskMasterWinUI.ViewModels;
 
@@ -81,6 +82,7 @@ public partial class StatusBarViewModel : ObservableObject
             CanCancel = false;
             _cancelAction = null;
         });
+        AudioFeedbackService.PlaySuccess();
     }
 
     public void Reset()

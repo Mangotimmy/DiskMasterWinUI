@@ -138,7 +138,7 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <FontIcon Grid.Column="0" Glyph="&#xE950;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="1" Text="📊 完整 S.M.A.R.T. 深度解析與硬體遙測" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="SmartDeepTelemetryTitle" Grid.Column="1" Text="📊 完整 S.M.A.R.T. 深度解析與硬體遙測" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" />
 
                                     <!-- Switch 1: Temp Unit -->
                                     <ToggleSwitch Grid.Column="2" x:Name="TempUnitSwitch"
@@ -153,7 +153,7 @@
                                                   Toggled="RawHex_Toggled" VerticalAlignment="Center" />
 
                                     <!-- Copy Button -->
-                                    <Button Grid.Column="4" Content="📋 複製報告"
+                                    <Button x:Name="CopySmartReportBtn" Grid.Column="4" Content="📋 複製報告"
                                             Command="{x:Bind ViewModel.CopyFullSmartReportCommand}"
                                             VerticalAlignment="Center" />
                                 </Grid>
@@ -163,7 +163,7 @@
 
                                 <!-- NVMe Dashboard (When Selected Disk is NVMe) -->
                                 <StackPanel Spacing="12" Visibility="{x:Bind ViewModel.HasSelectedNvme, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="⚡ NVMe 原生硬體健康指標 (NVMe 1.4 / 2.0 IOCTL 解碼)" FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                    <TextBlock x:Name="NvmeDashboardTitle" Text="⚡ NVMe 原生硬體健康指標 (NVMe 1.4 / 2.0 IOCTL 解碼)" FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
 
                                     <Grid ColumnSpacing="10" RowSpacing="10">
                                         <Grid.ColumnDefinitions>
@@ -180,16 +180,16 @@
                                         <!-- Card 1: Core Temperature -->
                                         <Border Grid.Row="0" Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
                                             <StackPanel Spacing="2">
-                                                <TextBlock Text="🌡️ 核心溫度 (Composite Temp)" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock x:Name="CardCoreTempHeader" Text="🌡️ 核心溫度 (Composite Temp)" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                                 <TextBlock Text="{x:Bind ViewModel.SelectedNvmeHealth.CompositeTemperatureDisplay, Mode=OneWay}" FontSize="18" FontWeight="Bold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                                                <TextBlock Text="原生開氏溫標精準換算" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                <TextBlock x:Name="CardCoreTempSub" Text="原生開氏溫標精準換算" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                                             </StackPanel>
                                         </Border>
 
                                         <!-- Card 2: SSD Health & Wear -->
                                         <Border Grid.Row="0" Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
                                             <StackPanel Spacing="2">
-                                                <TextBlock Text="🩺 健康度與耗損" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock x:Name="CardHealthWearHeader" Text="🩺 健康度與耗損" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                                 <TextBlock Text="{x:Bind ViewModel.SelectedNvmeHealth.HealthPercentDisplay, Mode=OneWay}" FontSize="18" FontWeight="Bold" Foreground="#107C41" />
                                                 <TextBlock Text="{x:Bind ViewModel.SelectedNvmeHealth.PercentageUsedDisplay, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                             </StackPanel>
@@ -198,25 +198,25 @@
                                         <!-- Card 3: TBW -->
                                         <Border Grid.Row="0" Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
                                             <StackPanel Spacing="2">
-                                                <TextBlock Text="📝 累計總寫入量 (TBW)" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock x:Name="CardTbwHeader" Text="📝 累計總寫入量 (TBW)" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                                 <TextBlock Text="{x:Bind ViewModel.SelectedNvmeHealth.TotalWrittenDisplay, Mode=OneWay}" FontSize="18" FontWeight="Bold" />
-                                                <TextBlock Text="主機寫入累計資料區塊" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                <TextBlock x:Name="CardTbwSub" Text="主機寫入累計資料區塊" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                                             </StackPanel>
                                         </Border>
 
                                         <!-- Card 4: TBR -->
                                         <Border Grid.Row="0" Grid.Column="3" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
                                             <StackPanel Spacing="2">
-                                                <TextBlock Text="📖 累計總讀取量 (TBR)" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock x:Name="CardTbrHeader" Text="📖 累計總讀取量 (TBR)" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                                 <TextBlock Text="{x:Bind ViewModel.SelectedNvmeHealth.TotalReadDisplay, Mode=OneWay}" FontSize="18" FontWeight="Bold" />
-                                                <TextBlock Text="主機讀取累計資料區塊" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                <TextBlock x:Name="CardTbrSub" Text="主機讀取累計資料區塊" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                                             </StackPanel>
                                         </Border>
 
                                         <!-- Card 5: Power-On Hours -->
                                         <Border Grid.Row="1" Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
                                             <StackPanel Spacing="2">
-                                                <TextBlock Text="⏱️ 通電運作時數" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock x:Name="CardPowerHoursHeader" Text="⏱️ 通電運作時數" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                                 <TextBlock Text="{x:Bind ViewModel.SelectedNvmeHealth.PowerOnHoursDisplay, Mode=OneWay}" FontSize="14" FontWeight="SemiBold" />
                                             </StackPanel>
                                         </Border>
@@ -224,7 +224,7 @@
                                         <!-- Card 6: Power Cycles -->
                                         <Border Grid.Row="1" Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
                                             <StackPanel Spacing="2">
-                                                <TextBlock Text="🔌 通電次數" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock x:Name="CardPowerCyclesHeader" Text="🔌 通電次數" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                                 <TextBlock Text="{x:Bind ViewModel.SelectedNvmeHealth.PowerCyclesDisplay, Mode=OneWay}" FontSize="14" FontWeight="SemiBold" />
                                             </StackPanel>
                                         </Border>
@@ -232,7 +232,7 @@
                                         <!-- Card 7: Unsafe Shutdowns -->
                                         <Border Grid.Row="1" Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
                                             <StackPanel Spacing="2">
-                                                <TextBlock Text="⚡ 不正常斷電次數" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock x:Name="CardUnsafeShutdownsHeader" Text="⚡ 不正常斷電次數" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                                 <TextBlock Text="{x:Bind ViewModel.SelectedNvmeHealth.UnsafeShutdownsDisplay, Mode=OneWay}" FontSize="14" FontWeight="SemiBold" />
                                             </StackPanel>
                                         </Border>
@@ -240,7 +240,7 @@
                                         <!-- Card 8: Available Spare -->
                                         <Border Grid.Row="1" Grid.Column="3" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
                                             <StackPanel Spacing="2">
-                                                <TextBlock Text="🛡️ 備用空間比例" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock x:Name="CardAvailableSpareHeader" Text="🛡️ 備用空間比例" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                                 <TextBlock Text="{x:Bind ViewModel.SelectedNvmeHealth.AvailableSpareDisplay, Mode=OneWay}" FontSize="14" FontWeight="SemiBold" />
                                             </StackPanel>
                                         </Border>
@@ -249,7 +249,7 @@
 
                                 <!-- ATA SMART Attributes Table (When Selected Disk is SATA/HDD) -->
                                 <StackPanel Spacing="8" Visibility="{x:Bind ViewModel.HasSelectedAta, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="🗄️ ATA S.M.A.R.T. 30 項硬體診斷指標資料表" FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                    <TextBlock x:Name="AtaSmartTableTitle" Text="🗄️ ATA S.M.A.R.T. 30 項硬體診斷指標資料表" FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
 
                                     <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="8">
                                         <ListView ItemsSource="{x:Bind ViewModel.AtaSmartAttributes, Mode=OneWay}" SelectionMode="None" MaxHeight="280">
@@ -303,7 +303,7 @@
 
                                 <!-- Fallback Summary Panel (When device does not expose raw ATA registers) -->
                                 <StackPanel Spacing="10" Visibility="{x:Bind ViewModel.HasNoSmartTelemetry, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <TextBlock Text="ℹ️ 磁碟健康與基礎遙測摘要 (Basic Hardware Diagnostics)" FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                    <TextBlock x:Name="BasicTelemetrySummaryTitle" Text="ℹ️ 磁碟健康與基礎遙測摘要 (Basic Hardware Diagnostics)" FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
                                     <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="14">
                                         <Grid ColumnSpacing="16" RowSpacing="10">
                                             <Grid.ColumnDefinitions>
@@ -312,15 +312,15 @@
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Grid.Column="0" Spacing="2">
-                                                <TextBlock Text="裝置名稱 / 型號" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock x:Name="FallbackDeviceModelTitle" Text="裝置名稱 / 型號" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                                 <TextBlock Text="{x:Bind ViewModel.SelectedDiskHealth.FriendlyName, Mode=OneWay}" FontWeight="SemiBold" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="1" Spacing="2">
-                                                <TextBlock Text="介面與類型" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock x:Name="FallbackInterfaceTypeTitle" Text="介面與類型" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                                 <TextBlock Text="{x:Bind ViewModel.SelectedDiskHealth.Summary, Mode=OneWay}" FontWeight="SemiBold" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="2" Spacing="2">
-                                                <TextBlock Text="目前核心溫度" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock x:Name="FallbackCurrentTempTitle" Text="目前核心溫度" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                                 <TextBlock Text="{x:Bind ViewModel.SelectedDiskHealth.TemperatureDisplay, Mode=OneWay}" FontWeight="Bold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" FontSize="16" />
                                             </StackPanel>
                                         </Grid>

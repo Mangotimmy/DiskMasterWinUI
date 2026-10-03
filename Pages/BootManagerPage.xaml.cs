@@ -14,6 +14,7 @@ public sealed partial class BootManagerPage : Page
     {
         InitializeComponent();
         NavigationCacheMode = NavigationCacheMode.Required;
+        DiskMasterWinUI.Helpers.TabReorderHelper.Attach(BootTabView);
         ApplyLanguage();
         LocalizationService.Instance.LanguageChanged += ApplyLanguage;
     }
@@ -85,6 +86,7 @@ public sealed partial class BootManagerPage : Page
             "ja-JP" => "グローバルブート設定",
             _ => "全域開機設定"
         };
+        TabTpm.Header = LocalizationService.Instance["TabTpm"];
 
         SearchBox.PlaceholderText = lang switch
         {
@@ -207,6 +209,7 @@ public sealed partial class BootManagerPage : Page
         ApplyLanguage();
         await ViewModel.RefreshEntriesCommand.ExecuteAsync(null);
         await ViewModel.LoadSafeBootConfigCommand.ExecuteAsync(null);
+        await ViewModel.LoadTpmStatusCommand.ExecuteAsync(null);
     }
     private void AddToBcd_Click(object sender, RoutedEventArgs e)
     {

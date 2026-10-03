@@ -31,12 +31,16 @@ public partial class NetworkToolsViewModel : ObservableObject
     public ObservableCollection<UpnpPortMappingItem> GamePresets { get; } = new();
     [ObservableProperty] private UpnpPortMappingItem? _selectedGamePreset;
 
-    // ── 2. Recommended DNS Settings ──
+    // ── 2. Recommended DNS Settings & Adapters ──
+    public ObservableCollection<NetworkAdapterItem> NetworkAdapters { get; } = new();
+    [ObservableProperty] private NetworkAdapterItem? _selectedAdapter;
     public ObservableCollection<DnsPreset> DnsPresets { get; } = new();
     [ObservableProperty] private DnsPreset? _selectedDnsPreset;
     [ObservableProperty] private string _customPrimaryDns = "1.1.1.1";
     [ObservableProperty] private string _customSecondaryDns = "1.0.0.1";
     [ObservableProperty] private bool _isApplyingDns;
+    [ObservableProperty] private bool _isPingingDns;
+    [ObservableProperty] private string _dnsPingSummary = "尚未測試 Ping 延遲";
 
     // ── 3. Smart Network Diagnostic ──
     public ObservableCollection<DiagnosticStepResult> DiagnosticResults { get; } = new();
@@ -63,7 +67,19 @@ public partial class NetworkToolsViewModel : ObservableObject
             DnsPresets.Add(dns);
         }
         SelectedDnsPreset = DnsPresets.FirstOrDefault();
+        RefreshNetworkAdapters();
         _ = LoadInitialDataAsync();
+    }
+
+    [RelayCommand]
+    public void RefreshNetworkAdapters()
+    {
+        NetworkAdapters.Clear();
+        foreach (var nic in NetworkDiagnosticService.GetAvailableNetworkAdapters())
+        {
+            NetworkAdapters.Add(nic);
+        }
+        SelectedAdapter = NetworkAdapters.FirstOrDefault(a => a.IsPrimary) ?? NetworkAdapters.FirstOrDefault();
     }
 
     [RelayCommand]
@@ -197,8 +213,9 @@ public partial class NetworkToolsViewModel : ObservableObject
         try
         {
             IsApplyingDns = true;
-            StatusMessage = $"正在套用 DNS: {SelectedDnsPreset.Name}...";
-            var (ok, msg) = await _diagService.ApplyDnsAsync(SelectedDnsPreset.PrimaryDns, SelectedDnsPreset.SecondaryDns);
+            string targetName = SelectedAdapter?.Name ?? "";
+            StatusMessage = $"正在套用 DNS ({SelectedDnsPreset.Name}) 至網卡 '{targetName}'...";
+            var (ok, msg) = await _diagService.ApplyDnsAsync(SelectedDnsPreset.PrimaryDns, SelectedDnsPreset.SecondaryDns, targetName);
             StatusMessage = msg;
             if (ok) AudioFeedbackService.PlaySuccess();
             else AudioFeedbackService.PlayWarning();
@@ -220,8 +237,9 @@ public partial class NetworkToolsViewModel : ObservableObject
         try
         {
             IsApplyingDns = true;
-            StatusMessage = "正在套用自訂 DNS 設定...";
-            var (ok, msg) = await _diagService.ApplyDnsAsync(CustomPrimaryDns, CustomSecondaryDns);
+            string targetName = SelectedAdapter?.Name ?? "";
+            StatusMessage = $"正在套用自訂 DNS 至網卡 '{targetName}'...";
+            var (ok, msg) = await _diagService.ApplyDnsAsync(CustomPrimaryDns, CustomSecondaryDns, targetName);
             StatusMessage = msg;
             if (ok) AudioFeedbackService.PlaySuccess();
             else AudioFeedbackService.PlayWarning();
@@ -234,6 +252,104 @@ public partial class NetworkToolsViewModel : ObservableObject
         finally
         {
             IsApplyingDns = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task ResetDnsToDhcpAsync()
+    {
+        try
+        {
+            IsApplyingDns = true;
+            string targetName = SelectedAdapter?.Name ?? "";
+            StatusMessage = $"正在還原網卡 '{targetName}' 為自動 DHCP DNS...";
+            var (ok, msg) = await _diagService.ApplyDnsAsync("", "", targetName);
+            StatusMessage = msg;
+            if (ok) AudioFeedbackService.PlaySuccess();
+            else AudioFeedbackService.PlayWarning();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"還原 DHCP 失敗: {ex.Message}";
+            AudioFeedbackService.PlayError();
+        }
+        finally
+        {
+            IsApplyingDns = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task TestDnsPingAsync()
+    {
+        if (IsPingingDns) return;
+        try
+        {
+            IsPingingDns = true;
+            DnsPingSummary = "正在並行探測全網 DNS 伺服器延遲 (ICMP Echo)...";
+
+            var tasks = DnsPresets.Select(async preset =>
+            {
+                if (string.IsNullOrWhiteSpace(preset.PrimaryDns))
+                {
+                    preset.PingMs = -1;
+                    preset.IsFastest = false;
+                    return;
+                }
+
+                long latency = await NetworkDiagnosticService.PingDnsServerAsync(preset.PrimaryDns);
+                preset.PingMs = latency;
+                preset.IsFastest = false;
+            }).ToList();
+
+            await Task.WhenAll(tasks);
+
+            // Determine fastest
+            var validPresets = DnsPresets.Where(p => p.PingMs > 0).ToList();
+            if (validPresets.Count > 0)
+            {
+                var fastest = validPresets.OrderBy(p => p.PingMs).First();
+                fastest.IsFastest = true;
+                DnsPingSummary = $"測速完成！最快 DNS: {fastest.Name} ({fastest.PingMs} ms)";
+            }
+            else
+            {
+                DnsPingSummary = "測速完成，但各伺服器暫無回應 (可能防火牆阻擋 ICMP)";
+            }
+
+            AudioFeedbackService.PlaySuccess();
+        }
+        catch (Exception ex)
+        {
+            DnsPingSummary = $"測速過程發生錯誤: {ex.Message}";
+            AudioFeedbackService.PlayError();
+        }
+        finally
+        {
+            IsPingingDns = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task ApplyFastestDnsAsync()
+    {
+        var fastest = DnsPresets.FirstOrDefault(p => p.IsFastest) ??
+                      DnsPresets.Where(p => p.PingMs > 0).OrderBy(p => p.PingMs).FirstOrDefault();
+
+        if (fastest != null)
+        {
+            SelectedDnsPreset = fastest;
+            await ApplySelectedDnsAsync();
+        }
+        else
+        {
+            await TestDnsPingAsync();
+            fastest = DnsPresets.FirstOrDefault(p => p.IsFastest);
+            if (fastest != null)
+            {
+                SelectedDnsPreset = fastest;
+                await ApplySelectedDnsAsync();
+            }
         }
     }
 

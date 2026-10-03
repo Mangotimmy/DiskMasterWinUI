@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using DiskMasterWinUI.Services;
 
 namespace DiskMasterWinUI.Models;
 
@@ -90,10 +91,10 @@ public partial class NvmeHealthDetails : ObservableObject
 
     public string HealthStatus => PercentageUsed switch
     {
-        <= 10 => "良好 (Excellent)",
-        <= 30 => "正常 (Good)",
-        <= 60 => "注意 (Fair)",
-        _ => "警告 (Warning)"
+        <= 10 => LocalizationService.T("良好 (極佳)", "良好 (极佳)", "Excellent", "良好 (極めて良好)"),
+        <= 30 => LocalizationService.T("正常 (良好)", "正常 (良好)", "Good", "正常 (良好)"),
+        <= 60 => LocalizationService.T("注意 (尚可)", "注意 (尚可)", "Fair", "注意 (普通)"),
+        _ => LocalizationService.T("警告 (壽命告急)", "警告 (寿命告急)", "Warning", "警告 (寿命低下)")
     };
 
     public string HealthIcon => PercentageUsed switch
@@ -105,9 +106,30 @@ public partial class NvmeHealthDetails : ObservableObject
 
     public string TotalWrittenDisplay => TotalBytesWrittenTB > 0 ? $"{TotalBytesWrittenTB:F2} TB" : "< 0.01 TB";
     public string TotalReadDisplay => TotalBytesReadTB > 0 ? $"{TotalBytesReadTB:F2} TB" : "< 0.01 TB";
-    public string PowerOnHoursDisplay => PowerOnHours > 0 ? $"{PowerOnHours:N0} 小時 ({PowerOnHours / 24:N0} 天)" : "剛啟用";
-    public string PowerCyclesDisplay => PowerCycles > 0 ? $"{PowerCycles:N0} 次" : "1 次";
-    public string UnsafeShutdownsDisplay => $"{UnsafeShutdowns:N0} 次";
+
+    public string PowerOnHoursDisplay => PowerOnHours > 0
+        ? LocalizationService.T(
+            $"{PowerOnHours:N0} 小時 ({PowerOnHours / 24:N0} 天)",
+            $"{PowerOnHours:N0} 小时 ({PowerOnHours / 24:N0} 天)",
+            $"{PowerOnHours:N0} hrs ({PowerOnHours / 24:N0} days)",
+            $"{PowerOnHours:N0} 時間 ({PowerOnHours / 24:N0} 日)")
+        : LocalizationService.T("剛啟用", "刚启用", "Newly deployed", "稼働開始直後");
+
+    public string PowerCyclesDisplay => PowerCycles > 0
+        ? LocalizationService.T($"{PowerCycles:N0} 次", $"{PowerCycles:N0} 次", $"{PowerCycles:N0} cycles", $"{PowerCycles:N0} 回")
+        : LocalizationService.T("1 次", "1 次", "1 cycle", "1 回");
+
+    public string UnsafeShutdownsDisplay => LocalizationService.T(
+        $"{UnsafeShutdowns:N0} 次",
+        $"{UnsafeShutdowns:N0} 次",
+        $"{UnsafeShutdowns:N0} times",
+        $"{UnsafeShutdowns:N0} 回");
+
     public string MediaErrorsDisplay => $"{MediaErrors:N0}";
-    public string AvailableSpareDisplay => $"{AvailableSpare}% (門檻: {AvailableSpareThreshold}%)";
+
+    public string AvailableSpareDisplay => LocalizationService.T(
+        $"{AvailableSpare}% (門檻: {AvailableSpareThreshold}%)",
+        $"{AvailableSpare}% (阈值: {AvailableSpareThreshold}%)",
+        $"{AvailableSpare}% (Threshold: {AvailableSpareThreshold}%)",
+        $"{AvailableSpare}% (しきい値: {AvailableSpareThreshold}%)");
 }

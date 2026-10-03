@@ -16,6 +16,7 @@ public sealed partial class SystemOptimizerPage : Page
     {
         InitializeComponent();
         NavigationCacheMode = NavigationCacheMode.Required;
+        DiskMasterWinUI.Helpers.TabReorderHelper.Attach(OptimizerTabView);
         ApplyLanguage();
         LocalizationService.Instance.LanguageChanged += ApplyLanguage;
     }
