@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="DiskMasterWinUI.Controls.StatusBarControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:DiskMasterWinUI.ViewModels"
+    mc:Ignorable="d">
+
+    <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0"
+            Padding="16,8"
+            Visibility="{x:Bind ViewModel.IsActive, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+        <Grid RowSpacing="6">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Top: Continuous Progress Bar -->
+            <ProgressBar Grid.Row="0"
+                         IsIndeterminate="{x:Bind ViewModel.IsIndeterminate, Mode=OneWay}"
+                         Value="{x:Bind ViewModel.ProgressPercent, Mode=OneWay}"
+                         Height="4" CornerRadius="2" HorizontalAlignment="Stretch" />
+
+            <!-- Bottom: Detail Badges and Timer -->
+            <Grid Grid.Row="1" ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Current Action Title -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <FontIcon Glyph="&#xE90F;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                    <TextBlock Text="{x:Bind ViewModel.OperationTitle, Mode=OneWay}"
+                               FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+
+                <!-- Progress Percent Badge -->
+                <Border Grid.Column="1" Background="{ThemeResource AccentFillColorDefaultBrush}"
+                        CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                    <TextBlock Text="{x:Bind ViewModel.ProgressText, Mode=OneWay}"
+                               Foreground="White" FontWeight="Bold" FontSize="11" />
+                </Border>
+
+                <!-- Elapsed Timer -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <FontIcon Glyph="&#xE916;" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Text="{x:Bind ViewModel.ElapsedText, Mode=OneWay}"
+                               FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+
+                <!-- Dynamic Estimated Time Remaining (ETA) -->
+                <Border Grid.Column="3" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                        CornerRadius="4" Padding="8,3" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE823;" FontSize="12" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                        <TextBlock Text="{x:Bind ViewModel.EtaText, Mode=OneWay}"
+                                   FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Stop / Cancel Button -->
+                <Button x:Name="StopBtn" Grid.Column="4" Content="⏹️ 停止" Command="{x:Bind ViewModel.CancelCommand}"
+                        Visibility="{x:Bind ViewModel.CanCancel, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                        Padding="10,4" FontSize="12" />
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

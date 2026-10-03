@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "DiskMasterWinUI (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "DiskMasterWinUI (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

@@ -1,0 +1,68 @@
+name: Build and Release Multi-Arch DiskMaster Pro
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        target: [win-x64, win-arm64]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore DiskMasterWinUI.csproj -r ${{ matrix.target }}
+
+    - name: Build One-File Portable Executable (.EXE)
+      run: |
+        powershell -ExecutionPolicy Bypass -File .\build_portable_singlefile.ps1 -Architecture ${{ matrix.target }}
+
+    - name: Archive WinPE Portable Zip
+      run: |
+        Compress-Archive -Path publish/* -DestinationPath DiskMaster_${{ matrix.target }}_WinPE_Portable.zip
+
+    - name: Upload Single-File EXE Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: DiskMaster-${{ matrix.target }}-Portable
+        path: installer_output/*.exe
+
+    - name: Upload Portable ZIP Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: DiskMaster-${{ matrix.target }}-Zip
+        path: DiskMaster_${{ matrix.target }}_WinPE_Portable.zip
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+
+    - name: Publish GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          DiskMaster-win-x64-Portable/*.exe
+          DiskMaster-win-arm64-Portable/*.exe
+          DiskMaster-win-x64-Zip/DiskMaster_win-x64_WinPE_Portable.zip
+          DiskMaster-win-arm64-Zip/DiskMaster_win-arm64_WinPE_Portable.zip
+        generate_release_notes: true

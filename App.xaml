@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="DiskMasterWinUI.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:DiskMasterWinUI"
+    xmlns:helpers="using:DiskMasterWinUI.Helpers">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+            <!-- Converters -->
+            <helpers:InvertBoolConverter x:Key="InvertBoolConverter" />
+            <helpers:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+            <helpers:BoolToVisibilityConverter x:Key="InvertBoolToVisibilityConverter" Invert="True" />
+            <helpers:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

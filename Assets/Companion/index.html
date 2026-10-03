@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DiskMaster Companion</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: transparent !important;
+            font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+        }
+        #stage {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            pointer-events: none;
+        }
+        #avatar-container {
+            position: relative;
+            width: 240px;
+            height: 320px;
+            pointer-events: auto;
+            cursor: pointer;
+            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        #avatar-container:hover {
+            transform: scale(1.03);
+        }
+        #avatar-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        /* Speech Bubble */
+        #speech-bubble {
+            position: absolute;
+            bottom: 310px;
+            left: 50%;
+            transform: translateX(-50%) translateY(10px);
+            background: rgba(255, 255, 255, 0.92);
+            color: #1a1a1a;
+            padding: 10px 16px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.08);
+            font-size: 13px;
+            font-weight: 500;
+            line-height: 1.4;
+            max-width: 260px;
+            min-width: 140px;
+            text-align: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            z-index: 100;
+        }
+        #speech-bubble.active {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        #speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 8px 8px 0;
+            border-style: solid;
+            border-color: rgba(255, 255, 255, 0.92) transparent;
+            display: block;
+            width: 0;
+        }
+        @media (prefers-color-scheme: dark) {
+            #speech-bubble {
+                background: rgba(36, 36, 36, 0.92);
+                color: #f3f3f3;
+                border-color: rgba(255, 255, 255, 0.12);
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+            }
+            #speech-bubble::after {
+                border-color: rgba(36, 36, 36, 0.92) transparent;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="stage">
+        <div id="speech-bubble">歡迎使用 DiskMaster Pro！我是您的磁碟維護助手～</div>
+        <div id="avatar-container" title="點擊與助手互動">
+            <canvas id="avatar-canvas" width="480" height="640"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('avatar-canvas');
+        const ctx = canvas.getContext('2d');
+        const bubble = document.getElementById('speech-bubble');
+        const container = document.getElementById('avatar-container');
+
+        let mouseX = 240;
+        let mouseY = 320;
+        let eyeOffsetX = 0;
+        let eyeOffsetY = 0;
+        let breathTime = 0;
+        let blinkProgress = 0; // 0: open, 1: closed
+        let isBlinking = false;
+        let bubbleTimeout = null;
+
+        // Interactive mouse tracking
+        window.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = (e.clientX - rect.left) * (canvas.width / rect.width);
+            mouseY = (e.clientY - rect.top) * (canvas.height / rect.height);
+        });
+
+        // Click interaction
+        const greetings = [
+            "磁碟狀態良好，隨時準備就緒！",
+            "正在守護您的開機引導與分區安全～",
+            "需要下載 Windows 11 或 經典 Win7 嗎？",
+            "BitLocker 加密狀態隨時為您監控中！",
+            "點擊我可以看到最新系統健康狀況喔～"
+        ];
+
+        container.addEventListener('click', () => {
+            const quote = greetings[Math.floor(Math.random() * greetings.length)];
+            say(quote, 4000);
+            blink();
+        });
+
+        function say(text, duration = 4000) {
+            bubble.textContent = text;
+            bubble.classList.add('active');
+            if (bubbleTimeout) clearTimeout(bubbleTimeout);
+            bubbleTimeout = setTimeout(() => {
+                bubble.classList.remove('active');
+            }, duration);
+        }
+
+        // Periodic blink
+        function scheduleBlink() {
+            const nextBlink = 2000 + Math.random() * 4000;
+            setTimeout(() => {
+                blink();
+                scheduleBlink();
+            }, nextBlink);
+        }
+        function blink() {
+            isBlinking = true;
+            let closing = true;
+            const blinkInterval = setInterval(() => {
+                if (closing) {
+                    blinkProgress += 0.25;
+                    if (blinkProgress >= 1) {
+                        blinkProgress = 1;
+                        closing = false;
+                    }
+                } else {
+                    blinkProgress -= 0.25;
+                    if (blinkProgress <= 0) {
+                        blinkProgress = 0;
+                        isBlinking = false;
+                        clearInterval(blinkInterval);
+                    }
+                }
+            }, 16);
+        }
+        scheduleBlink();
+
+        // Initial greeting
+        setTimeout(() => {
+            say("歡迎使用 DiskMaster Pro！隨時為您服務～", 5000);
+        }, 1200);
+
+        // Receive messages from WinUI 3 C# Host
+        if (window.chrome && window.chrome.webview) {
+            window.chrome.webview.addEventListener('message', event => {
+                const data = event.data;
+                if (typeof data === 'string') {
+                    say(data, 4500);
+                } else if (data && data.text) {
+                    say(data.text, data.duration || 4000);
+                }
+            });
+        }
+
+        // High-Quality Procedural Anime Avatar Renderer (Full offline fallback)
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            breathTime += 0.035;
+            const breathY = Math.sin(breathTime) * 4;
+
+            // Target eye pupil tracking towards mouse
+            const headCenterX = 240;
+            const headCenterY = 270 + breathY;
+            const dx = (mouseX - headCenterX) * 0.04;
+            const dy = (mouseY - headCenterY) * 0.04;
+            eyeOffsetX += (Math.max(-10, Math.min(10, dx)) - eyeOffsetX) * 0.12;
+            eyeOffsetY += (Math.max(-8, Math.min(8, dy)) - eyeOffsetY) * 0.12;
+
+            // 1. Shadow underneath
+            ctx.save();
+            ctx.beginPath();
+            ctx.ellipse(240, 620, 110, 18, 0, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
+            ctx.fill();
+            ctx.restore();
+
+            // 2. Body / Torso (Modern Tech Hoodie / Uniform)
+            ctx.save();
+            ctx.translate(0, breathY * 0.6);
+
+            // Shoulder & Jacket
+            ctx.beginPath();
+            ctx.moveTo(150, 480);
+            ctx.bezierCurveTo(170, 430, 200, 410, 240, 410);
+            ctx.bezierCurveTo(280, 410, 310, 430, 330, 480);
+            ctx.lineTo(350, 620);
+            ctx.lineTo(130, 620);
+            ctx.closePath();
+            const jacketGrad = ctx.createLinearGradient(130, 410, 350, 620);
+            jacketGrad.addColorStop(0, '#0078D4');
+            jacketGrad.addColorStop(1, '#004578');
+            ctx.fillStyle = jacketGrad;
+            ctx.fill();
+
+            // Collar / Tech Tie
+            ctx.beginPath();
+            ctx.moveTo(215, 410);
+            ctx.lineTo(240, 470);
+            ctx.lineTo(265, 410);
+            ctx.closePath();
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(234, 460);
+            ctx.lineTo(246, 460);
+            ctx.lineTo(243, 530);
+            ctx.lineTo(237, 530);
+            ctx.closePath();
+            ctx.fillStyle = '#00B7C3';
+            ctx.fill();
+
+            ctx.restore();
+
+            // 3. Head & Face
+            ctx.save();
+            ctx.translate(0, breathY);
+
+            // Neck
+            ctx.beginPath();
+            ctx.rect(224, 370, 32, 50);
+            ctx.fillStyle = '#FFE5D9';
+            ctx.fill();
+
+            // Hair Back
+            ctx.beginPath();
+            ctx.ellipse(240, 270, 95, 110, 0, 0, Math.PI * 2);
+            ctx.fillStyle = '#3A405A';
+            ctx.fill();
+
+            // Face Contour
+            ctx.beginPath();
+            ctx.moveTo(165, 250);
+            ctx.bezierCurveTo(165, 340, 195, 395, 240, 395);
+            ctx.bezierCurveTo(285, 395, 315, 340, 315, 250);
+            ctx.bezierCurveTo(315, 180, 165, 180, 165, 250);
+            ctx.closePath();
+            ctx.fillStyle = '#FFF0EB';
+            ctx.fill();
+
+            // Cheeks Blush
+            ctx.beginPath();
+            ctx.ellipse(190, 315, 16, 8, 0, 0, Math.PI * 2);
+            ctx.ellipse(290, 315, 16, 8, 0, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 138, 155, 0.4)';
+            ctx.fill();
+
+            // Eyes (Anime style with pupil follow & blinking)
+            drawEye(195, 285, eyeOffsetX, eyeOffsetY, blinkProgress);
+            drawEye(285, 285, eyeOffsetX, eyeOffsetY, blinkProgress);
+
+            // Nose
+            ctx.beginPath();
+            ctx.arc(240, 315, 2.5, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(200, 130, 120, 0.6)';
+            ctx.fill();
+
+            // Mouth (Smiling curve)
+            ctx.beginPath();
+            ctx.arc(240, 338, 12, 0.15 * Math.PI, 0.85 * Math.PI, false);
+            ctx.strokeStyle = '#D96570';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            // Hair Front / Bangs
+            ctx.beginPath();
+            ctx.moveTo(155, 230);
+            ctx.bezierCurveTo(180, 260, 210, 275, 230, 240);
+            ctx.bezierCurveTo(250, 280, 290, 260, 325, 230);
+            ctx.bezierCurveTo(315, 150, 165, 150, 155, 230);
+            ctx.closePath();
+            ctx.fillStyle = '#4E598C';
+            ctx.fill();
+
+            // Cute Headset / Antennas (DiskMaster Theme)
+            ctx.beginPath();
+            ctx.arc(155, 260, 14, 0, Math.PI * 2);
+            ctx.arc(325, 260, 14, 0, Math.PI * 2);
+            ctx.fillStyle = '#00B7C3';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(155, 260, 8, 0, Math.PI * 2);
+            ctx.arc(325, 260, 8, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+
+            ctx.restore();
+
+            requestAnimationFrame(render);
+        }
+
+        function drawEye(cx, cy, ox, oy, blink) {
+            ctx.save();
+            ctx.translate(cx, cy);
+
+            if (blink >= 0.9) {
+                // Closed Eye (Curved happy line)
+                ctx.beginPath();
+                ctx.arc(0, 0, 18, 0.1 * Math.PI, 0.9 * Math.PI, false);
+                ctx.strokeStyle = '#2A2E45';
+                ctx.lineWidth = 3.5;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+                ctx.restore();
+                return;
+            }
+
+            const scaleY = 1.0 - blink;
+            ctx.scale(1.0, scaleY);
+
+            // Eye White
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 22, 26, 0, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            ctx.strokeStyle = '#2A2E45';
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+
+            // Iris (Teal / Blue Gradient)
+            ctx.save();
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 21, 25, 0, 0, Math.PI * 2);
+            ctx.clip();
+
+            ctx.beginPath();
+            ctx.ellipse(ox, oy, 14, 18, 0, 0, Math.PI * 2);
+            const irisGrad = ctx.createLinearGradient(ox, oy - 18, ox, oy + 18);
+            irisGrad.addColorStop(0, '#004578');
+            irisGrad.addColorStop(0.5, '#0078D4');
+            irisGrad.addColorStop(1, '#00B7C3');
+            ctx.fillStyle = irisGrad;
+            ctx.fill();
+
+            // Pupil
+            ctx.beginPath();
+            ctx.ellipse(ox, oy, 6, 8, 0, 0, Math.PI * 2);
+            ctx.fillStyle = '#0F1A2A';
+            ctx.fill();
+
+            // Highlights
+            ctx.beginPath();
+            ctx.arc(ox - 5, oy - 7, 4, 0, Math.PI * 2);
+            ctx.arc(ox + 4, oy + 5, 2.5, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+
+            ctx.restore();
+
+            // Eyelash Top
+            ctx.beginPath();
+            ctx.arc(0, -6, 22, 1.15 * Math.PI, 1.85 * Math.PI, false);
+            ctx.strokeStyle = '#2A2E45';
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        render();
+    </script>
+</body>
+</html>

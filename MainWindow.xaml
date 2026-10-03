@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Window
+    x:Class="DiskMasterWinUI.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:DiskMasterWinUI"
+    xmlns:controls="using:DiskMasterWinUI.Controls"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="DiskMaster Pro 磁碟大師 — 旗艦級 Windows 磁碟維護與引導部署工具箱"
+    mc:Ignorable="d">
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Clean Native TitleBar (Full caption button clearance) -->
+        <TitleBar x:Name="AppTitleBar" Grid.Row="0" Title="DiskMaster Pro 磁碟大師 — 旗艦級 Windows 磁碟維護與引導部署工具箱">
+            <TitleBar.IconSource>
+                <ImageIconSource ImageSource="Assets/AppIcon.ico" />
+            </TitleBar.IconSource>
+        </TitleBar>
+
+        <!-- Main Window Container -->
+        <Grid Grid.Row="1">
+            <!-- Custom Background Image Layer -->
+            <Image x:Name="BackgroundCustomImage"
+                   Stretch="UniformToFill"
+                   HorizontalAlignment="Stretch"
+                   VerticalAlignment="Stretch"
+                   IsHitTestVisible="False"
+                   Opacity="0.25"
+                   Visibility="Collapsed" />
+
+            <Grid x:Name="NormalView" PointerMoved="NormalView_PointerMoved">
+                <Grid.Resources>
+                    <SolidColorBrush x:Name="DynamicCardBrush" x:Key="CardBackgroundFillColorDefaultBrush" Color="#B0202020" />
+                    <SolidColorBrush x:Name="DynamicCardSecBrush" x:Key="CardBackgroundFillColorSecondaryBrush" Color="#80282828" />
+                    <SolidColorBrush x:Name="DynamicExpanderHeaderBrush" x:Key="ExpanderHeaderBackground" Color="#99242424" />
+                    <SolidColorBrush x:Name="DynamicExpanderContentBrush" x:Key="ExpanderContentBackground" Color="#661A1A1A" />
+                </Grid.Resources>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Top Notification Banners -->
+                <StackPanel Grid.Row="0">
+                    <!-- Non-Admin Warning Banner (Auto pops up if not elevated) -->
+                    <InfoBar x:Name="AdminWarningBar" Severity="Warning" IsOpen="False" IsClosable="False"
+                             Title="未以系統管理員身分執行"
+                             Message="DISM 映像修復、SFC 掃描、DiskPart 磁碟分區抹除等底層操作需要系統管理員權限才能執行。">
+                        <InfoBar.ActionButton>
+                            <Button Content="🚀 立即以管理員身分重啟" Click="AdminRestart_Click" Style="{StaticResource AccentButtonStyle}" />
+                        </InfoBar.ActionButton>
+                    </InfoBar>
+
+                    <!-- Crash-Proof Global Exception Notification Bar -->
+                    <InfoBar x:Name="GlobalExceptionBar" Severity="Error" IsOpen="False" IsClosable="True"
+                             Title="系統已成功攔截並防止崩潰"
+                             Message="">
+                        <InfoBar.ActionButton>
+                            <Button Content="📋 複製錯誤詳情" Click="CopyErrorDetails_Click" Style="{StaticResource AccentButtonStyle}" />
+                        </InfoBar.ActionButton>
+                    </InfoBar>
+                </StackPanel>
+
+                <!-- ═══ Movable Top TabView (All tabs can drag & reorder & right-click) ═══ -->
+                <TabView x:Name="MainTabs" Grid.Row="1"
+                         TabWidthMode="SizeToContent"
+                         CanReorderTabs="True"
+                         CanDragTabs="True"
+                         IsAddTabButtonVisible="False"
+                         SelectionChanged="MainTabs_SelectionChanged"
+                         TabDroppedOutside="MainTabs_TabDroppedOutside"
+                         TabDragCompleted="MainTabs_TabDragCompleted">
+                    <TabView.TabItems>
+                        <TabViewItem x:Name="TabEasyMode" Header="簡易模式" Tag="EasyMode" IsClosable="False"
+                                      ToolTipService.ToolTip="簡易磁碟模式 — 快捷鍵: Ctrl+1 / 右鍵浮動視窗">
+                            <TabViewItem.IconSource>
+                                <FontIconSource Glyph="&#xEDA2;" />
+                            </TabViewItem.IconSource>
+                            <TabViewItem.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="🪟 獨立浮動視窗 [Ctrl+Shift+F]" Click="TabContext_Float_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最左側" Click="TabContext_MoveFirst_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最右側" Click="TabContext_MoveLast_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
+                                    <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                </MenuFlyout>
+                            </TabViewItem.ContextFlyout>
+                        </TabViewItem>
+
+                        <TabViewItem x:Name="TabWimDeploy" Header="系統部署" Tag="WimDeploy" IsClosable="False"
+                                      ToolTipService.ToolTip="WIM/ESD 映像套用與備份部署 — 快捷鍵: Ctrl+2 / 右鍵浮動視窗">
+                            <TabViewItem.IconSource>
+                                <FontIconSource Glyph="&#xE896;" />
+                            </TabViewItem.IconSource>
+                            <TabViewItem.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="🪟 獨立浮動視窗 [Ctrl+Shift+F]" Click="TabContext_Float_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最左側" Click="TabContext_MoveFirst_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最右側" Click="TabContext_MoveLast_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
+                                    <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                </MenuFlyout>
+                            </TabViewItem.ContextFlyout>
+                        </TabViewItem>
+
+                        <TabViewItem x:Name="TabBootManager" Header="引導管理" Tag="BootManager" IsClosable="False"
+                                      ToolTipService.ToolTip="Windows 開機引導管理與修復 — 快捷鍵: Ctrl+3 / 右鍵浮動視窗">
+                            <TabViewItem.IconSource>
+                                <FontIconSource Glyph="&#xE7C3;" />
+                            </TabViewItem.IconSource>
+                            <TabViewItem.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="🪟 獨立浮動視窗 [Ctrl+Shift+F]" Click="TabContext_Float_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最左側" Click="TabContext_MoveFirst_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最右側" Click="TabContext_MoveLast_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
+                                    <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                </MenuFlyout>
+                            </TabViewItem.ContextFlyout>
+                        </TabViewItem>
+
+                        <TabViewItem x:Name="TabDiskTools" Header="磁碟工具" Tag="DiskTools" IsClosable="False"
+                                      ToolTipService.ToolTip="磁碟工具、SMART健康監控、WinRE 與救援 — 快捷鍵: Ctrl+4 / 右鍵浮動視窗">
+                            <TabViewItem.IconSource>
+                                <FontIconSource Glyph="&#xE90F;" />
+                            </TabViewItem.IconSource>
+                            <TabViewItem.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="🪟 獨立浮動視窗 [Ctrl+Shift+F]" Click="TabContext_Float_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最左側" Click="TabContext_MoveFirst_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最右側" Click="TabContext_MoveLast_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
+                                    <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                </MenuFlyout>
+                            </TabViewItem.ContextFlyout>
+                        </TabViewItem>
+
+                        <TabViewItem x:Name="TabSystemHealth" Header="系統修復" Tag="SystemHealth" IsClosable="False"
+                                      ToolTipService.ToolTip="Windows 系統修復 — 快捷鍵: Ctrl+5 / 右鍵浮動視窗">
+                            <TabViewItem.IconSource>
+                                <FontIconSource Glyph="&#xEC06;" />
+                            </TabViewItem.IconSource>
+                            <TabViewItem.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="🪟 獨立浮動視窗 [Ctrl+Shift+F]" Click="TabContext_Float_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最左側" Click="TabContext_MoveFirst_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最右側" Click="TabContext_MoveLast_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
+                                    <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                </MenuFlyout>
+                            </TabViewItem.ContextFlyout>
+                        </TabViewItem>
+
+                        <TabViewItem x:Name="TabNtfsPermissions" Header="權限管理" Tag="NtfsPermissions" IsClosable="False"
+                                      ToolTipService.ToolTip="NTFS 權限與檔案擁有權奪取 — 快捷鍵: Ctrl+6 / 右鍵浮動視窗">
+                            <TabViewItem.IconSource>
+                                <FontIconSource Glyph="&#xE72E;" />
+                            </TabViewItem.IconSource>
+                            <TabViewItem.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="🪟 獨立浮動視窗 [Ctrl+Shift+F]" Click="TabContext_Float_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最左側" Click="TabContext_MoveFirst_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最右側" Click="TabContext_MoveLast_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
+                                    <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                </MenuFlyout>
+                            </TabViewItem.ContextFlyout>
+                        </TabViewItem>
+
+                        <TabViewItem x:Name="TabAdvancedMode" Header="進階腳本" Tag="AdvancedMode" IsClosable="False"
+                                      ToolTipService.ToolTip="DiskPart 進階腳本與範本執行 — 快捷鍵: Ctrl+7 / 右鍵浮動視窗">
+                            <TabViewItem.IconSource>
+                                <FontIconSource Glyph="&#xEC7A;" />
+                            </TabViewItem.IconSource>
+                            <TabViewItem.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="🪟 獨立浮動視窗 [Ctrl+Shift+F]" Click="TabContext_Float_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最左側" Click="TabContext_MoveFirst_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最右側" Click="TabContext_MoveLast_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
+                                    <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                </MenuFlyout>
+                            </TabViewItem.ContextFlyout>
+                        </TabViewItem>
+
+                        <TabViewItem x:Name="TabOptimizer" Header="最佳化" Tag="SystemOptimizer" IsClosable="False"
+                                      ToolTipService.ToolTip="CPU排程、遊戲模式、電源計畫與登錄檔備份 — 快捷鍵: Ctrl+8 / 右鍵浮動視窗">
+                            <TabViewItem.IconSource>
+                                <FontIconSource Glyph="&#xE945;" />
+                            </TabViewItem.IconSource>
+                            <TabViewItem.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="🪟 獨立浮動視窗 [Ctrl+Shift+F]" Click="TabContext_Float_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最左側" Click="TabContext_MoveFirst_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最右側" Click="TabContext_MoveLast_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
+                                    <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                </MenuFlyout>
+                            </TabViewItem.ContextFlyout>
+                        </TabViewItem>
+
+                        <TabViewItem x:Name="TabSettings" Header="設定" Tag="Settings" IsClosable="False"
+                                      ToolTipService.ToolTip="偏好設定 — 快捷鍵: Ctrl+, / 右鍵浮動視窗">
+                            <TabViewItem.IconSource>
+                                <FontIconSource Glyph="&#xE713;" />
+                            </TabViewItem.IconSource>
+                            <TabViewItem.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="🪟 獨立浮動視窗 [Ctrl+Shift+F]" Click="TabContext_Float_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最左側" Click="TabContext_MoveFirst_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最右側" Click="TabContext_MoveLast_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
+                                    <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                </MenuFlyout>
+                            </TabViewItem.ContextFlyout>
+                        </TabViewItem>
+                    </TabView.TabItems>
+
+                    <TabView.TabStripFooter>
+                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,12,0" VerticalAlignment="Center">
+                            <!-- Adobe Workspace Preset Dropdown -->
+                            <ComboBox x:Name="WorkspaceCombo" SelectionChanged="WorkspaceCombo_SelectionChanged"
+                                      Padding="6,2" FontSize="11" Width="130" ToolTipService.ToolTip="工作區排版預設" />
+
+                            <!-- Float Active Tab Button -->
+                            <Button x:Name="FloatTabBtn" Content="🪟 浮動" Click="FloatCurrentTab_Click"
+                                    Padding="6,2" FontSize="11" ToolTipService.ToolTip="撕離為獨立視窗 [Ctrl+Shift+F]" />
+
+                            <!-- Floating Windows Manager (Shows count, click to Dock All) -->
+                            <Button x:Name="FloatingManagerBtn" Click="DockAll_Click" Visibility="Collapsed"
+                                    Style="{StaticResource AccentButtonStyle}" Padding="6,2" FontSize="11"
+                                    ToolTipService.ToolTip="點擊將所有浮動視窗一鍵嵌回主視窗 [Ctrl+Shift+D]">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <FontIcon Glyph="&#xE8B0;" FontSize="11" />
+                                    <TextBlock x:Name="FloatingCountText" Text="1 浮動視窗" FontSize="11" />
+                                </StackPanel>
+                            </Button>
+
+
+                            <Button x:Name="CompanionToggleBtn" Content="🎭 2D 助手" Click="CompanionToggle_Click"
+                                    Padding="6,2" FontSize="11" ToolTipService.ToolTip="顯示 / 隱藏 2D 守護助手" />
+
+                            <Button x:Name="LanguageToggleBtn" Content="🌐 繁體中文" Click="LanguageToggle_Click" Padding="8,4" FontSize="12" />
+                        </StackPanel>
+                    </TabView.TabStripFooter>
+                </TabView>
+
+                <!-- Scalable Content Area (Browser Viewport Auto-Responsive Flex Width) -->
+                <ScrollViewer x:Name="ContentScrollViewer" Grid.Row="2"
+                              HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto"
+                              SizeChanged="ContentScrollViewer_SizeChanged">
+                    <Grid x:Name="ContentRoot" RenderTransformOrigin="0,0" HorizontalAlignment="Left">
+                        <Grid.RenderTransform>
+                            <ScaleTransform x:Name="RootScaleTransform" ScaleX="1.0" ScaleY="1.0" />
+                        </Grid.RenderTransform>
+                        <Frame x:Name="ContentFrame" SizeChanged="ContentFrame_SizeChanged" />
+                    </Grid>
+                </ScrollViewer>
+
+                <!-- Unified Bottom Status Bar with % and ETA -->
+                <controls:StatusBarControl Grid.Row="3" />
+            </Grid>
+
+            <!-- CrystalDiskInfo-Style Live2D Floating Companion Avatar Overlay -->
+            <controls:AvatarCompanionControl x:Name="CompanionControl"
+                                             HorizontalAlignment="Right"
+                                             VerticalAlignment="Bottom"
+                                             Margin="0,0,24,36"
+                                             Visibility="Visible" />
+        </Grid>
+    </Grid>
+</Window>

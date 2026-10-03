@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentDialog
+    x:Class="DiskMasterWinUI.Controls.BitLockerUnlockDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="🔓 解鎖 BitLocker 加密磁碟"
+    PrimaryButtonText="立即解鎖"
+    CloseButtonText="取消"
+    DefaultButton="Primary"
+    PrimaryButtonClick="ContentDialog_PrimaryButtonClick">
+
+    <StackPanel Spacing="16" Width="400" Margin="0,8,0,0">
+        <!-- Target Drive Banner -->
+        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1" CornerRadius="8" Padding="12">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <FontIcon Glyph="&#xE72E;" FontSize="28" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                <StackPanel Spacing="2">
+                    <TextBlock x:Name="DriveTitleText" Text="磁碟機: D:" FontWeight="Bold" FontSize="15" />
+                    <TextBlock Text="此磁碟機已透過 BitLocker 加密鎖定，請提供憑據以存取檔案。"
+                               Style="{StaticResource CaptionTextBlockStyle}"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Unlock Mode Selector -->
+        <RadioButtons x:Name="ModeRadioButtons" SelectedIndex="0" SelectionChanged="ModeRadioButtons_SelectionChanged">
+            <RadioButton Content="🔑 使用 48 位元修復金鑰 (Recovery Key)" />
+            <RadioButton Content="🔒 使用使用者密碼 (Password)" />
+        </RadioButtons>
+
+        <!-- 48-digit Recovery Key Input -->
+        <StackPanel x:Name="RecoveryKeyPanel" Spacing="6">
+            <TextBox x:Name="RecoveryKeyBox" Header="48 位元修復金鑰"
+                     PlaceholderText="例如: 123456-123456-123456-123456-123456-123456-123456-123456"
+                     FontFamily="Consolas" FontSize="13" />
+            <TextBlock Text="格式為 8 組 6 位數數字，以連字號分隔。可直接貼上完整金鑰。"
+                       Style="{StaticResource CaptionTextBlockStyle}"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        </StackPanel>
+
+        <!-- Password Input -->
+        <StackPanel x:Name="PasswordPanel" Spacing="6" Visibility="Collapsed">
+            <PasswordBox x:Name="DrivePasswordBox" Header="磁碟機解鎖密碼"
+                         PlaceholderText="輸入加密時所設定的密碼" />
+        </StackPanel>
+
+        <!-- Error Feedback Banner -->
+        <InfoBar x:Name="ErrorInfoBar" IsOpen="False" Severity="Error" Title="解鎖失敗" />
+    </StackPanel>
+</ContentDialog>

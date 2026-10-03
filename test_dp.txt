@@ -1,0 +1,4 @@
+list disk
+list volume
+exit
+

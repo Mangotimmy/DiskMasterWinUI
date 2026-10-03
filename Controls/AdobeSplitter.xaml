@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="DiskMasterWinUI.Controls.AdobeSplitter"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    PointerEntered="OnPointerEntered"
+    PointerExited="OnPointerExited"
+    PointerPressed="OnPointerPressed"
+    PointerMoved="OnPointerMoved"
+    PointerReleased="OnPointerReleased"
+    PointerCaptureLost="OnPointerCaptureLost"
+    DoubleTapped="OnDoubleTapped">
+
+    <Grid x:Name="RootGrid" Background="Transparent">
+        <!-- Visual Line in center -->
+        <Border x:Name="VisualLine"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                Background="{ThemeResource CardStrokeColorDefaultBrush}"
+                CornerRadius="2" />
+
+        <!-- Subtle center grip dots for Adobe-style tactile feel -->
+        <StackPanel x:Name="GripIndicator"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="3">
+            <Rectangle x:Name="Dot1" Width="3" Height="3" RadiusX="1.5" RadiusY="1.5" Fill="{ThemeResource TextFillColorTertiaryBrush}" />
+            <Rectangle x:Name="Dot2" Width="3" Height="3" RadiusX="1.5" RadiusY="1.5" Fill="{ThemeResource TextFillColorTertiaryBrush}" />
+            <Rectangle x:Name="Dot3" Width="3" Height="3" RadiusX="1.5" RadiusY="1.5" Fill="{ThemeResource TextFillColorTertiaryBrush}" />
+        </StackPanel>
+    </Grid>
+</UserControl>
