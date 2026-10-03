@@ -15,6 +15,7 @@ public sealed partial class NetworkToolsPage : Page
     {
         InitializeComponent();
         NavigationCacheMode = NavigationCacheMode.Required;
+        DiskMasterWinUI.Helpers.TabReorderHelper.Attach(NetTabView);
         ApplyLanguage();
         LocalizationService.Instance.LanguageChanged += ApplyLanguage;
     }

@@ -146,6 +146,7 @@ public sealed partial class MainWindow : Window
         }
 
         SetupKeyboardAccelerators();
+        TabReorderHelper.Attach(MainTabs, SaveCustomTabOrder);
 
         CurrentInstance = this;
         ApplyBackgroundAndCompanion();

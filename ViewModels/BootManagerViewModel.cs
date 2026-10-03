@@ -426,14 +426,83 @@ public partial class BootManagerViewModel : ObservableObject
             var result = await _bcdService.ApplySafeBootConfigAsync(config);
             SafeBootConfig = config;
             SafeBootOperationStatus = "安全開機與啟動旗標設定已成功生效！";
+            AudioFeedbackService.PlaySuccess();
         }
         catch (Exception ex)
         {
             SafeBootOperationStatus = $"寫入失敗: {ex.Message}";
+            AudioFeedbackService.PlayError();
         }
         finally
         {
             IsLoading = false;
         }
     }
+
+    // ═══ TPM 2.0 & Win11 Security LabConfig Bypass ═══
+    private readonly TpmService _tpmService = new();
+    [ObservableProperty] private TpmStatusInfo _tpmStatus = new();
+    [ObservableProperty] private bool _isWin11BypassEnabled;
+    [ObservableProperty] private string _tpmOperationStatus = "就緒";
+
+    [RelayCommand]
+    public async Task LoadTpmStatusAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            TpmOperationStatus = "正在探測硬體 TPM 2.0 與安全性狀態...";
+            TpmStatus = await _tpmService.GetTpmStatusAsync();
+            IsWin11BypassEnabled = TpmStatus.IsWin11BypassActive;
+            TpmOperationStatus = TpmStatus.StatusSummary;
+        }
+        catch (Exception ex)
+        {
+            TpmOperationStatus = $"TPM 查詢失敗: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task ToggleWin11BypassAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            bool targetState = !IsWin11BypassEnabled;
+            TpmOperationStatus = targetState ? "正在寫入 LabConfig 繞過登錄檔..." : "正在還原 LabConfig 預設設定...";
+            var (ok, msg) = await _tpmService.SetWin11RequirementBypassAsync(targetState);
+            if (ok)
+            {
+                IsWin11BypassEnabled = targetState;
+                TpmOperationStatus = msg;
+                AudioFeedbackService.PlaySuccess();
+            }
+            else
+            {
+                TpmOperationStatus = msg;
+                AudioFeedbackService.PlayError();
+            }
+            await LoadTpmStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            TpmOperationStatus = $"操作失敗: {ex.Message}";
+            AudioFeedbackService.PlayError();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public void OpenTpmMsc()
+    {
+        _tpmService.OpenTpmManagementConsole();
+    }
 }
+

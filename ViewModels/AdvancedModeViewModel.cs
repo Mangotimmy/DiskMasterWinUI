@@ -71,11 +71,13 @@ public partial class AdvancedModeViewModel : ObservableObject
             DiskPartOutput = output;
             AppendLog("DiskPart Script", output);
             StatusMessage = "DiskPart script executed.";
+            AudioFeedbackService.PlaySuccess();
         }
         catch (Exception ex)
         {
             DiskPartOutput = $"ERROR: {ex.Message}";
             StatusMessage = $"Error: {ex.Message}";
+            AudioFeedbackService.PlayError();
         }
         finally { IsLoading = false; }
     }

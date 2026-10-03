@@ -921,12 +921,14 @@ public partial class WimDeployViewModel : ObservableObject
             OnPropertyChanged(nameof(ProgressPercentDisplay));
             ProgressText = "Deployment Completed Successfully!";
             StatusMessage = "系統映像套用與開機引導建立成功！";
+            AudioFeedbackService.PlaySuccess();
             MainWindow.CurrentInstance?.CompanionSay("恭喜！Windows 部署與引導修復已完美完成～重開機即可進入系統。");
         }
         catch (Exception ex)
         {
             StatusMessage = $"Deploy Error: {ex.Message}";
             Log($"\n[FATAL ERROR] {ex.Message}\n");
+            AudioFeedbackService.PlayError();
             MainWindow.CurrentInstance?.CompanionSay($"部署過程發生異常: {ex.Message}");
         }
         finally
@@ -947,11 +949,13 @@ public partial class WimDeployViewModel : ObservableObject
             var result = await _wimService.CaptureImageAsync(CaptureDir, CaptureOutputPath, CaptureName);
             Log(result);
             StatusMessage = "Image capture completed.";
+            AudioFeedbackService.PlaySuccess();
         }
         catch (Exception ex)
         {
             StatusMessage = $"Capture Error: {ex.Message}";
             Log($"[ERROR] {ex.Message}");
+            AudioFeedbackService.PlayError();
         }
         finally { IsDeploying = false; }
     }
@@ -968,11 +972,13 @@ public partial class WimDeployViewModel : ObservableObject
             var result = await _wimService.ExportImageAsync(ImagePath, SelectedImage.Index, ExportDestPath);
             Log(result);
             StatusMessage = "Image export completed.";
+            AudioFeedbackService.PlaySuccess();
         }
         catch (Exception ex)
         {
             StatusMessage = $"Export Error: {ex.Message}";
             Log($"[ERROR] {ex.Message}");
+            AudioFeedbackService.PlayError();
         }
         finally { IsDeploying = false; }
     }
@@ -989,11 +995,13 @@ public partial class WimDeployViewModel : ObservableObject
             var result = await _wimService.SplitImageAsync(ImagePath, SplitOutputPath);
             Log(result);
             StatusMessage = "Image splitting completed.";
+            AudioFeedbackService.PlaySuccess();
         }
         catch (Exception ex)
         {
             StatusMessage = $"Split Error: {ex.Message}";
             Log($"[ERROR] {ex.Message}");
+            AudioFeedbackService.PlayError();
         }
         finally { IsDeploying = false; }
     }
@@ -1010,11 +1018,13 @@ public partial class WimDeployViewModel : ObservableObject
             var result = await _wimService.MountWimImageAsync(ImagePath, SelectedImage.Index, MountDir);
             Log(result);
             StatusMessage = "WIM mounted successfully.";
+            AudioFeedbackService.PlaySuccess();
         }
         catch (Exception ex)
         {
             StatusMessage = $"Mount Error: {ex.Message}";
             Log($"[ERROR] {ex.Message}");
+            AudioFeedbackService.PlayError();
         }
         finally { IsDeploying = false; }
     }
@@ -1031,11 +1041,13 @@ public partial class WimDeployViewModel : ObservableObject
             var result = await _wimService.UnmountWimImageAsync(MountDir, true);
             Log(result);
             StatusMessage = "WIM unmounted.";
+            AudioFeedbackService.PlaySuccess();
         }
         catch (Exception ex)
         {
             StatusMessage = $"Unmount Error: {ex.Message}";
             Log($"[ERROR] {ex.Message}");
+            AudioFeedbackService.PlayError();
         }
         finally { IsDeploying = false; }
     }

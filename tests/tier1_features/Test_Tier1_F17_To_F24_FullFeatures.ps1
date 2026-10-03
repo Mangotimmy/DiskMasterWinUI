@@ -274,3 +274,72 @@ Register-E2ETest -Tier 1 -Feature "F24" -Source "PROJECT.md § F24" `
         Assert-Contains $methods "RestoreFromTray"
         Assert-Contains $methods "ShowNotification"
     }
+
+# --- Feature F25: TPM 2.0 Diagnostics & Windows 11 Bypass ---
+
+Register-E2ETest -Tier 1 -Feature "F25" -Source "PROJECT.md § F25" `
+    -Name "T1.F25.01_TpmServiceAndModelContracts" `
+    -Description "Verifies TpmService and TpmStatusInfo models exist with all required diagnostic properties." `
+    -TestBlock {
+        $asm = Initialize-TestAssembly
+        $serviceType = $asm.GetType("DiskMasterWinUI.Services.TpmService")
+        Assert-NotNull $serviceType "TpmService must exist"
+
+        $modelType = $asm.GetType("DiskMasterWinUI.Models.TpmStatusInfo")
+        Assert-NotNull $modelType "TpmStatusInfo must exist"
+
+        $model = [System.Activator]::CreateInstance($modelType)
+        Assert-NotNull $model
+        Assert-Equal $model.IsPresent $false
+        Assert-Equal $model.IsWin11BypassActive $false
+
+        $methods = $serviceType.GetMethods() | ForEach-Object { $_.Name }
+        Assert-Contains $methods "GetTpmStatusAsync"
+        Assert-Contains $methods "SetWin11SetupBypassAsync"
+        Assert-Contains $methods "OpenTpmManagementConsole"
+    }
+
+Register-E2ETest -Tier 1 -Feature "F25" -Source "PROJECT.md § F25" `
+    -Name "T1.F25.02_TpmStatusAsyncExecutionSafety" `
+    -Description "Verifies GetTpmStatusAsync runs safely without throwing exceptions." `
+    -TestBlock {
+        $asm = Initialize-TestAssembly
+        $serviceType = $asm.GetType("DiskMasterWinUI.Services.TpmService")
+        $service = [System.Activator]::CreateInstance($serviceType)
+        $task = $service.GetTpmStatusAsync()
+        $status = $task.GetAwaiter().GetResult()
+        Assert-NotNull $status "TPM status result must not be null"
+    }
+
+# --- Feature F26: Real-time DNS Latency Ping & Universal Tab Reordering ---
+
+Register-E2ETest -Tier 1 -Feature "F26" -Source "PROJECT.md § F26" `
+    -Name "T1.F26.01_PhysicalNetworkAdapterDetectionContract" `
+    -Description "Verifies GetAvailableNetworkAdapters filters and returns valid adapter items." `
+    -TestBlock {
+        $asm = Initialize-TestAssembly
+        $diagType = $asm.GetType("DiskMasterWinUI.Services.NetworkDiagnosticService")
+        Assert-NotNull $diagType "NetworkDiagnosticService must exist"
+
+        $method = $diagType.GetMethod("GetAvailableNetworkAdapters", [System.Reflection.BindingFlags]::Static -bor [System.Reflection.BindingFlags]::Public)
+        Assert-NotNull $method "GetAvailableNetworkAdapters static method must exist"
+
+        $adapters = $method.Invoke($null, @())
+        Assert-NotNull $adapters "Adapters collection must not be null"
+    }
+
+Register-E2ETest -Tier 1 -Feature "F26" -Source "PROJECT.md § F26" `
+    -Name "T1.F26.02_TabReorderHelperContract" `
+    -Description "Verifies TabReorderHelper exposes universal Attach and EnhanceTabs methods." `
+    -TestBlock {
+        $asm = Initialize-TestAssembly
+        $helperType = $asm.GetType("DiskMasterWinUI.Helpers.TabReorderHelper")
+        Assert-NotNull $helperType "TabReorderHelper must exist"
+
+        $attach = $helperType.GetMethod("Attach", [System.Reflection.BindingFlags]::Static -bor [System.Reflection.BindingFlags]::Public)
+        Assert-NotNull $attach "Attach method must exist"
+
+        $enhance = $helperType.GetMethod("EnhanceTabs", [System.Reflection.BindingFlags]::Static -bor [System.Reflection.BindingFlags]::Public)
+        Assert-NotNull $enhance "EnhanceTabs method must exist"
+    }
+

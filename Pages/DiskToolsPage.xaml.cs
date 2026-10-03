@@ -14,6 +14,7 @@ public sealed partial class DiskToolsPage : Page
     {
         InitializeComponent();
         NavigationCacheMode = NavigationCacheMode.Required;
+        DiskMasterWinUI.Helpers.TabReorderHelper.Attach(DiskToolsTabView);
         ApplyLanguage();
         LocalizationService.Instance.LanguageChanged += ApplyLanguage;
     }
@@ -125,6 +126,54 @@ public sealed partial class DiskToolsPage : Page
             "ja-JP" => "📊 詳細信頼性カウンタ",
             _ => "📊 詳細可靠性指標"
         };
+        SmartDeepTelemetryTitle.Text = lang switch
+        {
+            "zh-CN" => "📊 完整 S.M.A.R.T. 深度解析与硬件遥测",
+            "en-US" => "📊 Full S.M.A.R.T. Deep Analysis & Telemetry",
+            "ja-JP" => "📊 完全な S.M.A.R.T. 詳細解析とテレメトリ",
+            _ => "📊 完整 S.M.A.R.T. 深度解析與硬體遙測"
+        };
+        TempUnitSwitch.OffContent = lang switch { "zh-CN" => "摄氏 (°C)", "en-US" => "Celsius (°C)", "ja-JP" => "摂氏 (°C)", _ => "攝氏 (°C)" };
+        TempUnitSwitch.OnContent = lang switch { "zh-CN" => "华氏 (°F)", "en-US" => "Fahrenheit (°F)", "ja-JP" => "華氏 (°F)", _ => "華氏 (°F)" };
+        RawHexSwitch.OffContent = lang switch { "zh-CN" => "十进制", "en-US" => "Decimal", "ja-JP" => "10進数", _ => "十進位" };
+        RawHexSwitch.OnContent = lang switch { "zh-CN" => "十六进制", "en-US" => "Hexadecimal", "ja-JP" => "16進数", _ => "十六進位" };
+        CopySmartReportBtn.Content = lang switch { "zh-CN" => "📋 复制报告", "en-US" => "📋 Copy Report", "ja-JP" => "📋 レポートをコピー", _ => "📋 複製報告" };
+        NvmeDashboardTitle.Text = lang switch
+        {
+            "zh-CN" => "⚡ NVMe 原生硬件健康指标 (NVMe 1.4 / 2.0 IOCTL 解码)",
+            "en-US" => "⚡ NVMe Native Health Metrics (NVMe 1.4 / 2.0 IOCTL Decoded)",
+            "ja-JP" => "⚡ NVMe ネイティブハードウェア診断 (NVMe 1.4 / 2.0 IOCTL デコード)",
+            _ => "⚡ NVMe 原生硬體健康指標 (NVMe 1.4 / 2.0 IOCTL 解碼)"
+        };
+        CardCoreTempHeader.Text = lang switch { "zh-CN" => "🌡️ 核心温度 (Composite Temp)", "en-US" => "🌡️ Core Temp (Composite)", "ja-JP" => "🌡️ コア温度 (Composite Temp)", _ => "🌡️ 核心溫度 (Composite Temp)" };
+        CardCoreTempSub.Text = lang switch { "zh-CN" => "原生开氏温标精准换算", "en-US" => "Converted from Kelvin sensors", "ja-JP" => "ケルビン単位から正確に換算", _ => "原生開氏溫標精準換算" };
+        CardHealthWearHeader.Text = lang switch { "zh-CN" => "🩺 健康度与耗损", "en-US" => "🩺 Health & Wear", "ja-JP" => "🩺 健康度と摩耗", _ => "🩺 健康度與耗損" };
+        CardTbwHeader.Text = lang switch { "zh-CN" => "📝 累计总写入量 (TBW)", "en-US" => "📝 Total Written (TBW)", "ja-JP" => "📝 累計総書込量 (TBW)", _ => "📝 累計總寫入量 (TBW)" };
+        CardTbwSub.Text = lang switch { "zh-CN" => "主机写入累计数据块", "en-US" => "Host write units accumulated", "ja-JP" => "ホスト書込累計データ単位", _ => "主機寫入累計資料區塊" };
+        CardTbrHeader.Text = lang switch { "zh-CN" => "📖 累计总读取量 (TBR)", "en-US" => "📖 Total Read (TBR)", "ja-JP" => "📖 累計総読込量 (TBR)", _ => "📖 累計總讀取量 (TBR)" };
+        CardTbrSub.Text = lang switch { "zh-CN" => "主机读取累计数据块", "en-US" => "Host read units accumulated", "ja-JP" => "ホスト読込累計データ単位", _ => "主機讀取累計資料區塊" };
+        CardPowerHoursHeader.Text = lang switch { "zh-CN" => "⏱️ 通电运作时数", "en-US" => "⏱️ Power-On Hours", "ja-JP" => "⏱️ 通電時間", _ => "⏱️ 通電運作時數" };
+        CardPowerCyclesHeader.Text = lang switch { "zh-CN" => "🔌 通电次数", "en-US" => "🔌 Power Cycles", "ja-JP" => "🔌 電源投入回数", _ => "🔌 通電次數" };
+        CardUnsafeShutdownsHeader.Text = lang switch { "zh-CN" => "⚡ 不正常断电次数", "en-US" => "⚡ Unsafe Shutdowns", "ja-JP" => "⚡ 予期せぬシャットダウン", _ => "⚡ 不正常斷電次數" };
+        CardAvailableSpareHeader.Text = lang switch { "zh-CN" => "🛡️ 备用空间比例", "en-US" => "🛡️ Available Spare", "ja-JP" => "🛡️ 予備領域の割合", _ => "🛡️ 備用空間比例" };
+
+        AtaSmartTableTitle.Text = lang switch
+        {
+            "zh-CN" => "🗄️ ATA S.M.A.R.T. 30 项硬件诊断指标数据表",
+            "en-US" => "🗄️ ATA S.M.A.R.T. 30-Attribute Hardware Diagnostics Table",
+            "ja-JP" => "🗄️ ATA S.M.A.R.T. 30項目 ハードウェア診断テーブル",
+            _ => "🗄️ ATA S.M.A.R.T. 30 項硬體診斷指標資料表"
+        };
+        BasicTelemetrySummaryTitle.Text = lang switch
+        {
+            "zh-CN" => "ℹ️ 磁盘健康与基础遥测摘要 (Basic Hardware Diagnostics)",
+            "en-US" => "ℹ️ Disk Health & Basic Diagnostics Summary",
+            "ja-JP" => "ℹ️ ディスク健康と基本テレメトリ概要",
+            _ => "ℹ️ 磁碟健康與基礎遙測摘要 (Basic Hardware Diagnostics)"
+        };
+        FallbackDeviceModelTitle.Text = lang switch { "zh-CN" => "设备名称 / 型号", "en-US" => "Device Name / Model", "ja-JP" => "デバイス名 / 型番", _ => "裝置名稱 / 型號" };
+        FallbackInterfaceTypeTitle.Text = lang switch { "zh-CN" => "接口与类型", "en-US" => "Interface & Type", "ja-JP" => "インターフェース & 種別", _ => "介面與類型" };
+        FallbackCurrentTempTitle.Text = lang switch { "zh-CN" => "当前核心温度", "en-US" => "Current Core Temp", "ja-JP" => "現在のコア温度", _ => "目前核心溫度" };
         ChkdskTitle.Text = lang switch
         {
             "zh-CN" => "chkdsk 文件系统完整性检查",

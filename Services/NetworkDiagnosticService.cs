@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using CommunityToolkit.Mvvm.ComponentModel;
+using DiskMasterWinUI.Models;
 
 namespace DiskMasterWinUI.Services;
 
@@ -19,21 +21,115 @@ public class DiagnosticStepResult
 }
 
 /// <summary>
-/// Predefined DNS configuration profile.
+/// Predefined DNS configuration profile with real-time ping latency and speed badges.
 /// </summary>
-public class DnsPreset
+public partial class DnsPreset : ObservableObject
 {
     public string Name { get; set; } = "";
     public string PrimaryDns { get; set; } = "";
     public string SecondaryDns { get; set; } = "";
     public string Description { get; set; } = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PingDisplay))]
+    [NotifyPropertyChangedFor(nameof(PingBadge))]
+    private long _pingMs = -1;
+
+    [ObservableProperty]
+    private bool _isFastest;
+
+    public string PingDisplay => PingMs >= 0 ? $"{PingMs} ms" : "--";
+    public string PingBadge => PingMs >= 0 ? (PingMs < 30 ? $"🟢 {PingMs} ms" : (PingMs < 80 ? $"🟡 {PingMs} ms" : $"🔴 {PingMs} ms")) : "⚪ 待測速";
 }
 
 /// <summary>
-/// Service providing 5-stage automated network bottleneck diagnosis and DNS configuration.
+/// Service providing 5-stage automated network bottleneck diagnosis, physical adapter filtering, and DNS ping benchmarks.
 /// </summary>
 public class NetworkDiagnosticService
 {
+    /// <summary>
+    /// Measures ICMP Echo ping latency to a DNS IP address.
+    /// </summary>
+    public static async Task<long> PingDnsServerAsync(string ipAddress, int timeoutMs = 1500)
+    {
+        if (string.IsNullOrWhiteSpace(ipAddress)) return -1;
+        try
+        {
+            using var ping = new Ping();
+            var reply = await ping.SendPingAsync(ipAddress, timeoutMs);
+            if (reply.Status == IPStatus.Success)
+            {
+                return reply.RoundtripTime;
+            }
+        }
+        catch { }
+        return -1;
+    }
+
+    /// <summary>
+    /// Gets physical, non-virtual network adapters filtered and sorted by active IPv4 default gateway.
+    /// Excludes Tailscale, VPN, WSL, Hyper-V, and pseudo tunnel interfaces.
+    /// </summary>
+    public static List<NetworkAdapterItem> GetAvailableNetworkAdapters()
+    {
+        var list = new List<NetworkAdapterItem>();
+        try
+        {
+            var interfaces = NetworkInterface.GetAllNetworkInterfaces();
+            foreach (var ni in interfaces)
+            {
+                if (ni.OperationalStatus != OperationalStatus.Up ||
+                    ni.NetworkInterfaceType == NetworkInterfaceType.Loopback ||
+                    ni.NetworkInterfaceType == NetworkInterfaceType.Tunnel)
+                {
+                    continue;
+                }
+
+                string nameLower = ni.Name.ToLowerInvariant();
+                string descLower = ni.Description.ToLowerInvariant();
+                bool isVirtual = nameLower.Contains("tailscale") || nameLower.Contains("tap") ||
+                                 nameLower.Contains("tun") || nameLower.Contains("vpn") ||
+                                 nameLower.Contains("wsl") || nameLower.Contains("hyper-v") ||
+                                 nameLower.Contains("vethernet") || nameLower.Contains("vmware") ||
+                                 nameLower.Contains("vmnet") || descLower.Contains("virtual") ||
+                                 descLower.Contains("pseudo") || descLower.Contains("bluetooth");
+
+                var ipProps = ni.GetIPProperties();
+                var ipv4 = ipProps.UnicastAddresses
+                    .FirstOrDefault(u => u.Address.AddressFamily == AddressFamily.InterNetwork)?.Address.ToString() ?? "";
+                var gw = ipProps.GatewayAddresses
+                    .FirstOrDefault(g => g.Address.AddressFamily == AddressFamily.InterNetwork && !g.Address.Equals(IPAddress.Any) && !g.Address.Equals(IPAddress.None))?.Address.ToString() ?? "";
+
+                var item = new NetworkAdapterItem
+                {
+                    Id = ni.Id,
+                    Name = ni.Name,
+                    Description = ni.Description,
+                    IPv4Address = ipv4,
+                    GatewayAddress = gw,
+                    IsPrimary = false
+                };
+
+                // Prioritize physical adapters with active default gateway
+                if (!isVirtual && !string.IsNullOrEmpty(gw))
+                {
+                    list.Insert(0, item);
+                }
+                else
+                {
+                    list.Add(item);
+                }
+            }
+
+            if (list.Count > 0)
+            {
+                list[0].IsPrimary = true;
+            }
+        }
+        catch { }
+        return list;
+    }
+
     /// <summary>
     /// Gets recommended DNS server profiles.
     /// </summary>
@@ -305,24 +401,34 @@ public class NetworkDiagnosticService
     }
 
     /// <summary>
-    /// Applies DNS settings to the primary active network adapter using PowerShell or netsh.
+    /// Applies DNS settings to the specified network adapter (or primary physical adapter) using netsh.
     /// </summary>
-    public async Task<(bool Success, string Message)> ApplyDnsAsync(string primaryDns, string secondaryDns)
+    public async Task<(bool Success, string Message)> ApplyDnsAsync(string primaryDns, string secondaryDns, string? targetAdapterName = null)
     {
         return await Task.Run(() =>
         {
             try
             {
-                var activeNic = NetworkInterface.GetAllNetworkInterfaces()
-                    .FirstOrDefault(ni => ni.OperationalStatus == OperationalStatus.Up &&
-                                          ni.NetworkInterfaceType != NetworkInterfaceType.Loopback);
+                var adapters = GetAvailableNetworkAdapters();
+                string? alias = null;
 
-                if (activeNic == null)
+                if (!string.IsNullOrWhiteSpace(targetAdapterName))
+                {
+                    alias = adapters.FirstOrDefault(a => a.Name.Equals(targetAdapterName, StringComparison.OrdinalIgnoreCase))?.Name;
+                }
+
+                if (string.IsNullOrEmpty(alias))
+                {
+                    alias = adapters.FirstOrDefault(a => a.IsPrimary)?.Name ??
+                            adapters.FirstOrDefault()?.Name ??
+                            NetworkInterface.GetAllNetworkInterfaces()
+                                .FirstOrDefault(ni => ni.OperationalStatus == OperationalStatus.Up && ni.NetworkInterfaceType != NetworkInterfaceType.Loopback)?.Name;
+                }
+
+                if (string.IsNullOrEmpty(alias))
                 {
                     return (false, "No active network adapter detected.");
                 }
-
-                string alias = activeNic.Name;
 
                 if (string.IsNullOrWhiteSpace(primaryDns))
                 {
