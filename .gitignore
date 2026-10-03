@@ -51,3 +51,7 @@ _ReSharper*/
 # Generated files
 Generated\ Files/
 *_wpftmp.csproj
+
+# Agent & AI tool directories
+.gemini/
+.agents/
