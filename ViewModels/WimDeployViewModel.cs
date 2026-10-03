@@ -16,6 +16,46 @@ public partial class WimDeployViewModel : ObservableObject
     [ObservableProperty] private string _imagePath = "";
     [ObservableProperty] private string _mountedIsoPath = "";
     [ObservableProperty] private WimImageInfo? _selectedImage;
+
+    partial void OnSelectedImageChanged(WimImageInfo? value)
+    {
+        EvaluateCompatibility();
+        OnPropertyChanged(nameof(HasSelectedImage));
+        OnPropertyChanged(nameof(SelectedImageDetailedSummary));
+        OnPropertyChanged(nameof(SelectedImageSizeBadge));
+    }
+
+    public bool HasSelectedImage => SelectedImage != null;
+
+    public string SelectedImageDetailedSummary
+    {
+        get
+        {
+            if (SelectedImage == null) return "";
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(SelectedImage.Architecture))
+                parts.Add($"架構: {SelectedImage.Architecture}");
+            if (!string.IsNullOrWhiteSpace(SelectedImage.MarketingVersion))
+                parts.Add($"發行: {SelectedImage.MarketingVersion}");
+            if (!string.IsNullOrWhiteSpace(SelectedImage.Version))
+                parts.Add($"核心: {SelectedImage.Version}");
+            if (!string.IsNullOrWhiteSpace(SelectedImage.Edition))
+                parts.Add($"代號: {SelectedImage.Edition}");
+            return parts.Count > 0 ? string.Join(" | ", parts) : SelectedImage.Name;
+        }
+    }
+
+    public string SelectedImageSizeBadge
+    {
+        get
+        {
+            if (SelectedImage == null) return "";
+            if (!string.IsNullOrWhiteSpace(SelectedImage.FormattedSize) && SelectedImage.SizeBytes > 0)
+                return $"{SelectedImage.FormattedSize} ({SelectedImage.SizeBytes:N0} 位元組)";
+            return SelectedImage.SizeDisplay;
+        }
+    }
+
     [ObservableProperty] private string _targetDrive = @"C:\";
     [ObservableProperty] private string _bootDrive = "";
     [ObservableProperty] private string _firmwareMode = "UEFI";

@@ -44,15 +44,182 @@ public partial class WimDeployService
             if (descMatch.Success) info.Description = descMatch.Groups[1].Value.Trim();
 
             var sizeMatch = Regex.Match(block, @"(?:Size|大小)\s*[:：]\s*(.+)", RegexOptions.IgnoreCase);
-            if (sizeMatch.Success) info.SizeDisplay = sizeMatch.Groups[1].Value.Trim();
+            if (sizeMatch.Success)
+            {
+                info.SizeDisplay = sizeMatch.Groups[1].Value.Trim();
+                ParseAndFormatSize(info, info.SizeDisplay);
+            }
 
-            var archMatch = Regex.Match(block, @"(?:Architecture|架構|架构)\s*[:：]\s*(.+)", RegexOptions.IgnoreCase);
-            if (archMatch.Success) info.Architecture = archMatch.Groups[1].Value.Trim();
+            var archMatch = Regex.Match(block, @"(?:Architecture|架構|架构|アーキテクチャ)\s*[:：]\s*(.+)", RegexOptions.IgnoreCase);
+            if (archMatch.Success) info.Architecture = NormalizeArchitecture(archMatch.Groups[1].Value.Trim());
 
             list.Add(info);
         }
 
+        // Parallel detailed inspection of each index to retrieve exact architecture, version, build, and edition
+        var detailTasks = list.Select(async info =>
+        {
+            try
+            {
+                var detailOutput = await RunCommandAsync("dism.exe", $"/Get-ImageInfo /ImageFile:\"{imagePath}\" /Index:{info.Index}");
+                ParseDetailBlock(info, detailOutput);
+            }
+            catch { }
+
+            EnrichWindowsMetadata(info);
+        });
+
+        await Task.WhenAll(detailTasks);
+
         return list;
+    }
+
+    private static void ParseAndFormatSize(WimImageInfo info, string rawSize)
+    {
+        var digits = Regex.Replace(rawSize, @"[^\d]", "");
+        if (long.TryParse(digits, out var bytes) && bytes > 0)
+        {
+            info.SizeBytes = bytes;
+            info.FormattedSize = FormatBytes(bytes);
+        }
+        else
+        {
+            info.FormattedSize = rawSize;
+        }
+    }
+
+    public static string FormatBytes(long bytes)
+    {
+        if (bytes >= 1024L * 1024L * 1024L * 1024L)
+            return $"{(double)bytes / (1024L * 1024L * 1024L * 1024L):F2} TB";
+        if (bytes >= 1024L * 1024L * 1024L)
+            return $"{(double)bytes / (1024L * 1024L * 1024L):F2} GB";
+        if (bytes >= 1024L * 1024L)
+            return $"{(double)bytes / (1024L * 1024L):F2} MB";
+        if (bytes >= 1024L)
+            return $"{(double)bytes / 1024L:F1} KB";
+        return $"{bytes} B";
+    }
+
+    private static string NormalizeArchitecture(string rawArch)
+    {
+        var lower = rawArch.Trim().ToLowerInvariant();
+        if (lower.Contains("arm64") || lower.Contains("aarch64") || lower == "12") return "arm64";
+        if (lower.Contains("x64") || lower.Contains("amd64") || lower.Contains("64") || lower == "9") return "x64";
+        if (lower.Contains("x86") || lower.Contains("32") || lower == "0") return "x86";
+        if (lower.Contains("arm") || lower == "5") return "arm";
+        return rawArch.Trim();
+    }
+
+    private static void ParseDetailBlock(WimImageInfo info, string detailOutput)
+    {
+        if (string.IsNullOrWhiteSpace(detailOutput)) return;
+
+        var archMatch = Regex.Match(detailOutput, @"(?:Architecture|架構|架构|アーキテクチャ)\s*[:：]\s*(.+)", RegexOptions.IgnoreCase);
+        if (archMatch.Success && !string.IsNullOrWhiteSpace(archMatch.Groups[1].Value))
+        {
+            info.Architecture = NormalizeArchitecture(archMatch.Groups[1].Value);
+        }
+
+        var verMatch = Regex.Match(detailOutput, @"(?:Version|版本|バージョン)\s*[:：]\s*([0-9\.]+)", RegexOptions.IgnoreCase);
+        if (verMatch.Success)
+        {
+            info.Version = verMatch.Groups[1].Value.Trim();
+        }
+
+        var spBuildMatch = Regex.Match(detailOutput, @"(?:ServicePack Build|ServicePack 組建|ServicePack 內部版本|ServicePack 内部版本)\s*[:：]\s*(\d+)", RegexOptions.IgnoreCase);
+        if (spBuildMatch.Success && !string.IsNullOrWhiteSpace(info.Version))
+        {
+            var sp = spBuildMatch.Groups[1].Value.Trim();
+            if (!info.Version.EndsWith("." + sp))
+            {
+                info.Version += "." + sp;
+            }
+        }
+
+        var editionMatch = Regex.Match(detailOutput, @"(?:Edition|版本代號|エディション)\s*[:：]\s*([a-zA-Z0-9_\-]+)", RegexOptions.IgnoreCase);
+        if (editionMatch.Success)
+        {
+            info.Edition = editionMatch.Groups[1].Value.Trim();
+        }
+
+        var sizeMatch = Regex.Match(detailOutput, @"(?:Size|大小)\s*[:：]\s*(.+)", RegexOptions.IgnoreCase);
+        if (sizeMatch.Success && info.SizeBytes == 0)
+        {
+            info.SizeDisplay = sizeMatch.Groups[1].Value.Trim();
+            ParseAndFormatSize(info, info.SizeDisplay);
+        }
+    }
+
+    private static void EnrichWindowsMetadata(WimImageInfo info)
+    {
+        // 1. Architecture inference fallback
+        if (string.IsNullOrWhiteSpace(info.Architecture))
+        {
+            var text = (info.Name + " " + info.Description).ToLowerInvariant();
+            if (text.Contains("arm64") || text.Contains("aarch64")) info.Architecture = "arm64";
+            else if (text.Contains("x64") || text.Contains("amd64") || text.Contains("64-bit") || text.Contains("64位元") || text.Contains("64位")) info.Architecture = "x64";
+            else if (text.Contains("x86") || text.Contains("32-bit") || text.Contains("32位元") || text.Contains("32位")) info.Architecture = "x86";
+            else if (text.Contains("windows 11") || text.Contains("win11")) info.Architecture = "x64";
+            else if (info.SizeBytes > 15L * 1024L * 1024L * 1024L) info.Architecture = "x64";
+        }
+
+        // 2. BuildNumber extraction
+        if (!string.IsNullOrWhiteSpace(info.Version))
+        {
+            var parts = info.Version.Split('.');
+            if (parts.Length >= 3)
+            {
+                info.BuildNumber = parts[2];
+            }
+            else
+            {
+                info.BuildNumber = info.Version;
+            }
+        }
+        else
+        {
+            var buildMatch = Regex.Match(info.Name + " " + info.Description, @"(?:Build|組建|內部版本|内部版本)\s*(\d{5})", RegexOptions.IgnoreCase);
+            if (buildMatch.Success)
+            {
+                info.BuildNumber = buildMatch.Groups[1].Value;
+            }
+        }
+
+        // 3. MarketingVersion mapping (e.g. 24H2, 23H2)
+        var textCombo = info.Name + " " + info.Description;
+        var releaseMatch = Regex.Match(textCombo, @"\b(2[1-5]H[12]|LTSC \d{4}|LTSB \d{4})\b", RegexOptions.IgnoreCase);
+        if (releaseMatch.Success)
+        {
+            info.MarketingVersion = releaseMatch.Value.ToUpperInvariant();
+        }
+        else if (!string.IsNullOrWhiteSpace(info.BuildNumber))
+        {
+            info.MarketingVersion = info.BuildNumber switch
+            {
+                "26100" => "24H2",
+                "22631" => "23H2",
+                "22621" => "22H2",
+                "22000" => "21H2",
+                "19045" => "22H2",
+                "19044" => "21H2",
+                "19043" => "21H1",
+                "19042" => "20H2",
+                "19041" => "2004",
+                "17763" => "LTSC 2019",
+                "14393" => "LTSB 2016",
+                "10240" => "LTSB 2015",
+                "7601" or "7600" => "SP1",
+                "9600" => "8.1",
+                _ => ""
+            };
+        }
+
+        // Ensure FormattedSize is populated
+        if (string.IsNullOrWhiteSpace(info.FormattedSize))
+        {
+            ParseAndFormatSize(info, info.SizeDisplay);
+        }
     }
 
     public async Task<string> ApplyImageAsync(

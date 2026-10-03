@@ -405,6 +405,26 @@
                             </ComboBox.ItemTemplate>
                         </ComboBox>
 
+                        <!-- Selected Image Details Card (Zero Clipping & Human Readable) -->
+                        <Border Visibility="{x:Bind ViewModel.HasSelectedImage, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="6" Padding="10,6" Margin="0,-4,0,0">
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE8B9;" FontSize="12" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                    <TextBlock Text="{x:Bind ViewModel.SelectedImageDetailedSummary, Mode=OneWay}"
+                                               FontSize="11" Style="{StaticResource CaptionTextBlockStyle}" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.SelectedImageSizeBadge, Mode=OneWay}"
+                                           FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+
                         <!-- Destination & Boot Partitions (ComboBox Dropdowns) -->
                         <Grid ColumnSpacing="8">
                             <Grid.ColumnDefinitions>
