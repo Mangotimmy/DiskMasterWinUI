@@ -50,7 +50,7 @@
                 <!-- ── Tab 0: Disk Health & Integrity ── -->
                 <TabViewItem x:Name="TabHealth" Header="🩺 磁碟健康 (Disk Health)" IsClosable="False">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                    <StackPanel x:Name="HealthCardsStack" Spacing="16" MaxWidth="900" HorizontalAlignment="Left">
+                    <StackPanel x:Name="HealthCardsStack" Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                         <!-- S.M.A.R.T. Health Overview -->
                         <Border x:Name="SmartOverviewCard" Tag="SmartOverviewCard"
@@ -442,7 +442,7 @@
             <!-- ── Tab 1: Windows License Keys & Serials ── -->
             <TabViewItem x:Name="TabKeys" Header="金鑰與硬體序號 (Keys &amp; Serials)" IsClosable="False">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                    <StackPanel Spacing="16" MaxWidth="800" HorizontalAlignment="Left">
+                    <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                         <!-- OEM BIOS Key Card -->
                         <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -957,7 +957,7 @@
             <!-- ── Tab 4: VHD / VHDX 虛擬硬碟與暫存清理管理箱 ── -->
             <TabViewItem x:Name="TabVhdx" Header="💽 VHD/VHDX 虛擬磁碟與快取清理" IsClosable="False">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                    <StackPanel Spacing="16" MaxWidth="900" HorizontalAlignment="Left">
+                    <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                         <!-- Card 1: VHD/VHDX Virtual Disk Manager -->
                         <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -1128,7 +1128,7 @@
             <!-- ── Tab 7: 磁碟目錄空間與功能指南 (Storage Directory Encyclopedia) ── -->
             <TabViewItem x:Name="TabDirectoryAnalyzer" Header="📁 目錄空間指南 (Storage Directory Guide)" IsClosable="False">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                    <StackPanel Spacing="16" MaxWidth="960" HorizontalAlignment="Left">
+                    <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                         <!-- Hero Header Card -->
                         <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"

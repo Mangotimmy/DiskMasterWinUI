@@ -294,7 +294,7 @@
             <TabViewItem x:Name="TabGlobalSettings" Header="全域開機設定 (Global Settings)" IsClosable="False">
                 <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                        CornerRadius="8" Padding="20" Margin="0,10,0,0" MaxWidth="600" HorizontalAlignment="Left">
+                        CornerRadius="8" Padding="20" Margin="0,10,16,20" HorizontalAlignment="Stretch">
                     <StackPanel Spacing="16">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon Glyph="&#xE713;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
@@ -324,7 +324,7 @@
             <!-- ── Tab 4: MSConfig 安全開機與旗標 (Safe Boot & Advanced Boot Flags) ── -->
             <TabViewItem x:Name="TabSafeBoot" Header="🛡️ 安全開機 (Safe Boot)" IsClosable="False">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                    <StackPanel Spacing="16" MaxWidth="800" HorizontalAlignment="Left">
+                    <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
                         <!-- Hero Card -->
                         <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"

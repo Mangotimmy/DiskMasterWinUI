@@ -50,7 +50,7 @@
                 <!-- ════ Tab 1: 電競遊戲模式 (Gaming Mode) ════ -->
                 <TabViewItem x:Name="TabGaming" Header="🎮 電競遊戲模式 (Gaming Mode)" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                        <StackPanel Spacing="16" MaxWidth="1000" HorizontalAlignment="Left">
+                        <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Hero Master Card -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -161,7 +161,7 @@
                 <!-- ════ Tab 2: CPU排程與工作優先權 (CPU & Task Priority) ════ -->
                 <TabViewItem x:Name="TabCpu" Header="⚡ CPU與排程優先權 (CPU &amp; Task)" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                        <StackPanel Spacing="16" MaxWidth="1000" HorizontalAlignment="Left">
+                        <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Win32PrioritySeparation Card -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -403,7 +403,7 @@
                 <!-- ════ Tab 3: 電源計畫與核心喚醒 (Power Plans & Core Unparking) ════ -->
                 <TabViewItem x:Name="TabPower" Header="🔋 電源計畫與核心喚醒 (Power Plans)" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                        <StackPanel Spacing="16" MaxWidth="1000" HorizontalAlignment="Left">
+                        <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Unlock & Quick Toggles -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -725,7 +725,7 @@
                 <!-- ════ Tab 4: 登錄檔備份與還原 (Backup & Restore) ════ -->
                 <TabViewItem x:Name="TabBackup" Header="💾 登錄檔備份與還原 (Backup &amp; Restore)" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                        <StackPanel Spacing="16" MaxWidth="1000" HorizontalAlignment="Left">
+                        <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Backup Actions Bar -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -815,7 +815,7 @@
                 <!-- ════ Tab 5: OneDrive 深度管理、修復與徹底卸載 (OneDrive Governance) ════ -->
                 <TabViewItem x:Name="TabOneDrive" Header="☁️ OneDrive 深度治理與卸載" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                        <StackPanel Spacing="16" MaxWidth="1000" HorizontalAlignment="Left">
+                        <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Hero Status Card -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -956,7 +956,7 @@
                 <!-- ════ Tab 6: OEM 驅動程式清理 (Driver Cleanup - PnPUtil) ════ -->
                 <TabViewItem x:Name="TabDrivers" Header="🏎️ OEM 驅動清理 (PnPUtil)" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                        <StackPanel Spacing="16" MaxWidth="1000" HorizontalAlignment="Left">
+                        <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Control Bar Card -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"

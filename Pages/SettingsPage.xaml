@@ -9,7 +9,7 @@
     mc:Ignorable="d">
 
     <ScrollViewer Padding="24" VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="16" MaxWidth="800" HorizontalAlignment="Left">
+        <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
             <!-- Title -->
             <StackPanel Spacing="4">
