@@ -1,4 +1,4 @@
-# DiskMaster Pro (磁碟大師 旗艦版)
+# DiskMaster Pro 
 
 <p align="center">
   <img src="Assets/Square150x150Logo.scale-200.png" alt="DiskMaster Pro Logo" width="128" height="128" />
