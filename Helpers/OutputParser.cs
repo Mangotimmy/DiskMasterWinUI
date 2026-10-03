@@ -379,30 +379,136 @@ public static partial class OutputParser
         var list = new List<OemDriverItem>();
         if (string.IsNullOrWhiteSpace(output)) return list;
 
-        var blocks = Regex.Split(output, @"(?=Published Name|發佈名稱|发布名称)", RegexOptions.IgnoreCase);
+        var blocks = Regex.Split(output, @"(?=(?:Published Name|發佈名稱|发布名称|公開名)\s*:)", RegexOptions.IgnoreCase);
         foreach (var block in blocks)
         {
             if (string.IsNullOrWhiteSpace(block)) continue;
-            var pubMatch = Regex.Match(block, @"(?:Published Name|發佈名稱|发布名称)\s*:\s*(.+)", RegexOptions.IgnoreCase);
+            var pubMatch = Regex.Match(block, @"(?:Published Name|發佈名稱|发布名称|公開名)\s*:\s*([^\r\n]+)", RegexOptions.IgnoreCase);
             if (!pubMatch.Success) continue;
 
-            var origMatch = Regex.Match(block, @"(?:Original Name|原始名稱|原始名称)\s*:\s*(.+)", RegexOptions.IgnoreCase);
-            var classMatch = Regex.Match(block, @"(?:Class Name|類別名稱|类别名称)\s*:\s*(.+)", RegexOptions.IgnoreCase);
-            var provMatch = Regex.Match(block, @"(?:Provider Name|提供者名稱|提供程序名称)\s*:\s*(.+)", RegexOptions.IgnoreCase);
-            var dateMatch = Regex.Match(block, @"(?:Driver Date|Date|日期)\s*:\s*(.+)", RegexOptions.IgnoreCase);
-            var verMatch = Regex.Match(block, @"(?:Driver Version|Version|版本)\s*:\s*(.+)", RegexOptions.IgnoreCase);
-
-            list.Add(new OemDriverItem
+            var item = new OemDriverItem
             {
-                PublishedName = pubMatch.Groups[1].Value.Trim(),
-                OriginalFileName = origMatch.Success ? origMatch.Groups[1].Value.Trim() : "",
-                DriverClass = classMatch.Success ? classMatch.Groups[1].Value.Trim() : "",
-                ProviderName = provMatch.Success ? provMatch.Groups[1].Value.Trim() : "",
-                Date = dateMatch.Success ? dateMatch.Groups[1].Value.Trim() : "",
-                Version = verMatch.Success ? verMatch.Groups[1].Value.Trim() : ""
-            });
+                PublishedName = pubMatch.Groups[1].Value.Trim()
+            };
+
+            var lines = block.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var rawLine in lines)
+            {
+                var line = rawLine.Trim();
+                var colonIdx = line.IndexOf(':');
+                if (colonIdx <= 0) continue;
+
+                var key = line.Substring(0, colonIdx).Trim();
+                var val = line.Substring(colonIdx + 1).Trim();
+
+                if (MatchesDriverKey(key, "Original Name", "原始名稱", "原始名称", "元の名前"))
+                {
+                    item.OriginalFileName = val;
+                }
+                else if (MatchesDriverKey(key, "Provider Name", "驅動程式套件提供者", "驱动程序程序包提供商",
+                                         "ドライバー パッケージ プロバイダー", "ドライバーパッケージプロバイダー",
+                                         "提供者名稱", "提供商名称", "提供程序名称", "プロバイダー名",
+                                         "提供者", "提供商", "プロバイダー"))
+                {
+                    item.ProviderName = val;
+                }
+                else if (MatchesDriverKey(key, "Class Name", "Driver Class", "類別名稱", "类别名称",
+                                         "类名称", "クラス名", "類別", "类别", "类", "クラス"))
+                {
+                    item.DriverClass = val;
+                }
+                else if (MatchesDriverKey(key, "Signer Name", "Signer", "簽署者名稱", "簽署人名稱",
+                                         "签名者名称", "签名人名称", "署名者名", "簽署者", "签名者", "署名者"))
+                {
+                    item.SignerName = val;
+                }
+                else if (MatchesDriverKey(key, "Driver Date and Version", "Driver Date & Version",
+                                         "驅動程式日期和版本", "驱动程序日期和版本",
+                                         "ドライバーの日付とバージョン", "Date and Version", "日期和版本"))
+                {
+                    var parts = val.Split(new[] { ' ', '\t' }, 2, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 0 && string.IsNullOrWhiteSpace(item.Date))
+                    {
+                        item.Date = parts[0].Trim();
+                    }
+                    if (parts.Length > 1 && string.IsNullOrWhiteSpace(item.Version))
+                    {
+                        item.Version = parts[1].Trim();
+                    }
+                }
+                else if (MatchesDriverKey(key, "Driver Date", "Date", "驅動程式日期", "驱动程序日期", "ドライバーの日付", "日期"))
+                {
+                    if (string.IsNullOrWhiteSpace(item.Date))
+                    {
+                        item.Date = val;
+                    }
+                }
+                else if (MatchesDriverKey(key, "Driver Version", "Version", "驅動程式版本", "驱动程序版本",
+                                         "ドライバーのバージョン", "ドライバーバージョン", "版本"))
+                {
+                    if (string.IsNullOrWhiteSpace(item.Version))
+                    {
+                        var parts = val.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length >= 2 && (parts[0].Contains("/") || parts[0].Contains("-") || parts[0].Contains(".")))
+                        {
+                            if (string.IsNullOrWhiteSpace(item.Date))
+                            {
+                                item.Date = parts[0].Trim();
+                            }
+                            item.Version = string.Join(" ", parts.Skip(1)).Trim();
+                        }
+                        else
+                        {
+                            item.Version = val;
+                        }
+                    }
+                }
+            }
+
+            // Fallback for fields if single-line or non-standard formatting was passed
+            if (string.IsNullOrWhiteSpace(item.OriginalFileName))
+            {
+                var m = Regex.Match(block, @"(?:Original Name|原始名稱|原始名称|元の名前)\s*:\s*([^\r\n]+)", RegexOptions.IgnoreCase);
+                if (m.Success) item.OriginalFileName = m.Groups[1].Value.Trim();
+            }
+            if (string.IsNullOrWhiteSpace(item.ProviderName))
+            {
+                var m = Regex.Match(block, @"(?:Provider Name|驅動程式套件提供者|驱动程序程序包提供商|ドライバー\s*パッケージ\s*プロバイダー|提供者名稱|提供商名称|提供程序名称|プロバイダー名|提供者|提供商|プロバイダー)\s*:\s*([^\r\n]+)", RegexOptions.IgnoreCase);
+                if (m.Success) item.ProviderName = m.Groups[1].Value.Trim();
+            }
+            if (string.IsNullOrWhiteSpace(item.DriverClass))
+            {
+                var m = Regex.Match(block, @"(?:Class Name|Driver Class|類別名稱|类别名称|类名称|クラス名|類別|类别|类|クラス)\s*:\s*([^\r\n]+)", RegexOptions.IgnoreCase);
+                if (m.Success) item.DriverClass = m.Groups[1].Value.Trim();
+            }
+            if (string.IsNullOrWhiteSpace(item.SignerName))
+            {
+                var m = Regex.Match(block, @"(?:Signer Name|Signer|簽署者名稱|簽署人名稱|签名者名称|签名人名称|署名者名|簽署者|签名者|署名者)\s*:\s*([^\r\n]+)", RegexOptions.IgnoreCase);
+                if (m.Success) item.SignerName = m.Groups[1].Value.Trim();
+            }
+            if (string.IsNullOrWhiteSpace(item.Date) && string.IsNullOrWhiteSpace(item.Version))
+            {
+                var m = Regex.Match(block, @"(?:Driver Date and Version|Driver Date & Version|驅動程式日期和版本|驱动程序日期和版本|ドライバーの日付とバージョン|Date and Version|日期和版本)\s*:\s*([^\r\n]+)", RegexOptions.IgnoreCase);
+                if (m.Success)
+                {
+                    var parts = m.Groups[1].Value.Trim().Split(new[] { ' ', '\t' }, 2, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 0 && string.IsNullOrWhiteSpace(item.Date)) item.Date = parts[0].Trim();
+                    if (parts.Length > 1 && string.IsNullOrWhiteSpace(item.Version)) item.Version = parts[1].Trim();
+                }
+            }
+
+            list.Add(item);
         }
         return list;
+    }
+
+    private static bool MatchesDriverKey(string key, params string[] candidates)
+    {
+        foreach (var c in candidates)
+        {
+            if (string.Equals(key, c, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
     }
 
     public static List<VssShadowItem> ParseVssShadows(string output)

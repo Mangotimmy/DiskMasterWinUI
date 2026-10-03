@@ -94,6 +94,8 @@ public partial class DiskToolsViewModel : ObservableObject
     public ObservableCollection<OemDriverItem> FilteredDrivers { get; } = new();
     [ObservableProperty] private OemDriverItem? _selectedDriver;
     [ObservableProperty] private string _driverFilterText = "";
+    [ObservableProperty] private string _driverSearchQuery = "";
+    [ObservableProperty] private OemDriverItem? _inspectedDriver;
     [ObservableProperty] private bool _isLoadingDrivers;
 
     public ObservableCollection<VssShadowItem> AllShadows { get; } = new();
@@ -103,11 +105,21 @@ public partial class DiskToolsViewModel : ObservableObject
     public ObservableCollection<BitLockerVolumeItem> BitLockerVolumes { get; } = new();
     [ObservableProperty] private BitLockerVolumeItem? _selectedBitLockerVolume;
 
+    // 9. Storage Directory Encyclopedia & Analyzer
+    private readonly StorageEncyclopediaService _encyclopediaService = new();
+    public ObservableCollection<StorageDirectoryItem> StorageDirectories { get; } = new();
+    [ObservableProperty] private bool _isScanningDirectories;
+    [ObservableProperty] private string _directoryScanStatus = "";
+
     private readonly ThrottledLogBuffer _logBuffer;
 
     public DiskToolsViewModel()
     {
         _logBuffer = new ThrottledLogBuffer(text => OutputLog = text);
+        foreach (var dir in _encyclopediaService.GetDefaultCatalog())
+        {
+            StorageDirectories.Add(dir);
+        }
     }
 
     private void AppendLog(string text)
@@ -1393,24 +1405,94 @@ public partial class DiskToolsViewModel : ObservableObject
 
     partial void OnDriverFilterTextChanged(string value)
     {
+        if (_driverSearchQuery != value) _driverSearchQuery = value;
+        ApplyDriverFilter();
+    }
+
+    partial void OnDriverSearchQueryChanged(string value)
+    {
+        if (_driverFilterText != value) _driverFilterText = value;
         ApplyDriverFilter();
     }
 
     private void ApplyDriverFilter()
     {
         FilteredDrivers.Clear();
-        var q = DriverFilterText?.Trim() ?? "";
+        var q = !string.IsNullOrWhiteSpace(DriverSearchQuery) ? DriverSearchQuery.Trim() : (DriverFilterText?.Trim() ?? "");
         foreach (var d in AllDrivers)
         {
             if (string.IsNullOrEmpty(q) ||
                 d.PublishedName.Contains(q, StringComparison.OrdinalIgnoreCase) ||
                 d.OriginalFileName.Contains(q, StringComparison.OrdinalIgnoreCase) ||
                 d.DriverClass.Contains(q, StringComparison.OrdinalIgnoreCase) ||
-                d.ProviderName.Contains(q, StringComparison.OrdinalIgnoreCase))
+                d.ProviderName.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                d.SignerName.Contains(q, StringComparison.OrdinalIgnoreCase))
             {
                 FilteredDrivers.Add(d);
             }
         }
+    }
+
+    [RelayCommand]
+    public void SelectAllDrivers()
+    {
+        foreach (var d in FilteredDrivers)
+        {
+            d.IsSelected = true;
+        }
+    }
+
+    [RelayCommand]
+    public void DeselectAllDrivers()
+    {
+        foreach (var d in AllDrivers)
+        {
+            d.IsSelected = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task DeleteSelectedDriversAsync()
+    {
+        var selected = AllDrivers.Where(d => d.IsSelected).ToList();
+        if (selected.Count == 0)
+        {
+            StatusMessage = "No drivers selected for deletion.";
+            return;
+        }
+
+        try
+        {
+            IsLoading = true;
+            StatusMessage = $"Batch deleting {selected.Count} driver(s)...";
+            AppendLog($"[INFO] Batch deleting {selected.Count} driver(s) via PnPUtil (/uninstall /force)...");
+            var infNames = selected.Select(d => d.PublishedName).ToList();
+            var result = await _driverService.BatchDeleteDriversAsync(infNames, force: true);
+            AppendLog($"[BATCH RESULT] {result.Summary}");
+            foreach (var detail in result.Details)
+            {
+                AppendLog($"  - {detail}");
+            }
+            StatusMessage = $"Deleted {result.SuccessCount}/{result.TotalCount} drivers.";
+            await LoadDriversStructuredAsync();
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[ERROR] Batch driver deletion failed: {ex.Message}");
+            StatusMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public void InspectDriver(OemDriverItem? item)
+    {
+        if (item == null) return;
+        InspectedDriver = item;
+        AppendLog($"[DRIVER DETAILS]\nPublished Name: {item.PublishedName}\nOriginal Name: {item.OriginalFileName}\nClass: {item.DriverClass}\nProvider: {item.ProviderName}\nDate: {item.Date}\nVersion: {item.Version}\nSigner: {(!string.IsNullOrEmpty(item.SignerName) ? item.SignerName : "(Unsigned / Unknown)")}");
     }
 
     [RelayCommand]
@@ -1548,6 +1630,64 @@ public partial class DiskToolsViewModel : ObservableObject
             StatusMessage = $"Error: {ex.Message}";
         }
         finally { IsLoading = false; }
+    }
+
+    [RelayCommand]
+    public async Task ScanStorageDirectoriesAsync()
+    {
+        if (IsScanningDirectories) return;
+        try
+        {
+            IsScanningDirectories = true;
+            DirectoryScanStatus = LocalizationService.Instance.CurrentLanguage switch
+            {
+                "zh-CN" => "正在深度分析系统关键目录容量与结构...",
+                "en-US" => "Analyzing system directory storage metrics...",
+                "ja-JP" => "システムディレクトリの容量と構造を分析中...",
+                _ => "正在深度分析系統關鍵目錄容量與結構..."
+            };
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🔍 開始分析磁碟系統關鍵目錄空間與功能說明...");
+
+            foreach (var item in StorageDirectories)
+            {
+                await _encyclopediaService.ScanDirectoryAsync(item);
+                AppendLog($"[{DateTime.Now:HH:mm:ss}]  - {item.DisplayName}: {item.DisplaySize} ({item.FileCount} 個檔案) [{item.DisplaySafety}]");
+            }
+
+            DirectoryScanStatus = LocalizationService.Instance.CurrentLanguage switch
+            {
+                "zh-CN" => $"分析完成：共检索 {StorageDirectories.Count} 个系统核心目录",
+                "en-US" => $"Analysis complete: {StorageDirectories.Count} system directories indexed",
+                "ja-JP" => $"分析完了: {StorageDirectories.Count} 個のシステムディレクトリ",
+                _ => $"分析完成：共檢索 {StorageDirectories.Count} 個系統核心目錄"
+            };
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] ✅ 磁碟目錄空間與功能指南分析完成！");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[ERROR] Directory analysis failed: {ex.Message}");
+        }
+        finally
+        {
+            IsScanningDirectories = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task ExecuteDirectoryActionAsync(StorageDirectoryItem? item)
+    {
+        if (item == null) return;
+        try
+        {
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🚀 執行操作: {item.DisplayName} -> {item.DisplayActionLabel}");
+            var res = await _encyclopediaService.ExecuteActionAsync(item);
+            AppendLog(res);
+            await _encyclopediaService.ScanDirectoryAsync(item);
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[ERROR] Action failed: {ex.Message}");
+        }
     }
 
     [RelayCommand]

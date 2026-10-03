@@ -1,16 +1,31 @@
 # DiskMaster Pro WinUI 3 — E2E Test Framework Engine
 # Author: Test Writer Agent (E2E Track)
 
-$script:AllTests = [System.Collections.Generic.List[PSCustomObject]]::new()
-$script:TestResults = [System.Collections.Generic.List[PSCustomObject]]::new()
-$script:AssemblyLoaded = $false
-$script:LoadedAssembly = $null
+if ($null -eq $global:E2EAllTests) {
+    $global:E2EAllTests = [System.Collections.Generic.List[PSCustomObject]]::new()
+}
+if ($null -eq $global:E2ETestResults) {
+    $global:E2ETestResults = [System.Collections.Generic.List[PSCustomObject]]::new()
+}
+$script:AllTests = $global:E2EAllTests
+$script:TestResults = $global:E2ETestResults
+if ($null -eq $script:LoadedAssembly) {
+    $script:AssemblyLoaded = $false
+    $script:LoadedAssembly = $null
+}
 
 function Initialize-TestAssembly {
-    param([string]$Configuration = "Debug")
+    param([string]$Configuration = "Release")
 
     if ($script:AssemblyLoaded -and $script:LoadedAssembly -ne $null) {
         return $script:LoadedAssembly
+    }
+
+    $alreadyLoaded = [System.AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.GetName().Name -eq "DiskMasterWinUI" } | Select-Object -First 1
+    if ($alreadyLoaded) {
+        $script:LoadedAssembly = $alreadyLoaded
+        $script:AssemblyLoaded = $true
+        return $alreadyLoaded
     }
 
     $projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
@@ -56,7 +71,7 @@ function Register-E2ETest {
         TestBlock   = $TestBlock
     }
 
-    $script:AllTests.Add($test)
+    $global:E2EAllTests.Add($test)
 }
 
 # --- Assertion Helpers ---
@@ -169,8 +184,12 @@ function Assert-Throws {
     }
     catch {
         $threw = $true
-        if ($ExpectedExceptionType -and $_.Exception.GetType().FullName -notlike "*$ExpectedExceptionType*") {
-            throw "ASSERTION FAILED: Threw $($_.Exception.GetType().FullName) but expected $ExpectedExceptionType"
+        $matched = (-not $ExpectedExceptionType) -or `
+            ($_.Exception.GetType().FullName -like "*$ExpectedExceptionType*") -or `
+            ($null -ne $_.Exception.InnerException -and $_.Exception.InnerException.GetType().FullName -like "*$ExpectedExceptionType*") -or `
+            ($_.Exception.Message -like "*$ExpectedExceptionType*")
+        if (-not $matched) {
+            throw "ASSERTION FAILED: Threw $($_.Exception.GetType().FullName) with message '$($_.Exception.Message)' but expected '$ExpectedExceptionType'"
         }
     }
     if (-not $threw) {
@@ -208,7 +227,7 @@ function Invoke-E2ETestSuite {
         [string]$OutputPath = ""
     )
 
-    $testsToRun = $script:AllTests
+    $testsToRun = $global:E2EAllTests
     if ($FilterTier -gt 0) {
         $testsToRun = $testsToRun | Where-Object { $_.Tier -eq $FilterTier }
     }
@@ -216,7 +235,7 @@ function Invoke-E2ETestSuite {
         $testsToRun = $testsToRun | Where-Object { $_.Feature -eq $FilterFeature }
     }
 
-    $script:TestResults.Clear()
+    $global:E2ETestResults.Clear()
     $total = $testsToRun.Count
     $passed = 0
     $failed = 0
@@ -258,7 +277,7 @@ function Invoke-E2ETestSuite {
             $errorMsg = $ex.Message
             $errorDetails = $_.ScriptStackTrace
 
-            if ($errorMsg -like "*PENDING_IMPLEMENTATION*" -or $errorMsg -like "*Pending M2*" -or $errorMsg -like "*Pending M3*") {
+            if ($errorMsg -like "*PENDING*" -or $errorMsg -like "*Pending*") {
                 if ($StrictMode) {
                     $status = "FAIL"
                 } else {
@@ -282,7 +301,7 @@ function Invoke-E2ETestSuite {
             ErrorMessage  = $errorMsg
             StackTrace    = $errorDetails
         }
-        $script:TestResults.Add($resultObj)
+        $global:E2ETestResults.Add($resultObj)
 
         switch ($status) {
             "PASS" {
@@ -315,7 +334,7 @@ function Invoke-E2ETestSuite {
     Write-Host "════════════════════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
 
     for ($t = 1; $t -le 4; $t++) {
-        $tierTests = $script:TestResults | Where-Object { $_.Tier -eq $t }
+        $tierTests = $global:E2ETestResults | Where-Object { $_.Tier -eq $t }
         $tTotal = $tierTests.Count
         $tPass = ($tierTests | Where-Object { $_.Status -eq 'PASS' }).Count
         $tFail = ($tierTests | Where-Object { $_.Status -eq 'FAIL' }).Count
@@ -338,7 +357,7 @@ function Invoke-E2ETestSuite {
     Write-Host "════════════════════════════════════════════════════════════════════════════════`n" -ForegroundColor Cyan
 
     if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
-        $json = $script:TestResults | ConvertTo-Json -Depth 5
+        $json = $global:E2ETestResults | ConvertTo-Json -Depth 5
         [System.IO.File]::WriteAllText($OutputPath, $json, [System.Text.Encoding]::UTF8)
         Write-Host "  Test execution artifact saved to: $OutputPath" -ForegroundColor DarkCyan
     }

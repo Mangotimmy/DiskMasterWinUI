@@ -56,6 +56,38 @@ public sealed partial class DiskToolsPage : Page
             "ja-JP" => "💽 VHD/VHDX 仮想ディスクとキャッシュ消去",
             _ => "💽 VHD/VHDX 虛擬磁碟與快取清理"
         };
+        TabDirectoryAnalyzer.Header = lang switch
+        {
+            "zh-CN" => "📁 目录空间指南",
+            "en-US" => "📁 Directory Guide",
+            "ja-JP" => "📁 ディレクトリ ガイド",
+            _ => "📁 目錄空間指南"
+        };
+        DirEncyclopediaTitle.Text = lang switch
+        {
+            "zh-CN" => "磁盘核心目录空间分析与用途百科",
+            "en-US" => "Directory Space & Function Encyclopedia",
+            "ja-JP" => "ディスク中核ディレクトリ容量と機能百科",
+            _ => "磁碟核心目錄空間分析與用途百科"
+        };
+        DirEncyclopediaSubtitle.Text = lang switch
+        {
+            "zh-CN" => "清楚盘点 WinSxS、SoftwareDistribution、DriverStore、Installer、Temp、hiberfil.sys 等重要目录与系统文件，提供容量占用、安全清理指引与一键操作处置。",
+            "en-US" => "Detailed analysis of WinSxS, SoftwareDistribution, DriverStore, Installer, Temp, hiberfil.sys and key OS storage locations with safety recommendations and one-click actions.",
+            "ja-JP" => "WinSxS、SoftwareDistribution、DriverStore、Installer、Temp、hiberfil.sys などの主要システムディレクトリを分析し、安全なクリーンアップ指針とワンクリック操作を提供します。",
+            _ => "清楚盤點 WinSxS、SoftwareDistribution、DriverStore、Installer、Temp、hiberfil.sys 等重要目錄與系統檔案，提供容量佔用、安全清理指引與一鍵操作處置。"
+        };
+        ScanDirectoriesBtnText.Text = lang switch
+        {
+            "zh-CN" => "🔍 深度扫描目录空间与用途",
+            "en-US" => "🔍 Deep Scan Directories",
+            "ja-JP" => "🔍 ディレクトリ容量を精密スキャン",
+            _ => "🔍 深度掃描目錄空間與用途"
+        };
+        foreach (var d in ViewModel.StorageDirectories)
+        {
+            d.NotifyLanguageChanged();
+        }
 
         // Disk Health Tab
         TabHealth.Header = lang switch
@@ -231,6 +263,9 @@ public sealed partial class DiskToolsPage : Page
         LoadDriversBtn.Content = lang switch { "zh-CN" => "📋 枚举驱动清单", "en-US" => "📋 List OEM Drivers", "ja-JP" => "📋 ドライバ一覧を取得", _ => "📋 列舉驅動 (UI 清單)" };
         ExportDriversBtn.Content = lang switch { "zh-CN" => "💾 导出驱动", "en-US" => "💾 Export Drivers", "ja-JP" => "💾 ドライバをエクスポート", _ => "💾 匯出驅動" };
         DriverFilterBox.PlaceholderText = lang switch { "zh-CN" => "🔍 搜索驱动 (OEM/Class/Provider)...", "en-US" => "🔍 Search drivers (OEM/Class/Provider)...", "ja-JP" => "🔍 ドライバを検索 (OEM/Class/Provider)...", _ => "🔍 搜尋驅動 (OEM/Class/Provider)..." };
+        SelectAllDriversBtn.Content = lang switch { "zh-CN" => "全选", "en-US" => "Select All", "ja-JP" => "すべて選択", _ => "全選" };
+        DeselectAllDriversBtn.Content = lang switch { "zh-CN" => "取消全选", "en-US" => "Deselect All", "ja-JP" => "選択解除", _ => "取消全選" };
+        DeleteSelectedDriversBtn.Content = lang switch { "zh-CN" => "批量卸载", "en-US" => "Batch Uninstall", "ja-JP" => "一括削除", _ => "批量卸載" };
 
         ActionLogTitle.Text = lang switch { "zh-CN" => "执行日志", "en-US" => "Action Output Log", "ja-JP" => "実行ログ", _ => "執行日誌 (Action Output Log)" };
     }
@@ -398,11 +433,143 @@ public sealed partial class DiskToolsPage : Page
         }
     }
 
-    private void DeleteDriver_Click(object sender, RoutedEventArgs e)
+    private async void DeleteDriver_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button btn && btn.DataContext is Models.OemDriverItem item)
         {
-            ViewModel.DeleteDriverDirectCommand.Execute(item);
+            if (XamlRoot != null)
+            {
+                var lang = LocalizationService.Instance.CurrentLanguage;
+                var title = lang switch
+                {
+                    "zh-CN" => "确认卸载驱动",
+                    "en-US" => "Confirm Driver Uninstallation",
+                    "ja-JP" => "ドライバ削除の確認",
+                    _ => "確認解除安裝驅動"
+                };
+                var content = lang switch
+                {
+                    "zh-CN" => $"确定要强制卸载并删除驱动程序 {item.PublishedName} ({item.OriginalFileName}) 吗？此操作将执行 pnputil /delete-driver /uninstall /force。",
+                    "en-US" => $"Are you sure you want to force uninstall and delete driver {item.PublishedName} ({item.OriginalFileName})? This will execute pnputil /delete-driver /uninstall /force.",
+                    "ja-JP" => $"ドライバ {item.PublishedName} ({item.OriginalFileName}) を強制的にアンインストールして削除してもよろしいですか？",
+                    _ => $"確定要強制解除安裝並刪除驅動程式 {item.PublishedName} ({item.OriginalFileName}) 嗎？此操作將執行 pnputil /delete-driver /uninstall /force。"
+                };
+                var dialog = new ContentDialog
+                {
+                    XamlRoot = XamlRoot,
+                    Title = title,
+                    Content = content,
+                    PrimaryButtonText = lang switch { "zh-CN" => "强制删除", "en-US" => "Force Delete", "ja-JP" => "強制削除", _ => "強制刪除" },
+                    CloseButtonText = lang switch { "zh-CN" => "取消", "en-US" => "Cancel", "ja-JP" => "キャンセル", _ => "取消" },
+                    DefaultButton = ContentDialogButton.Close
+                };
+                var result = await dialog.ShowAsync();
+                if (result != ContentDialogResult.Primary) return;
+            }
+            await ViewModel.DeleteDriverDirectCommand.ExecuteAsync(item);
+        }
+    }
+
+    private async void DeleteSelectedDrivers_Click(object sender, RoutedEventArgs e)
+    {
+        var selected = ViewModel.AllDrivers.Where(d => d.IsSelected).ToList();
+        if (selected.Count == 0) return;
+
+        if (XamlRoot != null)
+        {
+            var lang = LocalizationService.Instance.CurrentLanguage;
+            var title = lang switch
+            {
+                "zh-CN" => "批量卸载驱动确认",
+                "en-US" => "Confirm Batch Driver Uninstallation",
+                "ja-JP" => "ドライバの一括アンインストール確認",
+                _ => "批次解除安裝驅動確認"
+            };
+            var content = lang switch
+            {
+                "zh-CN" => $"确定要批量强制卸载并删除选中的 {selected.Count} 个驱动程序吗？此操作将执行 pnputil /delete-driver /uninstall /force。",
+                "en-US" => $"Are you sure you want to force uninstall and delete {selected.Count} selected driver(s)? This will execute pnputil /delete-driver /uninstall /force.",
+                "ja-JP" => $"選択された {selected.Count} 個のドライバを一括で強制アンインストールして削除してもよろしいですか？",
+                _ => $"確定要批次強制解除安裝並刪除選取的 {selected.Count} 個驅動程式嗎？此操作將執行 pnputil /delete-driver /uninstall /force。"
+            };
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = title,
+                Content = content,
+                PrimaryButtonText = lang switch { "zh-CN" => "全部强制删除", "en-US" => "Force Delete All", "ja-JP" => "すべて強制削除", _ => "全部強制刪除" },
+                CloseButtonText = lang switch { "zh-CN" => "取消", "en-US" => "Cancel", "ja-JP" => "キャンセル", _ => "取消" },
+                DefaultButton = ContentDialogButton.Close
+            };
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary) return;
+        }
+        await ViewModel.DeleteSelectedDriversCommand.ExecuteAsync(null);
+    }
+
+    private async void InspectDriver_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is Models.OemDriverItem item)
+        {
+            ViewModel.InspectDriverCommand.Execute(item);
+            if (XamlRoot != null)
+            {
+                var lang = LocalizationService.Instance.CurrentLanguage;
+                var signerDisplay = !string.IsNullOrWhiteSpace(item.SignerName) ? item.SignerName : (lang switch { "zh-CN" => "(未签名 / 未知)", "en-US" => "(Unsigned / Unknown)", "ja-JP" => "(未署名 / 不明)", _ => "(未簽署 / 未知)" });
+                var dialog = new ContentDialog
+                {
+                    XamlRoot = XamlRoot,
+                    Title = lang switch { "zh-CN" => $"驱动程序详情 — {item.PublishedName}", "en-US" => $"Driver Details — {item.PublishedName}", "ja-JP" => $"ドライバの詳細 — {item.PublishedName}", _ => $"驅動程式詳情 — {item.PublishedName}" },
+                    Content = new StackPanel
+                    {
+                        Spacing = 6,
+                        Children =
+                        {
+                            new TextBlock { Text = $"Published Name: {item.PublishedName}", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold },
+                            new TextBlock { Text = $"Original File Name: {item.OriginalFileName}" },
+                            new TextBlock { Text = $"Class: {item.DriverClass}" },
+                            new TextBlock { Text = $"Provider: {item.ProviderName}" },
+                            new TextBlock { Text = $"Date: {item.Date}" },
+                            new TextBlock { Text = $"Version: {item.Version}" },
+                            new TextBlock { Text = $"Signer: {signerDisplay}" }
+                        }
+                    },
+                    CloseButtonText = lang switch { "zh-CN" => "关闭", "en-US" => "Close", "ja-JP" => "閉じる", _ => "關閉" },
+                    DefaultButton = ContentDialogButton.Close
+                };
+                await dialog.ShowAsync();
+            }
+        }
+    }
+
+    private void ExecuteDirectoryAction_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is Models.StorageDirectoryItem item)
+        {
+            ViewModel.ExecuteDirectoryActionCommand.Execute(item);
+        }
+    }
+
+    private void OpenDirectoryExplorer_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is Models.StorageDirectoryItem item)
+        {
+            try
+            {
+                if (System.IO.File.Exists(item.Path))
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{item.Path}\"") { UseShellExecute = true });
+                }
+                else if (System.IO.Directory.Exists(item.Path))
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"\"{item.Path}\"") { UseShellExecute = true });
+                }
+                else
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", @"C:\") { UseShellExecute = true });
+                }
+            }
+            catch { }
         }
     }
 }

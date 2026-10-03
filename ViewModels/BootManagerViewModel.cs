@@ -359,4 +359,81 @@ public partial class BootManagerViewModel : ObservableObject
         catch (Exception ex) { StatusMessage = $"Error: {ex.Message}"; }
         finally { IsLoading = false; }
     }
+
+    // ══════════════════════════════════════════════════════════════
+    // Safe Boot & MSConfig Boot Options
+    // ══════════════════════════════════════════════════════════════
+
+    [ObservableProperty] private SafeBootConfig _safeBootConfig = new();
+    [ObservableProperty] private string _safeBootMode = "Normal";
+    [ObservableProperty] private bool _noGuiBoot;
+    [ObservableProperty] private bool _bootLog;
+    [ObservableProperty] private bool _baseVideo;
+    [ObservableProperty] private bool _sos;
+    [ObservableProperty] private bool _testSigning;
+    [ObservableProperty] private bool _noIntegrityChecks;
+    [ObservableProperty] private bool _hypervisorEnabled = true;
+    [ObservableProperty] private string _safeBootOperationStatus = "";
+
+    [RelayCommand]
+    public async Task LoadSafeBootConfigAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            SafeBootOperationStatus = "讀取開機 BCD 安全設定中...";
+            SafeBootConfig = await _bcdService.GetSafeBootConfigAsync();
+            SafeBootMode = SafeBootConfig.SafeBootMode;
+            NoGuiBoot = SafeBootConfig.NoGuiBoot;
+            BootLog = SafeBootConfig.BootLog;
+            BaseVideo = SafeBootConfig.BaseVideo;
+            Sos = SafeBootConfig.Sos;
+            TestSigning = SafeBootConfig.TestSigning;
+            NoIntegrityChecks = SafeBootConfig.NoIntegrityChecks;
+            HypervisorEnabled = !SafeBootConfig.HypervisorLaunchType.Equals("off", StringComparison.OrdinalIgnoreCase);
+            SafeBootOperationStatus = $"目前安全開機模式: {SafeBootMode}";
+        }
+        catch (Exception ex)
+        {
+            SafeBootOperationStatus = $"讀取失敗: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task ApplySafeBootConfigAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            SafeBootOperationStatus = "正在寫入 BCD 安全開機設定...";
+
+            var config = new SafeBootConfig
+            {
+                SafeBootMode = SafeBootMode,
+                NoGuiBoot = NoGuiBoot,
+                BootLog = BootLog,
+                BaseVideo = BaseVideo,
+                Sos = Sos,
+                TestSigning = TestSigning,
+                NoIntegrityChecks = NoIntegrityChecks,
+                HypervisorLaunchType = HypervisorEnabled ? "auto" : "off"
+            };
+
+            var result = await _bcdService.ApplySafeBootConfigAsync(config);
+            SafeBootConfig = config;
+            SafeBootOperationStatus = "安全開機與啟動旗標設定已成功生效！";
+        }
+        catch (Exception ex)
+        {
+            SafeBootOperationStatus = $"寫入失敗: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
 }

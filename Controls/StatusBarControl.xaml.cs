@@ -17,7 +17,6 @@ public sealed partial class StatusBarControl : UserControl
 
     public void ApplyLanguage()
     {
-        bool isZh = LocalizationService.Instance.IsChinese;
-        StopBtn.Content = isZh ? "⏹️ 停止" : "⏹️ Stop";
+        StopBtn.Content = LocalizationService.Instance["Stop"];
     }
 }

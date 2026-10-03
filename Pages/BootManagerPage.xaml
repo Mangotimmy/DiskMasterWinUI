@@ -317,6 +317,102 @@
                     </StackPanel>
                 </Border>
             </PivotItem>
+
+            <!-- ── Tab 4: MSConfig 安全開機與旗標 (Safe Boot & Advanced Boot Flags) ── -->
+            <PivotItem x:Name="TabSafeBoot" Header="🛡️ 安全開機 (Safe Boot)">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                    <StackPanel Spacing="16" MaxWidth="800" HorizontalAlignment="Left">
+                        <!-- Hero Card -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE7EF;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                    <TextBlock x:Name="SafeBootTitleText" Text="MSConfig 系統安全開機模式與進階開機旗標" Style="{StaticResource SubtitleTextBlockStyle}" />
+                                </StackPanel>
+                                <TextBlock x:Name="SafeBootSubtitleText"
+                                           Text="直接調用 Windows BCD 控制底層啟動參數，支援 Minimal、Network、AlternateShell、DsRepair 安全模式，以及無 GUI 開機、開機記錄檔與測試簽署。"
+                                           Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Command="{x:Bind ViewModel.LoadSafeBootConfigCommand}" Padding="12,6">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                                            <TextBlock x:Name="LoadSafeBootBtnText" Text="🔄 讀取當前開機設定" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Grid.Column="1" Command="{x:Bind ViewModel.ApplySafeBootConfigCommand}"
+                                            Style="{StaticResource AccentButtonStyle}" Padding="14,6">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon Glyph="&#xE8FB;" FontSize="14" />
+                                            <TextBlock x:Name="ApplySafeBootBtnText" Text="💾 套用安全開機設定" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                    </Button>
+                                    <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.SafeBootOperationStatus, Mode=OneWay}"
+                                               VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}"
+                                               Foreground="{ThemeResource AccentFillColorDefaultBrush}" TextWrapping="Wrap" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Safe Boot Mode Selection Card -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
+                                <TextBlock x:Name="SafeBootModeHeader" Text="安全開機模式 (Safe Boot Mode)" Style="{StaticResource BodyStrongTextBlockStyle}" />
+
+                                <ComboBox x:Name="SafeBootModeCombo"
+                                          SelectedValue="{x:Bind ViewModel.SafeBootMode, Mode=TwoWay}"
+                                          SelectedValuePath="Tag" HorizontalAlignment="Stretch">
+                                    <ComboBoxItem Content="正常開機 (Normal Boot - 已清除安全開機旗標)" Tag="Normal" />
+                                    <ComboBoxItem Content="最小安全開機 (Minimal - 僅載入必要核心驅動)" Tag="Minimal" />
+                                    <ComboBoxItem Content="具備命令提示字元 (Alternate Shell - 命令列環境)" Tag="AlternateShell" />
+                                    <ComboBoxItem Content="具備網路功能 (Network - 支援網路通訊驅動)" Tag="Network" />
+                                    <ComboBoxItem Content="目錄服務修復 (Active Directory Repair - dsrepair)" Tag="DsRepair" />
+                                </ComboBox>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Advanced Boot Flags Card -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
+                                <TextBlock x:Name="AdvancedFlagsHeader" Text="進階開機旗標與診斷開機 (Advanced Boot Flags)" Style="{StaticResource BodyStrongTextBlockStyle}" />
+
+                                <ToggleSwitch x:Name="NoGuiBootSwitch"
+                                              Header="無 GUI 開機 (No GUI Boot / noguiboot)"
+                                              IsOn="{x:Bind ViewModel.NoGuiBoot, Mode=TwoWay}" />
+                                <ToggleSwitch x:Name="BootLogSwitch"
+                                              Header="開機記錄檔 (Boot Log / bootlog - 輸出至 ntbtlog.txt)"
+                                              IsOn="{x:Bind ViewModel.BootLog, Mode=TwoWay}" />
+                                <ToggleSwitch x:Name="BaseVideoSwitch"
+                                              Header="基本視訊 (Base Video / basevideo - 使用標準 VGA 驅動)"
+                                              IsOn="{x:Bind ViewModel.BaseVideo, Mode=TwoWay}" />
+                                <ToggleSwitch x:Name="SosSwitch"
+                                              Header="顯示作業系統開機資訊 (OS Boot Information / sos)"
+                                              IsOn="{x:Bind ViewModel.Sos, Mode=TwoWay}" />
+                                <ToggleSwitch x:Name="TestSigningSwitch"
+                                              Header="測試簽署模式 (Test Signing / testsigning)"
+                                              IsOn="{x:Bind ViewModel.TestSigning, Mode=TwoWay}" />
+                                <ToggleSwitch x:Name="NoIntegritySwitch"
+                                              Header="停用驅動程式完整性檢查 (No Integrity Checks / nointegritychecks)"
+                                              IsOn="{x:Bind ViewModel.NoIntegrityChecks, Mode=TwoWay}" />
+                                <ToggleSwitch x:Name="HypervisorSwitch"
+                                              Header="Hypervisor 虛擬化平台 (Hypervisor Launch / auto vs off)"
+                                              IsOn="{x:Bind ViewModel.HypervisorEnabled, Mode=TwoWay}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </PivotItem>
         </Pivot>
     </Grid>
 </Page>
