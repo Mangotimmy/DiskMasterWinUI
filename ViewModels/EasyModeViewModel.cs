@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -75,10 +76,15 @@ public partial class EasyModeViewModel : ObservableObject
         });
     }
 
-    private void RefreshAvailableLetters()
+    private void RefreshAvailableLetters(string? currentLetter = null)
     {
         AvailableLetters.Clear();
-        var usedDrives = System.IO.DriveInfo.GetDrives().Select(d => d.Name[0]).ToHashSet();
+        var usedDrives = System.IO.DriveInfo.GetDrives().Select(d => char.ToUpperInvariant(d.Name[0])).ToHashSet();
+        if (!string.IsNullOrEmpty(currentLetter))
+        {
+            usedDrives.Remove(char.ToUpperInvariant(currentLetter[0]));
+        }
+
         for (char c = 'A'; c <= 'Z'; c++)
         {
             if (!usedDrives.Contains(c))
@@ -254,7 +260,13 @@ public partial class EasyModeViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(SelectedBlockBadge));
         OnPropertyChanged(nameof(IsResizeSliderEnabled));
-        if (value == null || SelectedDisk == null) return;
+        if (value == null || SelectedDisk == null)
+        {
+            FormatLabel = "";
+            RefreshAvailableLetters();
+            AssignLetter = "";
+            return;
+        }
 
         foreach (var b in SelectedDisk.VisualBlocks)
         {
@@ -279,6 +291,29 @@ public partial class EasyModeViewModel : ObservableObject
         else if (!string.IsNullOrEmpty(value.DriveLetter))
         {
             SelectedVolume = Volumes.FirstOrDefault(v => v.Letter.Equals(value.DriveLetter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Sync Label, Letter and FileSystem with UI
+        if (!value.IsUnallocated)
+        {
+            FormatLabel = value.Label ?? "";
+            RefreshAvailableLetters(value.DriveLetter);
+            AssignLetter = !string.IsNullOrEmpty(value.DriveLetter) ? value.DriveLetter : "";
+
+            if (!string.IsNullOrEmpty(value.FileSystem))
+            {
+                var matched = FileSystemOptions.FirstOrDefault(f => f.Equals(value.FileSystem, StringComparison.OrdinalIgnoreCase));
+                if (matched != null)
+                {
+                    FormatFileSystem = matched;
+                }
+            }
+        }
+        else
+        {
+            FormatLabel = "";
+            RefreshAvailableLetters();
+            AssignLetter = "";
         }
 
         ResizeSliderValue = 100.0;
@@ -673,17 +708,104 @@ public partial class EasyModeViewModel : ObservableObject
         finally { IsLoading = false; }
     }
 
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    private static extern bool SetVolumeLabel(string lpRootPathName, string? lpVolumeName);
+
     [RelayCommand]
-    private async Task AssignLetterAsync()
+    private async Task SetVolumeLabelAsync()
     {
-        if (SelectedVolume == null || string.IsNullOrEmpty(AssignLetter)) return;
+        if (SelectedBlock == null || SelectedBlock.IsUnallocated) return;
         try
         {
             IsLoading = true;
-            StatusMessage = $"Assigning letter {AssignLetter}: to Volume {SelectedVolume.Number}...";
-            var output = await _diskPart.AssignLetterAsync(SelectedVolume.Number, AssignLetter[0]);
+            StatusMessage = $"正在變更分割區標籤為 '{FormatLabel}'...";
+            bool success = false;
+
+            string letter = SelectedBlock.DriveLetter;
+            if (string.IsNullOrEmpty(letter) && SelectedVolume != null)
+            {
+                letter = SelectedVolume.Letter;
+            }
+
+            if (!string.IsNullOrEmpty(letter))
+            {
+                string rootPath = $"{letter}:\\";
+                success = SetVolumeLabel(rootPath, FormatLabel);
+                if (!success)
+                {
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = "cmd.exe",
+                        Arguments = $"/c label {letter}: {FormatLabel}",
+                        CreateNoWindow = true,
+                        UseShellExecute = false
+                    };
+                    using var p = Process.Start(psi);
+                    if (p != null) await p.WaitForExitAsync();
+                    success = true;
+                }
+            }
+            else if (SelectedPartition != null && SelectedDisk != null)
+            {
+                var script = $"Get-Partition -DiskNumber {SelectedDisk.Number} -PartitionNumber {SelectedPartition.Number} | Get-Volume | Set-Volume -NewFileSystemLabel '{FormatLabel}'";
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Arguments = $"-NoProfile -Command \"{script}\"",
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                };
+                using var p = Process.Start(psi);
+                if (p != null) await p.WaitForExitAsync();
+                success = true;
+            }
+
+            SelectedBlock.Label = FormatLabel;
+            if (SelectedVolume != null) SelectedVolume.Label = FormatLabel;
+            AppendLog($"[Info] 成功更新標籤為: {FormatLabel}");
+            StatusMessage = $"標籤已更新為 '{FormatLabel}'";
+            await RefreshDisksAsync();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"變更標籤失敗: {ex.Message}";
+            AppendLog($"[Error] 變更標籤失敗: {ex.Message}");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task AssignLetterAsync()
+    {
+        if (string.IsNullOrEmpty(AssignLetter)) return;
+        try
+        {
+            IsLoading = true;
+            string output = "";
+            if (SelectedVolume != null)
+            {
+                StatusMessage = $"Assigning letter {AssignLetter}: to Volume {SelectedVolume.Number}...";
+                output = await _diskPart.AssignLetterAsync(SelectedVolume.Number, AssignLetter[0]);
+            }
+            else if (SelectedDisk != null && SelectedPartition != null)
+            {
+                StatusMessage = $"Assigning letter {AssignLetter}: to Disk {SelectedDisk.Number} Partition {SelectedPartition.Number}...";
+                output = await _diskPart.RunCustomScriptAsync($"select disk {SelectedDisk.Number}\r\nselect partition {SelectedPartition.Number}\r\nassign letter={AssignLetter[0]}");
+            }
+            else
+            {
+                return;
+            }
+
             AppendLog($"=== Assign Letter ===\n" + output);
-            RefreshAvailableLetters();
+            if (SelectedBlock != null)
+            {
+                SelectedBlock.DriveLetter = AssignLetter;
+            }
+            RefreshAvailableLetters(AssignLetter);
             await RefreshDisksAsync();
         }
         catch (Exception ex)
@@ -697,13 +819,31 @@ public partial class EasyModeViewModel : ObservableObject
     [RelayCommand]
     private async Task RemoveLetterAsync()
     {
-        if (SelectedVolume == null) return;
         try
         {
             IsLoading = true;
-            StatusMessage = $"Removing drive letter from Volume {SelectedVolume.Number}...";
-            var output = await _diskPart.RemoveLetterAsync(SelectedVolume.Number);
+            string output = "";
+            if (SelectedVolume != null)
+            {
+                StatusMessage = $"Removing drive letter from Volume {SelectedVolume.Number}...";
+                output = await _diskPart.RemoveLetterAsync(SelectedVolume.Number);
+            }
+            else if (SelectedDisk != null && SelectedPartition != null)
+            {
+                StatusMessage = $"Removing drive letter from Disk {SelectedDisk.Number} Partition {SelectedPartition.Number}...";
+                output = await _diskPart.RunCustomScriptAsync($"select disk {SelectedDisk.Number}\r\nselect partition {SelectedPartition.Number}\r\nremove");
+            }
+            else
+            {
+                return;
+            }
+
             AppendLog($"=== Remove Letter ===\n" + output);
+            if (SelectedBlock != null)
+            {
+                SelectedBlock.DriveLetter = "";
+            }
+            AssignLetter = "";
             RefreshAvailableLetters();
             await RefreshDisksAsync();
         }

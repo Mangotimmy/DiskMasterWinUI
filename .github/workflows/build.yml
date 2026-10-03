@@ -3,13 +3,11 @@ name: Build and Release Multi-Arch DiskMaster Pro
 on:
   push:
     branches: [ "main", "master" ]
-    
     paths-ignore:
       - '**.md'
       - 'docs/**'
       - '.gitignore'
       - 'LICENSE'
-
     tags: 
       - 'v*'
   pull_request:
@@ -51,17 +49,22 @@ jobs:
       run: |
         .\build_portable_singlefile.ps1 -Architecture ${{ matrix.target }}
 
+    - name: Build Windows Setup Installer (.EXE)
+      shell: pwsh
+      run: |
+        .\build_installer.ps1 -Architecture ${{ matrix.target }}
+
     - name: Archive WinPE Portable Zip
       shell: pwsh
       run: |
         Compress-Archive -Path publish/* -DestinationPath DiskMaster_${{ matrix.target }}_WinPE_Portable.zip
 
-    - name: Upload Single-File EXE Artifact
+    - name: Upload Binaries and Certificate Artifact
       if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
       uses: actions/upload-artifact@v5
       with:
-        name: DiskMaster-${{ matrix.target }}-Portable
-        path: installer_output/*.exe
+        name: DiskMaster-${{ matrix.target }}-Release
+        path: installer_output/*
         if-no-files-found: error
 
     - name: Upload Portable ZIP Artifact
@@ -75,8 +78,8 @@ jobs:
   release:
     name: Create GitHub Release
     needs: build
-    # 僅在推送版本 Tag (v*) 時才執行 Release 發布
-    if: startsWith(github.ref, 'refs/tags/v')
+    # 支援版本 Tag (v*) 或手動觸發 workflow_dispatch 發布
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     
     permissions:
@@ -90,7 +93,7 @@ jobs:
       run: |
         echo "## SHA256 Checksums" > checksums_summary.md
         echo '```' >> checksums_summary.md
-        find . -type f \( -name "*.exe" -o -name "*.zip" \) -exec sha256sum {} + | sed 's|./[^/]*/||' > SHA256SUMS.txt
+        find . -type f \( -name "*.exe" -o -name "*.zip" -o -name "*.cer" \) -exec sha256sum {} + | sed 's|./[^/]*/||' > SHA256SUMS.txt
         cat SHA256SUMS.txt >> checksums_summary.md
         echo '```' >> checksums_summary.md
 
@@ -98,10 +101,8 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          DiskMaster-win-x64-Portable/*.exe
-          DiskMaster-win-arm64-Portable/*.exe
-          DiskMaster-win-x64-Zip/DiskMaster_win-x64_WinPE_Portable.zip
-          DiskMaster-win-arm64-Zip/DiskMaster_win-arm64_WinPE_Portable.zip
+          DiskMaster-*-Release/*
+          DiskMaster-*-Zip/*.zip
           SHA256SUMS.txt
         body_path: checksums_summary.md
         generate_release_notes: true

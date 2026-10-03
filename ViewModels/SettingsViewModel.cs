@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DiskMasterWinUI.Helpers;
@@ -18,7 +20,8 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _defaultBackupFolder = @"D:\Backup";
     [ObservableProperty] private int _maxLogBufferLines = 5000;
     [ObservableProperty] private string _statusMessage = "";
-    [ObservableProperty] private string _appVersion = "v3.3.0 Flagship (Build 2026.09)";
+    [ObservableProperty] private string _appVersion = $"{UpdateService.CurrentVersion} Flagship (Build {DateTime.Now:yyyy.MM})";
+    [ObservableProperty] private string _runningModeDescription = AppEnvironmentHelper.ExecutionModeDescription;
     [ObservableProperty] private string _systemInfo = "";
     [ObservableProperty] private string _displayMetricsDescription = "";
 
@@ -79,6 +82,13 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _isCheckingUpdates = false;
     [ObservableProperty] private string _latestReleaseUrl = "";
     [ObservableProperty] private bool _hasAvailableUpdate = false;
+    [ObservableProperty] private string _matchedAssetName = "";
+    [ObservableProperty] private string _matchedAssetUrl = "";
+    [ObservableProperty] private bool _isDownloadingUpdate = false;
+    [ObservableProperty] private double _updateDownloadProgress = 0.0;
+    [ObservableProperty] private string _downloadSpeedText = "";
+    [ObservableProperty] private string _downloadedFilePath = "";
+    [ObservableProperty] private bool _isDownloadCompleted = false;
 
     // ── System Tray & Window Notifications ──
     [ObservableProperty] private bool _minimizeToTray = false;
@@ -321,9 +331,16 @@ public partial class SettingsViewModel : ObservableObject
             var result = await UpdateService.Instance.CheckForUpdatesAsync();
             HasAvailableUpdate = result.HasUpdate;
             LatestReleaseUrl = result.ReleaseUrl;
+            MatchedAssetName = result.MatchingAssetName ?? "";
+            MatchedAssetUrl = result.MatchingAssetUrl ?? "";
+            IsDownloadCompleted = false;
+            DownloadedFilePath = "";
+            UpdateDownloadProgress = 0.0;
+
             if (result.HasUpdate)
             {
-                UpdateStatusText = string.Format(LocalizationService.T("🎉 發現新版本 {0}！點擊下載更新", "🎉 发现新版本 {0}！点击下载更新", "🎉 New version {0} available! Click to update", "🎉 新バージョン {0} が利用可能です！"), result.LatestVersion);
+                var assetNote = !string.IsNullOrEmpty(MatchedAssetName) ? $" [{MatchedAssetName}]" : "";
+                UpdateStatusText = string.Format(LocalizationService.T("🎉 發現新版本 {0}{1}！點擊下方按鈕自動下載更新", "🎉 发现新版本 {0}{1}！点击下方按钮自动下载更新", "🎉 New version {0}{1} available! Click below to download update", "🎉 新バージョン {0}{1} が利用可能です！"), result.LatestVersion, assetNote);
             }
             else
             {
@@ -337,6 +354,78 @@ public partial class SettingsViewModel : ObservableObject
         finally
         {
             IsCheckingUpdates = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task DownloadUpdateAsync()
+    {
+        if (string.IsNullOrEmpty(MatchedAssetUrl) && string.IsNullOrEmpty(LatestReleaseUrl)) return;
+
+        string targetFileName = !string.IsNullOrEmpty(MatchedAssetName)
+            ? MatchedAssetName
+            : AppEnvironmentHelper.PreferredAssetName;
+
+        string downloadFolder = !string.IsNullOrWhiteSpace(GlobalDownloadPath) && Directory.Exists(GlobalDownloadPath)
+            ? GlobalDownloadPath
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
+
+        string destinationPath = Path.Combine(downloadFolder, targetFileName);
+
+        try
+        {
+            IsDownloadingUpdate = true;
+            IsDownloadCompleted = false;
+            UpdateDownloadProgress = 0.0;
+            DownloadSpeedText = "正在連接下載節點...";
+
+            var progress = new Progress<UpdateDownloadProgress>(p =>
+            {
+                UpdateDownloadProgress = p.Percent;
+                var downloadedMb = p.BytesReceived / 1048576.0;
+                var totalMb = p.TotalBytes > 0 ? (p.TotalBytes / 1048576.0) : 0;
+                DownloadSpeedText = totalMb > 0
+                    ? $"{downloadedMb:F1} MB / {totalMb:F1} MB ({p.Percent:F0}%) • {p.SpeedText}"
+                    : $"{downloadedMb:F1} MB • {p.SpeedText}";
+            });
+
+            string url = !string.IsNullOrEmpty(MatchedAssetUrl) ? MatchedAssetUrl : LatestReleaseUrl;
+            await UpdateService.Instance.DownloadReleaseAssetAsync(url, destinationPath, progress);
+
+            DownloadedFilePath = destinationPath;
+            IsDownloadCompleted = true;
+            DownloadSpeedText = $"✅ 下載完成！已儲存至: {destinationPath}";
+            UpdateStatusText = $"🎉 更新已成功下載至本機 ({targetFileName})";
+        }
+        catch (Exception ex)
+        {
+            DownloadSpeedText = $"❌ 下載失敗: {ex.Message}";
+        }
+        finally
+        {
+            IsDownloadingUpdate = false;
+        }
+    }
+
+    [RelayCommand]
+    public void ApplyDownloadedUpdate()
+    {
+        if (!string.IsNullOrEmpty(DownloadedFilePath) && File.Exists(DownloadedFilePath))
+        {
+            UpdateService.ApplyUpdateAndRestart(DownloadedFilePath);
+        }
+    }
+
+    [RelayCommand]
+    public void OpenDownloadedFolder()
+    {
+        if (!string.IsNullOrEmpty(DownloadedFilePath) && File.Exists(DownloadedFilePath))
+        {
+            try
+            {
+                Process.Start("explorer.exe", $"/select,\"{DownloadedFilePath}\"");
+            }
+            catch { }
         }
     }
 
