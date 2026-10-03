@@ -60,24 +60,71 @@ public class KeyReaderService
                 }
             }
 
-            // 2. Hardware serials & Board info via in-process WMI (ultra-fast < 20ms)
+            // 2. Hardware serials & Board info via Registry + in-process WMI (ultra-fast < 20ms)
             try
             {
+                // Pre-populate from BIOS registry (0ms non-elevated read)
+                try
+                {
+                    using var biosRegKey = Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\BIOS");
+                    if (biosRegKey != null)
+                    {
+                        var boardMfg = biosRegKey.GetValue("BaseBoardManufacturer")?.ToString()?.Trim();
+                        var sysMfg = biosRegKey.GetValue("SystemManufacturer")?.ToString()?.Trim();
+                        var boardProd = biosRegKey.GetValue("BaseBoardProduct")?.ToString()?.Trim();
+                        var sysProd = biosRegKey.GetValue("SystemProductName")?.ToString()?.Trim();
+
+                        if (IsValidHardwareString(boardMfg)) info.MotherboardManufacturer = boardMfg!;
+                        else if (IsValidHardwareString(sysMfg)) info.MotherboardManufacturer = sysMfg!;
+
+                        if (IsValidHardwareString(boardProd)) info.MotherboardProduct = boardProd!;
+                        else if (IsValidHardwareString(sysProd)) info.MotherboardProduct = sysProd!;
+                    }
+                }
+                catch { }
+
                 using var biosSearcher = new ManagementObjectSearcher(@"root\cimv2", "SELECT SerialNumber FROM Win32_BIOS");
                 using var biosColl = biosSearcher.Get();
                 foreach (ManagementObject obj in biosColl)
                 {
-                    info.BiosSerialNumber = obj["SerialNumber"]?.ToString()?.Trim() ?? "";
-                    if (!string.IsNullOrEmpty(info.BiosSerialNumber)) break;
+                    var serial = obj["SerialNumber"]?.ToString()?.Trim() ?? "";
+                    if (IsValidHardwareString(serial))
+                    {
+                        info.BiosSerialNumber = serial;
+                        break;
+                    }
                 }
 
                 using var boardSearcher = new ManagementObjectSearcher(@"root\cimv2", "SELECT Product, Manufacturer FROM Win32_BaseBoard");
                 using var boardColl = boardSearcher.Get();
                 foreach (ManagementObject obj in boardColl)
                 {
-                    info.MotherboardProduct = obj["Product"]?.ToString()?.Trim() ?? "";
-                    info.MotherboardManufacturer = obj["Manufacturer"]?.ToString()?.Trim() ?? "";
-                    if (!string.IsNullOrEmpty(info.MotherboardProduct) || !string.IsNullOrEmpty(info.MotherboardManufacturer)) break;
+                    var prod = obj["Product"]?.ToString()?.Trim();
+                    var mfg = obj["Manufacturer"]?.ToString()?.Trim();
+                    if (IsValidHardwareString(prod)) info.MotherboardProduct = prod!;
+                    if (IsValidHardwareString(mfg)) info.MotherboardManufacturer = mfg!;
+                    if (!string.IsNullOrEmpty(info.MotherboardProduct) && !string.IsNullOrEmpty(info.MotherboardManufacturer)) break;
+                }
+
+                // If manufacturer or product is still missing/generic, query Win32_ComputerSystem
+                if (!IsValidHardwareString(info.MotherboardManufacturer) || !IsValidHardwareString(info.MotherboardProduct))
+                {
+                    try
+                    {
+                        using var sysSearcher = new ManagementObjectSearcher(@"root\cimv2", "SELECT Manufacturer, Model FROM Win32_ComputerSystem");
+                        using var sysColl = sysSearcher.Get();
+                        foreach (ManagementObject obj in sysColl)
+                        {
+                            var sysMfg = obj["Manufacturer"]?.ToString()?.Trim();
+                            var sysMod = obj["Model"]?.ToString()?.Trim();
+                            if (!IsValidHardwareString(info.MotherboardManufacturer) && IsValidHardwareString(sysMfg))
+                                info.MotherboardManufacturer = sysMfg!;
+                            if (!IsValidHardwareString(info.MotherboardProduct) && IsValidHardwareString(sysMod))
+                                info.MotherboardProduct = sysMod!;
+                            break;
+                        }
+                    }
+                    catch { }
                 }
 
                 sb.AppendLine($"[BIOS Serial] {info.BiosSerialNumber}");
@@ -226,5 +273,21 @@ public class KeyReaderService
         {
             return "Unable to decode key";
         }
+    }
+
+    private static bool IsValidHardwareString(string? val)
+    {
+        if (string.IsNullOrWhiteSpace(val)) return false;
+        var s = val.Trim();
+        if (s.Equals("To be filled by O.E.M.", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("Default string", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("System manufacturer", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("System Product Name", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("None", StringComparison.OrdinalIgnoreCase) ||
+            s.Equals("Unknown", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+        return true;
     }
 }

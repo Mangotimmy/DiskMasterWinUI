@@ -12,8 +12,23 @@ internal static class Program
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern int MessageBox(IntPtr hWnd, string lpText, string lpCaption, uint uType);
 
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool DeleteFile(string lpFileName);
+
     private const uint MB_OK = 0x00000000;
     private const uint MB_ICONERROR = 0x00000010;
+
+    private static void StripZoneIdentifier(string filePath)
+    {
+        try
+        {
+            if (File.Exists(filePath))
+            {
+                DeleteFile($"{filePath}:Zone.Identifier");
+            }
+        }
+        catch { }
+    }
 
     [STAThread]
     private static int Main(string[] args)
@@ -34,6 +49,7 @@ internal static class Program
 
             // Determine unique version tag based on launcher file write time
             var launcherPath = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "DiskMaster_Portable.exe");
+            StripZoneIdentifier(launcherPath);
             var launcherTicks = File.Exists(launcherPath) ? File.GetLastWriteTimeUtc(launcherPath).Ticks : 0;
             var versionTag = launcherTicks > 0 ? $"app_{launcherTicks}" : "app_latest";
 
@@ -106,6 +122,8 @@ internal static class Program
             }
 
             // 2. Launch application (default asInvoker; elevate if requested)
+            StripZoneIdentifier(targetExePath);
+
             bool requestAdmin = args.Any(a => string.Equals(a, "--elevate", StringComparison.OrdinalIgnoreCase) ||
                                               string.Equals(a, "/elevate", StringComparison.OrdinalIgnoreCase));
 
