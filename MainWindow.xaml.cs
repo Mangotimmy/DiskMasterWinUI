@@ -1064,9 +1064,12 @@ public sealed partial class MainWindow : Window
         _settingsPage?.ApplyLanguage();
     }
 
+    private string? _currentNavigatedTag;
+
     public void NavigateToTag(string? tag)
     {
-        if (string.IsNullOrEmpty(tag)) return;
+        if (string.IsNullOrEmpty(tag) || tag == _currentNavigatedTag) return;
+        _currentNavigatedTag = tag;
         switch (tag)
         {
             case "Starter":

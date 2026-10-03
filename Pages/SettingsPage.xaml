@@ -526,12 +526,33 @@
                         <Button x:Name="CheckUpdateBtn" Content="🔍 立即檢查更新"
                                 Command="{x:Bind ViewModel.CheckForUpdatesCommand}"
                                 Style="{StaticResource AccentButtonStyle}" />
-                        <Button x:Name="DownloadUpdateBtn" Content="🌐 下載最新版本"
+                        <Button x:Name="AutoDownloadUpdateBtn" Content="📥 一鍵下載更新至本機"
+                                Command="{x:Bind ViewModel.DownloadUpdateCommand}"
+                                IsEnabled="{x:Bind ViewModel.IsDownloadingUpdate, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}"
+                                Visibility="{x:Bind ViewModel.HasAvailableUpdate, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                Style="{StaticResource AccentButtonStyle}" />
+                        <Button x:Name="DownloadUpdateBtn" Content="🌐 前往 Release 網頁"
                                 Command="{x:Bind ViewModel.OpenUpdateDownloadCommand}"
                                 Visibility="{x:Bind ViewModel.HasAvailableUpdate, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
                         <ProgressRing IsActive="{x:Bind ViewModel.IsCheckingUpdates, Mode=OneWay}" Width="20" Height="20" VerticalAlignment="Center" />
                         <TextBlock Text="{x:Bind ViewModel.UpdateStatusText, Mode=OneWay}" VerticalAlignment="Center"
                                    Style="{StaticResource CaptionTextBlockStyle}" FontWeight="SemiBold" />
+                    </StackPanel>
+
+                    <!-- Download Progress & Actions -->
+                    <StackPanel Spacing="8" Visibility="{x:Bind ViewModel.IsDownloadingUpdate, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <ProgressBar Minimum="0" Maximum="100" Value="{x:Bind ViewModel.UpdateDownloadProgress, Mode=OneWay}" Height="8" HorizontalAlignment="Stretch" />
+                        <TextBlock Text="{x:Bind ViewModel.DownloadSpeedText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource AccentFillColorDefaultBrush}" FontWeight="SemiBold" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="12" Visibility="{x:Bind ViewModel.IsDownloadCompleted, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <Button x:Name="ApplyUpdateBtn" Content="🚀 立即套用更新 / 升級重啟"
+                                Command="{x:Bind ViewModel.ApplyDownloadedUpdateCommand}"
+                                Style="{StaticResource AccentButtonStyle}" />
+                        <Button x:Name="OpenDownloadFolderBtn" Content="📂 開啟檔案位置"
+                                Command="{x:Bind ViewModel.OpenDownloadedFolderCommand}" />
+                        <TextBlock Text="{x:Bind ViewModel.DownloadSpeedText, Mode=OneWay}" VerticalAlignment="Center"
+                                   Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource SystemFillColorSuccessBrush}" FontWeight="SemiBold" />
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -556,8 +577,9 @@
                     CornerRadius="8" Padding="16">
                 <StackPanel Spacing="8">
                     <TextBlock x:Name="AboutHeader" Text="ℹ️ 軟體與系統環境資訊" Style="{StaticResource SubtitleTextBlockStyle}" />
-                    <TextBlock Text="{x:Bind ViewModel.AppVersion}" FontWeight="SemiBold" />
-                    <TextBlock Text="{x:Bind ViewModel.SystemInfo}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Text="{x:Bind ViewModel.AppVersion, Mode=OneWay}" FontWeight="SemiBold" />
+                    <TextBlock Text="{x:Bind ViewModel.RunningModeDescription, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource AccentFillColorDefaultBrush}" FontWeight="SemiBold" />
+                    <TextBlock Text="{x:Bind ViewModel.SystemInfo, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
             </Border>
 

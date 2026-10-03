@@ -28,50 +28,12 @@ public static class TabReorderHelper
         tabView.TabDragStarting += (sender, args) =>
         {
             _currentDraggedItem = args.Tab;
-            args.Data.RequestedOperation = DataPackageOperation.Move;
-            args.Data.Properties["DraggedTab"] = args.Tab;
         };
 
-        tabView.TabStripDragOver += (sender, args) =>
+        tabView.TabDragCompleted += (sender, args) =>
         {
-            args.AcceptedOperation = DataPackageOperation.Move;
-        };
-
-        tabView.TabStripDrop += (sender, args) =>
-        {
-            var dragged = _currentDraggedItem;
             _currentDraggedItem = null;
-
-            if (dragged == null || sender is not TabView tv) return;
-
-            int oldIndex = tv.TabItems.IndexOf(dragged);
-            if (oldIndex < 0) return;
-
-            // Calculate drop target index based on cursor X position
-            var point = args.GetPosition(tv);
-            int newIndex = tv.TabItems.Count - 1;
-
-            for (int i = 0; i < tv.TabItems.Count; i++)
-            {
-                if (tv.TabItems[i] is FrameworkElement container)
-                {
-                    var transform = container.TransformToVisual(tv);
-                    var containerPos = transform.TransformPoint(new Windows.Foundation.Point(0, 0));
-                    if (point.X < containerPos.X + (container.ActualWidth / 2))
-                    {
-                        newIndex = i;
-                        break;
-                    }
-                }
-            }
-
-            if (newIndex >= 0 && newIndex != oldIndex && newIndex < tv.TabItems.Count)
-            {
-                tv.TabItems.RemoveAt(oldIndex);
-                tv.TabItems.Insert(newIndex, dragged);
-                tv.SelectedItem = dragged;
-                onReordered?.Invoke();
-            }
+            onReordered?.Invoke();
         };
 
         // Attach context menu items and keyboard reordering to each tab item

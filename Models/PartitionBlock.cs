@@ -15,14 +15,33 @@ public enum PartitionBlockType
 
 public partial class PartitionBlock : ObservableObject
 {
-    [ObservableProperty] private int _partitionNumber;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HeaderText))]
+    private int _partitionNumber;
+
     [ObservableProperty] private int _volumeNumber = -1;
-    [ObservableProperty] private string _driveLetter = "";
-    [ObservableProperty] private string _label = "";
-    [ObservableProperty] private string _fileSystem = "";
-    [ObservableProperty] private string _typeDescription = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HeaderText))]
+    private string _driveLetter = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HeaderText))]
+    private string _label = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SubtitleText))]
+    private string _fileSystem = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SubtitleText))]
+    private string _typeDescription = "";
+
     [ObservableProperty] private long _sizeBytes;
-    [ObservableProperty] private string _sizeDisplay = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SubtitleText))]
+    private string _sizeDisplay = "";
     [ObservableProperty] private double _proportionalWeight = 1.0;
     [ObservableProperty] private double _displayWidth = 140.0;
     [ObservableProperty] private bool _isResizable = true;

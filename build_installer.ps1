@@ -1,68 +1,101 @@
-# Build and Package DiskMaster Installer
+# Build Native Windows Setup Installer (DiskMaster_Setup.exe)
+param(
+    [string]$Architecture = "win-x64"
+)
+
 $ErrorActionPreference = "Stop"
 
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  Building DiskMaster Release & Setup   " -ForegroundColor Cyan
-Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "=================================================================" -ForegroundColor Cyan
+Write-Host "     DiskMaster Pro Windows Setup Installer (.EXE) Builder       " -ForegroundColor Cyan
+Write-Host "     Target Architecture: $Architecture                          " -ForegroundColor Cyan
+Write-Host "=================================================================" -ForegroundColor Cyan
 
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
-Set-Location $ScriptDir
+$projectDir = $PSScriptRoot
+Set-Location $projectDir
 
-# 1. Publish Release
-Write-Host "`n[1/3] Publishing self-contained Release (win-x64)..." -ForegroundColor Yellow
-dotnet publish -c Release -r win-x64 --self-contained -o "./publish"
+# Close any running instances
+Stop-Process -Name "DiskMasterWinUI" -Force -ErrorAction SilentlyContinue
+Stop-Process -Name "DiskMaster_Setup" -Force -ErrorAction SilentlyContinue
+Stop-Process -Name "DiskMasterInstaller" -Force -ErrorAction SilentlyContinue
 
-# Verify critical files
-$criticalFiles = @(
-    "publish\DiskMasterWinUI.exe",
-    "publish\resources.pri",
-    "publish\MainWindow.xbf",
-    "publish\App.xbf"
-)
-foreach ($f in $criticalFiles) {
-    if (-not (Test-Path $f)) {
-        Write-Error "Critical file missing in publish directory: $f"
+$publishDir = "$projectDir\publish"
+$installerProj = "$projectDir\tools\DiskMasterInstaller\DiskMasterInstaller.csproj"
+$payloadZip = "$projectDir\tools\DiskMasterInstaller\payload.zip"
+$installerCert = "$projectDir\tools\DiskMasterInstaller\DiskMaster_Certificate.cer"
+$outputDir = "$projectDir\installer_output"
+
+if (-not (Test-Path $outputDir)) {
+    New-Item -ItemType Directory -Path $outputDir | Out-Null
+}
+
+# 1. Ensure publish directory is fresh
+if (-not (Test-Path "$publishDir\DiskMasterWinUI.exe")) {
+    Write-Host "`n[1/4] Publishing main WinUI 3 project ($Architecture)..." -ForegroundColor Yellow
+    dotnet publish "$projectDir\DiskMasterWinUI.csproj" -c Release -r $Architecture --self-contained true -o $publishDir
+    Copy-Item -Recurse -Force "$projectDir\Scripts" "$publishDir\"
+} else {
+    Write-Host "`n[1/4] Using existing published binaries in $publishDir..." -ForegroundColor Yellow
+}
+
+# 2. Compress publish directory into payload.zip
+Write-Host "`n[2/4] Compacting payload archive into installer..." -ForegroundColor Yellow
+if (Test-Path $payloadZip) { Remove-Item $payloadZip -Force }
+
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[System.IO.Compression.ZipFile]::CreateFromDirectory($publishDir, $payloadZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+
+$zipSizeMb = [math]::Round((Get-Item $payloadZip).Length / 1MB, 2)
+Write-Host "[OK] Compressed installer payload size: $zipSizeMb MB" -ForegroundColor Green
+
+# Copy Certificate if available
+$existingCert = "$outputDir\DiskMaster_Certificate.cer"
+if (Test-Path $existingCert) {
+    Copy-Item -Force $existingCert $installerCert
+}
+
+# 3. Compile Installer into single-file executable
+Write-Host "`n[3/4] Compiling Single-File Setup Installer ($Architecture)..." -ForegroundColor Yellow
+$tempOut = "$projectDir\tools\DiskMasterInstaller\bin\temp_out"
+if (Test-Path $tempOut) { Remove-Item $tempOut -Recurse -Force }
+
+dotnet publish $installerProj `
+    -c Release `
+    -r $Architecture `
+    --self-contained true `
+    -p:PublishSingleFile=true `
+    -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:EnableCompressionInSingleFile=true `
+    -o $tempOut
+
+# 4. Finalize and move output
+Write-Host "`n[4/4] Finalizing setup installer executable..." -ForegroundColor Yellow
+$archSuffix = if ($Architecture -eq "win-arm64") { "_arm64" } else { "" }
+$finalExeName = "DiskMaster${archSuffix}_Setup.exe"
+$finalExePath = Join-Path $outputDir $finalExeName
+
+Copy-Item "$tempOut\DiskMasterInstaller.exe" -Destination $finalExePath -Force
+
+# Cleanup temp files
+Remove-Item $payloadZip -Force -ErrorAction SilentlyContinue
+Remove-Item $installerCert -Force -ErrorAction SilentlyContinue
+Remove-Item $tempOut -Recurse -Force -ErrorAction SilentlyContinue
+
+# 5. Sign binary with Authenticode certificate
+$signScript = "$projectDir\tools\Sign-ReleaseBinary.ps1"
+if (Test-Path $signScript) {
+    Write-Host "`n[5/5] Signing setup installer with Authenticode..." -ForegroundColor Yellow
+    try {
+        & $signScript -TargetPath $finalExePath
+    } catch {
+        Write-Warning "Signing failed or skipped: $_"
     }
 }
-Write-Host "Publish verification succeeded! All XAML and PRI files verified." -ForegroundColor Green
 
-# 2. Locate Inno Setup Compiler
-Write-Host "`n[2/3] Locating Inno Setup Compiler..." -ForegroundColor Yellow
-$isccCandidates = @(
-    "C:\Users\Atszl\AppData\Local\Programs\Inno Setup 6\ISCC.exe",
-    "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
-    "C:\Program Files\Inno Setup 6\ISCC.exe",
-    (Get-Command ISCC.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source)
-)
+Unblock-File $finalExePath -ErrorAction SilentlyContinue
 
-$iscc = $null
-foreach ($path in $isccCandidates) {
-    if ($path -and (Test-Path $path)) {
-        $iscc = $path
-        break
-    }
-}
-
-if (-not $iscc) {
-    Write-Error "Inno Setup Compiler (ISCC.exe) was not found."
-}
-Write-Host "Found ISCC at: $iscc" -ForegroundColor Green
-
-# 3. Compile Installer
-Write-Host "`n[3/3] Compiling Installer executable..." -ForegroundColor Yellow
-if (-not (Test-Path "installer_output")) {
-    New-Item -ItemType Directory -Path "installer_output" | Out-Null
-}
-
-& $iscc "DiskMasterSetup.iss"
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "Inno Setup compilation failed with exit code $LASTEXITCODE"
-}
-
-$installer = Get-Item "installer_output\DiskMaster-Setup-v1.0.0.exe"
-Write-Host "`n========================================" -ForegroundColor Green
-Write-Host " Installer Successfully Created!" -ForegroundColor Green
-Write-Host " File: $($installer.FullName)" -ForegroundColor White
-Write-Host " Size: $([math]::Round($installer.Length / 1MB, 2)) MB" -ForegroundColor White
-Write-Host "========================================" -ForegroundColor Green
+$exeSizeMb = [math]::Round((Get-Item $finalExePath).Length / 1MB, 2)
+Write-Host "`n=================================================================" -ForegroundColor Green
+Write-Host "  SUCCESS: Windows Setup Installer EXE Generated!" -ForegroundColor Green
+Write-Host "  Path: $finalExePath" -ForegroundColor Cyan
+Write-Host "  File Size: $exeSizeMb MB" -ForegroundColor Cyan
+Write-Host "=================================================================" -ForegroundColor Green

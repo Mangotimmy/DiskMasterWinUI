@@ -378,7 +378,7 @@
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="100" />
-                                        <ColumnDefinition Width="110" />
+                                        <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
@@ -393,8 +393,17 @@
                                               ItemsSource="{x:Bind ViewModel.ClusterSizes}"
                                               SelectedItem="{x:Bind ViewModel.SelectedClusterSize, Mode=TwoWay}" />
 
-                                    <TextBox x:Name="LabelBox" Grid.Column="2" Header="Volume Label"
-                                             Text="{x:Bind ViewModel.FormatLabel, Mode=TwoWay}" />
+                                    <Grid Grid.Column="2" ColumnSpacing="4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="LabelBox" Grid.Column="0" Header="Volume Label"
+                                                 Text="{x:Bind ViewModel.FormatLabel, Mode=TwoWay}" MinWidth="110" />
+                                        <Button x:Name="SetLabelBtn" Grid.Column="1" Content="🏷️" VerticalAlignment="Bottom"
+                                                Command="{x:Bind ViewModel.SetVolumeLabelCommand}"
+                                                ToolTipService.ToolTip="變更磁碟區標籤 (免格式化直接重命名)" />
+                                    </Grid>
 
                                     <ToggleSwitch x:Name="QuickFormatSwitch" Grid.Column="3"
                                                   IsOn="{x:Bind ViewModel.QuickFormat, Mode=TwoWay}"

@@ -217,7 +217,10 @@ public sealed partial class SettingsPage : Page
         AutoCheckUpdatesToggle.OnContent = LocalizationService.T("自動檢查", "自动检查", "Automatic", "自動");
         UpdateFrequencyBox.Header = LocalizationService.T("檢查更新頻率", "检查更新频率", "Check Frequency", "確認頻度");
         CheckUpdateBtn.Content = LocalizationService.T("🔍 立即檢查更新", "🔍 立即检查更新", "🔍 Check for Updates", "🔍 アップデートを確認");
-        DownloadUpdateBtn.Content = LocalizationService.T("🌐 下載最新版本", "🌐 下载最新版本", "🌐 Download Latest Release", "🌐 最新版をダウンロード");
+        AutoDownloadUpdateBtn.Content = LocalizationService.T("📥 一鍵下載更新至本機", "📥 一键下载更新至本机", "📥 Download Update to PC", "📥 PCに更新をダウンロード");
+        DownloadUpdateBtn.Content = LocalizationService.T("🌐 前往 Release 網頁", "🌐 前往 Release 网页", "🌐 Open Release Webpage", "🌐 リリースページを開く");
+        ApplyUpdateBtn.Content = LocalizationService.T("🚀 立即套用更新 / 升級重啟", "🚀 立即应用更新 / 升级重启", "🚀 Apply Update & Restart", "🚀 更新を適用して再起動");
+        OpenDownloadFolderBtn.Content = LocalizationService.T("📂 開啟檔案位置", "📂 打开文件位置", "📂 Open File Location", "📂 ファイルの場所を開く");
 
         // Section 8: Maintenance & Cache
         MaintenanceHeader.Text = LocalizationService.T("🧹 維護與暫存清理", "🧹 维护与临时清理", "🧹 Maintenance & Cache Cleanup", "🧹 メンテナンスとキャッシュ削除");
