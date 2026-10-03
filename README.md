@@ -42,7 +42,7 @@ DiskMaster Pro runs as a **self-contained unpackaged desktop application** (`Win
 - **Direct ISO Acquisition**: Integrated Fido / Microsoft official download helpers with HTTP Range header probing and download resume support.
 
 ### 3.  MSConfig-Style BCD Boot Manager & Safe Boot
-- **Comprehensive BCD Management**: Enumerate, add, delete, rename, and backup/restore Windows Boot Configuration Data entries.
+- **Comprehensive BCD Management**: Enumerate, add, delete, rename, and backup/restore Windows Boot Configuration Data entries using `bcdedit` and native WMI/BcdObject providers.
 - **One-Click ESP Auto-Mount**: Safely mount and unmount hidden EFI System Partitions (`mountvol /s` / `mountvol /d`) with automatic unmount guarantees on application exit.
 - **Safe Boot Modes**: Interactive selection of MSConfig-equivalent safe boot profiles:
   - `Minimal`: Core safe mode drivers only (`safeboot minimal`).
@@ -67,8 +67,8 @@ DiskMaster Pro runs as a **self-contained unpackaged desktop application** (`Win
 - **One-Click Actions**: Open directly in File Explorer, trigger native safe cleanup, or launch DISM Component Cleanup.
 
 ### 6.  Hidden Performance & CPU Power Tuning
-- **Ultra Gaming & Latency Optimization**:
-- **Complete Hiberfil.sys Purge**:
+- **Ultra Gaming & Latency Optimization**: Fine-tune hidden power scheme attributes under the processor power management subgroup (`SUB_PROCESSOR`), unlock processor energy performance preference (EPP), unpark CPU cores (0% to 100%), and disable dynamic ticking (`disabledynamictick yes`).
+- **Complete Hiberfil.sys Purge**: Safely disable Windows hibernation (`powercfg /h off`) and instantly purge the dormant `hiberfil.sys` file to reclaim up to 32 GB of SSD storage.
 
 ### 7.  S.M.A.R.T. NVMe Telemetry & Reliability Monitoring
 - **NVMe Log Page 0x02 Specification Compliance**: Fully compliant with NVM Express Base Specification 5.14.1.2 (correct byte offset 128 for `PowerOnHours`, offset 112 for `PowerCycles`, offset 3 for `AvailableSpare`).

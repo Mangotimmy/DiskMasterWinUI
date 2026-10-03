@@ -10,7 +10,7 @@
     Loaded="Page_Loaded">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
-        <StackPanel Spacing="20" MaxWidth="1050" HorizontalAlignment="Left">
+        <StackPanel Spacing="20" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
             <!-- Hero Health Score Card -->
             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"

@@ -50,7 +50,7 @@
                 <!-- ════ Tab 1: UPnP 自動通訊埠轉發 ════ -->
                 <TabViewItem x:Name="TabUpnp" Header="🔀 UPnP 自動通訊埠轉發" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                        <StackPanel Spacing="16" MaxWidth="1000" HorizontalAlignment="Left">
+                        <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Status & Quick Presets -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -72,18 +72,25 @@
                                                 VerticalAlignment="Center" />
                                     </Grid>
 
-                                    <!-- Quick Game Presets Buttons -->
+                                    <!-- Quick Game Presets Buttons (Responsive 2x3 Grid) -->
                                     <TextBlock Text="熱門遊戲與伺服器範本快速載入：" FontWeight="SemiBold" FontSize="13" />
-                                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <Button Content="⛏️ Minecraft (25565)" Click="PresetMinecraft_Click" />
-                                            <Button Content="🎮 Steam CS2 (27015)" Click="PresetSteam_Click" />
-                                            <Button Content="🌳 Terraria (7777)" Click="PresetTerraria_Click" />
-                                            <Button Content="🐺 Palworld (8211)" Click="PresetPalworld_Click" />
-                                            <Button Content="🖥️ Windows 遠端桌面 (3389)" Click="PresetRdp_Click" />
-                                            <Button Content="🎬 Plex 串流 (32400)" Click="PresetPlex_Click" />
-                                        </StackPanel>
-                                    </ScrollViewer>
+                                    <Grid ColumnSpacing="10" RowSpacing="8" HorizontalAlignment="Stretch">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Button Grid.Row="0" Grid.Column="0" Content="⛏️ Minecraft (25565)" Click="PresetMinecraft_Click" HorizontalAlignment="Stretch" />
+                                        <Button Grid.Row="0" Grid.Column="1" Content="🎮 Steam CS2 (27015)" Click="PresetSteam_Click" HorizontalAlignment="Stretch" />
+                                        <Button Grid.Row="0" Grid.Column="2" Content="🌳 Terraria (7777)" Click="PresetTerraria_Click" HorizontalAlignment="Stretch" />
+                                        <Button Grid.Row="1" Grid.Column="0" Content="🐺 Palworld (8211)" Click="PresetPalworld_Click" HorizontalAlignment="Stretch" />
+                                        <Button Grid.Row="1" Grid.Column="1" Content="🖥️ Windows 遠端桌面 (3389)" Click="PresetRdp_Click" HorizontalAlignment="Stretch" />
+                                        <Button Grid.Row="1" Grid.Column="2" Content="🎬 Plex 串流 (32400)" Click="PresetPlex_Click" HorizontalAlignment="Stretch" />
+                                    </Grid>
 
                                     <!-- Manual Add Rule Form -->
                                     <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
@@ -148,7 +155,7 @@
                 <!-- ════ Tab 2: 推薦 DNS 設定與快取清理 ════ -->
                 <TabViewItem x:Name="TabDns" Header="🌐 推薦 DNS 設定" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                        <StackPanel Spacing="16" MaxWidth="1000" HorizontalAlignment="Left">
+                        <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- DNS Presets Card -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -217,7 +224,7 @@
                 <!-- ════ Tab 3: 為什麼網路慢？智慧診斷 ════ -->
                 <TabViewItem x:Name="TabDiagnostic" Header="🩺 智慧連線卡頓診斷" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                        <StackPanel Spacing="16" MaxWidth="1000" HorizontalAlignment="Left">
+                        <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Hero Diagnostic Card -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -277,7 +284,7 @@
                 <!-- ════ Tab 4: Windows Hosts 檔案視覺化編輯器 ════ -->
                 <TabViewItem x:Name="TabHosts" Header="📝 Hosts 檔案編輯器" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                        <StackPanel Spacing="16" MaxWidth="1000" HorizontalAlignment="Left">
+                        <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Control Card -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"

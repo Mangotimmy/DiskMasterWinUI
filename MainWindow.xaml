@@ -313,11 +313,11 @@
                               HorizontalScrollBarVisibility="Disabled"
                               VerticalScrollBarVisibility="Auto"
                               SizeChanged="ContentScrollViewer_SizeChanged">
-                    <Grid x:Name="ContentRoot" RenderTransformOrigin="0,0" HorizontalAlignment="Left">
+                    <Grid x:Name="ContentRoot" RenderTransformOrigin="0,0" HorizontalAlignment="Stretch">
                         <Grid.RenderTransform>
                             <ScaleTransform x:Name="RootScaleTransform" ScaleX="1.0" ScaleY="1.0" />
                         </Grid.RenderTransform>
-                        <Frame x:Name="ContentFrame" SizeChanged="ContentFrame_SizeChanged" />
+                        <Frame x:Name="ContentFrame" SizeChanged="ContentFrame_SizeChanged" HorizontalAlignment="Stretch" />
                     </Grid>
                 </ScrollViewer>
 

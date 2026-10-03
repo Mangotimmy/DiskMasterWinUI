@@ -15,6 +15,7 @@
             <helpers:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter" />
             <helpers:BoolToVisibilityConverter x:Key="InvertBoolToVisibilityConverter" Invert="True" />
             <helpers:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
+            <helpers:StringFormatConverter x:Key="StringFormatConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>
