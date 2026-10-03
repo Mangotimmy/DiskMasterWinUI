@@ -19,7 +19,7 @@
 
 ---
 
-## 📖 Overview
+##  Overview
 
 **DiskMaster Pro** is a modern, enterprise-grade Windows system maintenance and deployment utility engineered natively in **WinUI 3 (Windows App SDK)** and **.NET 9**. Designed for system engineers, IT administrators, power users, and competitive gamers, it integrates low-level disk operations, offline Windows image servicing, NVMe telemetry, BCD boot configuration, OEM driver lifecycle management, storage directory space diagnostics, and hidden kernel/CPU power tuning into a single, cohesive, high-performance application.
 
@@ -27,21 +27,21 @@ DiskMaster Pro runs as a **self-contained unpackaged desktop application** (`Win
 
 ---
 
-## 🌟 Key Features
+##  Key Features
 
-### 1. 💽 Easy Mode & Graphical Partitioning
+### 1.  Easy Mode & Graphical Partitioning
 - **Visual Partition Sizer**: Interactive partition visualization map allowing drag-and-snap partition sizing, shrinking, and expansion.
 - **Dynamic Physical Disk Selection**: Automatic hardware hot-plug detection; dynamically indexes physical disks (`SelectedDisk.Number`) with real-time sector size and partition style reporting.
 - **Lossless & Direct Conversions**: One-click conversion between MBR and GPT partition tables.
 - **Volume Lifecycle Management**: Format volumes (NTFS, FAT32, exFAT, ReFS), assign/remove drive letters, label volumes, and clean disks with defensive verification barriers.
 
-### 2. 🚀 WIM / ESD Deployment Engine
+### 2.  WIM / ESD Deployment Engine
 - **Image Servicing & Deployment**: Apply, capture, mount, and split Windows WIM, ESD, and SWM images using native DISM pipelines.
 - **Compact OS Integration**: Deploy Windows in ultra-compact compressed states (`XPRESS4K`, `XPRESS8K`, `XPRESS16K`, `LZX`) to save up to 60% of OS footprint on lightweight SSDs and embedded drives.
 - **Windows 11 Hardware Bypass**: Automatic offline registry injection bypassing TPM 2.0, SecureBoot, RAM (4GB), and CPU generation checks during unattended installations.
 - **Direct ISO Acquisition**: Integrated Fido / Microsoft official download helpers with HTTP Range header probing and download resume support.
 
-### 3. 🛡️ MSConfig-Style BCD Boot Manager & Safe Boot
+### 3.  MSConfig-Style BCD Boot Manager & Safe Boot
 - **Comprehensive BCD Management**: Enumerate, add, delete, rename, and backup/restore Windows Boot Configuration Data entries.
 - **One-Click ESP Auto-Mount**: Safely mount and unmount hidden EFI System Partitions (`mountvol /s` / `mountvol /d`) with automatic unmount guarantees on application exit.
 - **Safe Boot Modes**: Interactive selection of MSConfig-equivalent safe boot profiles:
@@ -52,13 +52,13 @@ DiskMaster Pro runs as a **self-contained unpackaged desktop application** (`Win
   - `Normal Boot`: Clean removal of safe boot flags.
 - **Advanced Kernel Boot Flags**: Toggle low-level BCD switches including `noguiboot` (No GUI boot), `bootlog` (write `ntbtlog.txt`), `basevideo` (standard VGA driver), `sos` (verbose kernel driver loading), `testsigning` (test mode), `nointegritychecks` (driver signature enforcement bypass), and `hypervisorlaunchtype` (Virtualization control).
 
-### 4. 🔌 OEM Driver Lifecycle & Force Uninstallation
+### 4.  OEM Driver Lifecycle & Force Uninstallation
 - **Structured PnPUtil Enumeration**: Structured parsing and inspection of all installed 3rd-party driver packages (`pnputil /enum-drivers`).
 - **Deep Driver Telemetry**: Instant display of Driver Class, Provider Name, Driver Date, Driver Version, and Signer authenticity.
 - **Multi-Selection & Batch Removal**: Filter drivers by keyword, select multiple packages simultaneously, and execute batch uninstallations.
 - **Force Uninstall Guardrail**: Support for `/uninstall /force` with explicit destructive operation confirmation prompts.
 
-### 5. 📚 Storage Directory Encyclopedia & Space Analyzer
+### 5.  Storage Directory Encyclopedia & Space Analyzer
 - **Targeted Heavy Directory Scans**: Deep recursive size and item count analysis on critical Windows system folders:
   - `WinSxS`: Windows Component Store and update cache.
   - `SoftwareDistribution`: Windows Update temporary download payloads.
@@ -74,7 +74,7 @@ DiskMaster Pro runs as a **self-contained unpackaged desktop application** (`Win
   - 🔴 **Essential Core - Do Not Delete**: Crucial OS infrastructure; manual deletion causes severe corruption.
 - **One-Click Actions**: Open directly in File Explorer, trigger native safe cleanup, or launch DISM Component Cleanup.
 
-### 6. ⚡ Hidden Performance & CPU Power Tuning
+### 6.  Hidden Performance & CPU Power Tuning
 - **Windows Power Options Unhiding**: Reveal and configure hidden Windows Processor Power Management (`SUB_PROCESSOR`) policies:
   - **Processor Performance Boost Mode** (`be337238-0d82-4146-a960-4f3749d470c7`): Control Aggressive, Efficient, or Disabled boost behavior.
   - **Energy Performance Preference (EPP)** (`36687f9e-e376-49e8-b783-be5e3e3563ab`): Tune responsiveness scale from raw performance (0) to maximum efficiency (100).
@@ -90,19 +90,19 @@ DiskMaster Pro runs as a **self-contained unpackaged desktop application** (`Win
   - Execute `powercfg /hibernate off` with verified deletion and release of `C:\hiberfil.sys`.
   - Calculate and report reclaimed SSD disk space in gigabytes.
 
-### 7. 🩺 S.M.A.R.T. NVMe Telemetry & Reliability Monitoring
+### 7.  S.M.A.R.T. NVMe Telemetry & Reliability Monitoring
 - **NVMe Log Page 0x02 Specification Compliance**: Fully compliant with NVM Express Base Specification 5.14.1.2 (correct byte offset 128 for `PowerOnHours`, offset 112 for `PowerCycles`, offset 3 for `AvailableSpare`).
 - **Unprivileged Telemetry Fallback**: Graceful fallback using Windows `InstallDate` and `TickCount64` heuristics when low-level IOCTL / CIM hardware queries are restricted.
 - **Clean Health Indicators**: Guarantees zero read/write error counters display as `"0"` instead of confusing `null` / `"N/A"`.
 
-### 8. 🪟 Modern Fluent Interface & Chrome-Style Tab Tear-Off
+### 8.  Modern Fluent Interface & Chrome-Style Tab Tear-Off
 - **Tab Tear-Off & Multi-Window Docking**: Drag tabs outside the main window to instantly detach them into standalone `FloatingTabWindow` instances; effortlessly drag back or use one-click "Dock All".
 - **Dynamic Fluent Design**: Fluent Acrylic, Mica Alt material, smooth transitions, and high-DPI crisp rendering.
 - **Full 4-Language Hot-Swap Parity**: Dynamic runtime language switching between Traditional Chinese (`zh-TW`), Simplified Chinese (`zh-CN`), English (`en-US`), and Japanese (`ja-JP`).
 
 ---
 
-## 🏛️ Architecture & Engineering Design
+##  Architecture & Engineering Design
 
 ```
 DiskMasterWinUI/
@@ -151,7 +151,7 @@ await Task.WhenAll(stdoutTask, stderrTask, process.WaitForExitAsync(cancellation
 
 ---
 
-## 📊 Tuning Benchmarks & Technical Analysis
+##  Tuning Benchmarks & Technical Analysis
 
 ### 1. CPU Quantum Scheduling (`Win32PrioritySeparation`)
 | Configuration | Hex Value | Quantum Length | Priority Boost Ratio | Target Workload |
@@ -172,7 +172,7 @@ await Task.WhenAll(stdoutTask, stderrTask, process.WaitForExitAsync(cancellation
 
 ---
 
-## 🛡️ Safety Guardrails & Defensive Engineering
+##  Safety Guardrails & Defensive Engineering
 
 1. **Non-Destructive Defaults**:
    All critical disk operations (DiskPart Clean, Format, Delete Partition, Driver Force Delete, Safe Boot configuration) require explicit user confirmation through `DialogHelper.ConfirmDestructiveOperationAsync`.
@@ -197,7 +197,7 @@ Languages can be hot-swapped instantly in `SettingsPage` without restarting the 
 
 ---
 
-## 🛠️ Build & Compilation Guide
+##  Build & Compilation Guide
 
 ### Prerequisites
 - **Operating System**: Windows 10 Version 1809 (Build 17763) or Windows 11 (all versions up to 24H2).
