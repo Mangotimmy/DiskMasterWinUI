@@ -291,6 +291,148 @@ public class SystemOptimizerService
     }
 
     // ══════════════════════════════════════════════════════════
+    //  3.5 Advanced Latency, Memory & Group Policy Tweaks
+    // ══════════════════════════════════════════════════════════
+
+    public bool GetNagleDisabled()
+    {
+        try
+        {
+            using var baseKey = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces");
+            if (baseKey != null)
+            {
+                foreach (var subName in baseKey.GetSubKeyNames())
+                {
+                    using var ifKey = baseKey.OpenSubKey(subName);
+                    if (ifKey != null)
+                    {
+                        var ack = ifKey.GetValue("TcpAckFrequency");
+                        var nodelay = ifKey.GetValue("TCPNoDelay");
+                        if (ack is int ackVal && nodelay is int ndVal && ackVal == 1 && ndVal == 1)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    public bool ConfigureNagleAlgorithm(bool disableNagle)
+    {
+        try
+        {
+            using var baseKey = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces", writable: true);
+            if (baseKey != null)
+            {
+                foreach (var subName in baseKey.GetSubKeyNames())
+                {
+                    using var ifKey = baseKey.OpenSubKey(subName, writable: true);
+                    if (ifKey != null)
+                    {
+                        if (disableNagle)
+                        {
+                            ifKey.SetValue("TcpAckFrequency", 1, RegistryValueKind.DWord);
+                            ifKey.SetValue("TCPNoDelay", 1, RegistryValueKind.DWord);
+                        }
+                        else
+                        {
+                            try { ifKey.DeleteValue("TcpAckFrequency"); } catch { }
+                            try { ifKey.DeleteValue("TCPNoDelay"); } catch { }
+                        }
+                    }
+                }
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    public bool GetDisablePagingExecutive()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management");
+            if (key != null)
+            {
+                var val = key.GetValue("DisablePagingExecutive");
+                if (val is int intVal) return intVal == 1;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    public bool ConfigureMemoryManagement(bool optimize)
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.CreateSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management", writable: true);
+            if (key != null)
+            {
+                key.SetValue("DisablePagingExecutive", optimize ? 1 : 0, RegistryValueKind.DWord);
+                key.SetValue("LargeSystemCache", optimize ? 1 : 0, RegistryValueKind.DWord);
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    public bool GetTelemetryDisabled()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Policies\Microsoft\Windows\DataCollection");
+            if (key != null)
+            {
+                var val = key.GetValue("AllowTelemetry");
+                if (val is int intVal) return intVal == 0;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    public bool ConfigureGroupPolicyPrivacy(bool disableTelemetryAndAds)
+    {
+        try
+        {
+            // 1. Data Collection / Telemetry
+            using (var key = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\DataCollection", writable: true))
+            {
+                key?.SetValue("AllowTelemetry", disableTelemetryAndAds ? 0 : 3, RegistryValueKind.DWord);
+            }
+            // 2. Search Box Suggestions (Bing in Start)
+            using (var key = Registry.CurrentUser.CreateSubKey(@"Software\Policies\Microsoft\Windows\Explorer", writable: true))
+            {
+                key?.SetValue("DisableSearchBoxSuggestions", disableTelemetryAndAds ? 1 : 0, RegistryValueKind.DWord);
+            }
+            // 3. Cloud Content / Consumer Features
+            using (var key = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\CloudContent", writable: true))
+            {
+                key?.SetValue("DisableWindowsConsumerFeatures", disableTelemetryAndAds ? 1 : 0, RegistryValueKind.DWord);
+            }
+            // 4. Windows Error Reporting UI Hang
+            using (var key = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\Windows Error Reporting", writable: true))
+            {
+                key?.SetValue("DontShowUI", disableTelemetryAndAds ? 1 : 0, RegistryValueKind.DWord);
+            }
+            // 5. Delivery Optimization P2P upload
+            using (var key = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization", writable: true))
+            {
+                key?.SetValue("DODownloadMode", disableTelemetryAndAds ? 0 : 1, RegistryValueKind.DWord);
+            }
+            return true;
+        }
+        catch { }
+        return false;
+    }
+
+    // ══════════════════════════════════════════════════════════
     //  4. 1-Click Gaming Mode / Restore Factory Defaults
     // ══════════════════════════════════════════════════════════
 

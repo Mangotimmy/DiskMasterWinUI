@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="DiskMasterWinUI.Pages.StarterPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:DiskMasterWinUI.ViewModels"
+    mc:Ignorable="d"
+    Loaded="Page_Loaded">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
+        <StackPanel Spacing="20" MaxWidth="1050" HorizontalAlignment="Left">
+
+            <!-- Hero Health Score Card -->
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource AccentFillColorDefaultBrush}" BorderThickness="2"
+                    CornerRadius="12" Padding="24">
+                <Grid ColumnSpacing="24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Score Circle Badge -->
+                    <Border Grid.Column="0" Width="100" Height="100" CornerRadius="50"
+                            Background="{ThemeResource AccentFillColorTertiaryBrush}" BorderBrush="{ThemeResource AccentFillColorDefaultBrush}" BorderThickness="3">
+                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                            <TextBlock Text="{x:Bind ViewModel.HealthScore, Mode=OneWay}"
+                                       FontSize="36" FontWeight="Bold" HorizontalAlignment="Center"
+                                       Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                            <TextBlock Text="綜合評分" FontSize="11" HorizontalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Title & Details -->
+                    <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock x:Name="StarterHeroTitle" Text="DiskMaster 智慧系統守護精靈 (Easy Mode)" FontWeight="Bold" FontSize="20" />
+                            <Border Background="{ThemeResource SystemFillColorSuccessBrush}" CornerRadius="4" Padding="6,2">
+                                <TextBlock Text="{x:Bind ViewModel.HealthRatingText, Mode=OneWay}" FontSize="11" FontWeight="Bold" Foreground="White" />
+                            </Border>
+                        </StackPanel>
+                        <TextBlock Text="{x:Bind ViewModel.HealthSummaryText, Mode=OneWay}"
+                                   Style="{StaticResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                        <TextBlock Text="{x:Bind ViewModel.OneDriveStatusText, Mode=OneWay}"
+                                   FontSize="12" Foreground="{ThemeResource AccentFillColorDefaultBrush}" FontWeight="SemiBold" />
+                    </StackPanel>
+
+                    <!-- Refresh Button -->
+                    <Button Grid.Column="2" Content="🔄 重新體檢" Command="{x:Bind ViewModel.RefreshStatusCommand}"
+                            Style="{StaticResource AccentButtonStyle}" Padding="16,10" VerticalAlignment="Center" />
+                </Grid>
+            </Border>
+
+            <!-- 1-Click Action Cards Grid -->
+            <TextBlock Text="🌟 新手推薦一鍵式快速維護" FontWeight="Bold" FontSize="16" />
+
+            <Grid ColumnSpacing="16" RowSpacing="16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Card 1: 1-Click Game Boost -->
+                <Border Grid.Row="0" Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                        CornerRadius="10" Padding="18">
+                    <Grid RowSpacing="12">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10">
+                            <FontIcon Glyph="&#xE7FC;" FontSize="24" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                            <TextBlock Text="⚡ 一鍵電競極致加速" FontWeight="Bold" FontSize="16" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Grid.Row="1" Text="立即解鎖 100% 前台 CPU 算力、關閉網路節流佇列、最佳化滑鼠 1:1 感應器與停用 Game DVR 背景錄影負擔。"
+                                   Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                        <Button Grid.Row="2" Content="🚀 一鍵遊戲加速" Command="{x:Bind ViewModel.OneClickGameBoostCommand}"
+                                Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" Padding="12" />
+                    </Grid>
+                </Border>
+
+                <!-- Card 2: 1-Click Free SSD Space -->
+                <Border Grid.Row="0" Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                        CornerRadius="10" Padding="18">
+                    <Grid RowSpacing="12">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10">
+                            <FontIcon Glyph="&#xE7E8;" FontSize="24" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                            <TextBlock Text="💽 一鍵休眠釋放 SSD 空間" FontWeight="Bold" FontSize="16" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Grid.Row="1" Text="安全關閉系統休眠並清除巨大的 hiberfil.sys 檔案，立即為 C: 槽釋放 8 ~ 32 GB 以上的寶貴固態硬碟空間。"
+                                   Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                        <Button Grid.Row="2" Content="🧹 釋放休眠硬碟空間" Command="{x:Bind ViewModel.OneClickFreeSsdCommand}"
+                                HorizontalAlignment="Stretch" Padding="12" />
+                    </Grid>
+                </Border>
+
+                <!-- Card 3: 1-Click System Integrity Repair -->
+                <Border Grid.Row="1" Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                        CornerRadius="10" Padding="18">
+                    <Grid RowSpacing="12">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10">
+                            <FontIcon Glyph="&#xE7EF;" FontSize="24" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                            <TextBlock Text="🛡️ 一鍵修復系統完整性" FontWeight="Bold" FontSize="16" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Grid.Row="1" Text="調用 Windows 系統檔案檢查器 (SFC)，自動掃描並修復 Windows 損毀的核心動態連結程式庫與開機相依組件。"
+                                   Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                        <Button Grid.Row="2" Content="🔍 開始系統修復" Command="{x:Bind ViewModel.OneClickSystemRepairCommand}"
+                                HorizontalAlignment="Stretch" Padding="12" />
+                    </Grid>
+                </Border>
+
+                <!-- Card 4: 1-Click OneDrive Uninstall (Prominent when installed) -->
+                <Border Grid.Row="1" Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                        CornerRadius="10" Padding="18">
+                    <Grid RowSpacing="12">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10">
+                            <FontIcon Glyph="&#xE753;" FontSize="24" Foreground="Crimson" />
+                            <TextBlock Text="☁️ 一鍵徹底卸載 OneDrive" FontWeight="Bold" FontSize="16" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Grid.Row="1" Text="安全卸載微軟 OneDrive、清理背景快取、自動將被綁架的桌面與個人資料夾移回本機 %USERPROFILE%，並封鎖自動重裝。"
+                                   Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                        <Button Grid.Row="2" Content="🚀 一鍵深度卸載 OneDrive" Command="{x:Bind ViewModel.OneClickUninstallOneDriveCommand}"
+                                IsEnabled="{x:Bind ViewModel.IsOneDriveInstalled, Mode=OneWay}"
+                                Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" Padding="12" />
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- Bottom Status Banner -->
+            <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="8" Padding="12">
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <ProgressRing Grid.Column="0" IsActive="{x:Bind ViewModel.IsOperating, Mode=OneWay}" Width="20" Height="20" />
+                    <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.OperationStatus, Mode=OneWay}"
+                               VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" />
+                </Grid>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

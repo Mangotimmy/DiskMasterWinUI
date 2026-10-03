@@ -62,6 +62,7 @@ $testFiles = @(
     (Join-Path $scriptRoot "tier1_features\Test_Tier1_F08_To_F10_SafeBootAndBcd.ps1"),
     (Join-Path $scriptRoot "tier1_features\Test_Tier1_F11_To_F13_PowerAndLatency.ps1"),
     (Join-Path $scriptRoot "tier1_features\Test_Tier1_F14_To_F16_AssetsLocGuide.ps1"),
+    (Join-Path $scriptRoot "tier1_features\Test_Tier1_F17_To_F24_FullFeatures.ps1"),
     # Tier 2
     (Join-Path $scriptRoot "tier2_boundaries\Test_Tier2_F01_To_F04_DriverBoundaries.ps1"),
     (Join-Path $scriptRoot "tier2_boundaries\Test_Tier2_F05_To_F07_StorageBoundaries.ps1"),

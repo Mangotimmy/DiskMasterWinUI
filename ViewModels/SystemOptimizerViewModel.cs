@@ -66,6 +66,41 @@ public partial class SystemOptimizerViewModel : ObservableObject
     public ObservableCollection<SystemRestorePointItem> RestorePoints { get; } = new();
     [ObservableProperty] private string _manualBackupDescription = "自訂優化備份";
 
+    // ── OEM Driver Management (PnPUtil) ──
+    private readonly DriverService _driverService = new();
+    public ObservableCollection<OemDriverItem> OemDrivers { get; } = new();
+    [ObservableProperty] private bool _isLoadingDrivers;
+    [ObservableProperty] private string _driverFilterText = "";
+
+    // ── OneDrive Deep Management & Repair ──
+    private readonly OneDriveService _oneDriveService = new();
+    [ObservableProperty] private OneDriveStatusInfo _oneDriveStatus = new();
+    [ObservableProperty] private bool _isOneDriveInstalled;
+    [ObservableProperty] private bool _isOneDriveRunning;
+    [ObservableProperty] private bool _isOneDriveFoldersRedirected;
+    [ObservableProperty] private bool _hasOneDriveCloudOnlyFiles;
+    [ObservableProperty] private int _oneDriveCloudOnlyCount;
+    [ObservableProperty] private bool _isOneDrivePinned;
+    [ObservableProperty] private bool _isOneDrivePolicyBlocked;
+    [ObservableProperty] private bool _isOneDriveOperating;
+
+    public string OneDriveInstalledStatusText => IsOneDriveInstalled ? "已安裝 (Installed)" : "未安裝 / 已徹底清除 (Clean)";
+    public string OneDriveRunningStatusText => IsOneDriveRunning ? "🟢 行程運作中 (Running)" : "⚪ 未執行 (Stopped)";
+    public string OneDriveRedirectStatusText => IsOneDriveFoldersRedirected ? "⚠️ 個人資料夾遭重定向" : "✅ 原生個人資料夾路徑正常";
+    public string OneDriveCloudFilesStatusText => HasOneDriveCloudOnlyFiles ? $"⚠️ 偵測到 {OneDriveCloudOnlyCount} 個雲端脫機檔案" : "✅ 無脫機檔案遺失風險";
+    public string OneDriveGhostIconStatusText => IsOneDrivePinned ? "⚠️ 檔案總管側邊欄存在圖示" : "✅ 側邊欄無幽靈圖示殘留";
+    public string OneDrivePolicyStatusText => IsOneDrivePolicyBlocked ? "🛡️ 已透過原則封鎖自動安裝" : "⚪ 群組原則未封鎖";
+
+    // ── Advanced Latency, Memory & Group Policy Tweaks ──
+    [ObservableProperty] private bool _isNagleDisabled;
+    [ObservableProperty] private bool _isDisablePagingExecutive;
+    [ObservableProperty] private bool _isGroupPolicyTelemetryDisabled;
+
+    // ── CPU PPM Controls (EPP, Core Parking, Boost) ──
+    [ObservableProperty] private int _cpuEppSliderValue = 0;
+    [ObservableProperty] private int _cpuCoreParkingMinPercent = 100;
+    [ObservableProperty] private int _selectedCpuBoostModeIndex = 2;
+
     public SystemOptimizerViewModel()
     {
         AppendLog("⚡ 系統最佳化與遊戲模式引擎已啟動 (FPSHeaven & PowerPlan Suite)");
@@ -115,6 +150,9 @@ public partial class SystemOptimizerViewModel : ObservableObject
             IsNetworkThrottlingDisabled = _optimizer.GetNetworkThrottlingDisabled();
             IsGameDvrDisabled = _optimizer.GetGameDvrDisabled();
             IsHagsEnabled = _optimizer.GetHagsStatus();
+            IsNagleDisabled = _optimizer.GetNagleDisabled();
+            IsDisablePagingExecutive = _optimizer.GetDisablePagingExecutive();
+            IsGroupPolicyTelemetryDisabled = _optimizer.GetTelemetryDisabled();
 
             IsGamingModeEnabled = (SelectedCpuPresetIndex == 0 || SelectedCpuPresetIndex == 1)
                                   && IsSystemResponsivenessZero
@@ -190,7 +228,17 @@ public partial class SystemOptimizerViewModel : ObservableObject
                 catch { }
             });
 
-            await Task.WhenAll(powerTask, mmTask, wakeTask, blockersTask, restorePointsTask);
+            var oneDriveTask = Task.Run(async () =>
+            {
+                try { await RefreshOneDriveStatusAsync(); } catch { }
+            });
+
+            var driversTask = Task.Run(async () =>
+            {
+                try { await RefreshDriversAsync(); } catch { }
+            });
+
+            await Task.WhenAll(powerTask, mmTask, wakeTask, blockersTask, restorePointsTask, oneDriveTask, driversTask);
 
             DispatcherHelper.RunOnUIThread(() =>
             {
@@ -927,5 +975,339 @@ public partial class SystemOptimizerViewModel : ObservableObject
     public void ClearLog()
     {
         ConsoleLog = "";
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  OEM Driver Management Commands (PnPUtil)
+    // ══════════════════════════════════════════════════════════
+
+    [RelayCommand]
+    public async Task RefreshDriversAsync()
+    {
+        try
+        {
+            IsLoadingDrivers = true;
+            var drivers = await _driverService.EnumDriversStructuredAsync();
+            DispatcherHelper.RunOnUIThread(() =>
+            {
+                OemDrivers.Clear();
+                foreach (var d in drivers) OemDrivers.Add(d);
+            });
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[ERROR] 列舉驅動失敗: {ex.Message}");
+        }
+        finally
+        {
+            IsLoadingDrivers = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task DeleteDriverAsync(OemDriverItem? driver)
+    {
+        if (driver == null) return;
+        var confirmed = await DialogHelper.ConfirmDestructiveOperationAsync(
+            WindowHelper.GetXamlRoot(),
+            "卸載 OEM 驅動程式 (Uninstall Driver)",
+            $"即將強制移除驅動檔案: {driver.PublishedName} ({driver.OriginalFileName} - {driver.DriverClass})。\n若此驅動為系統關鍵裝置，可能導致硬體無法正常運作！",
+            driver.PublishedName);
+        if (!confirmed) return;
+
+        try
+        {
+            IsLoading = true;
+            var res = await _driverService.DeleteDriverAsync(driver.PublishedName, force: true);
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🗑️ 卸載驅動 {driver.PublishedName}: {res}");
+            AudioFeedbackService.PlaySuccess();
+            await RefreshDriversAsync();
+        }
+        catch (Exception ex)
+        {
+            AudioFeedbackService.PlayError();
+            AppendLog($"[ERROR] 卸載驅動失敗: {ex.Message}");
+        }
+        finally { IsLoading = false; }
+    }
+
+    [RelayCommand]
+    public async Task BatchDeleteSelectedDriversAsync()
+    {
+        var selected = OemDrivers.Where(d => d.IsSelected).ToList();
+        if (selected.Count == 0) return;
+
+        var confirmed = await DialogHelper.ConfirmDestructiveOperationAsync(
+            WindowHelper.GetXamlRoot(),
+            "批次卸載選取之 OEM 驅動程式",
+            $"即將批次移除 {selected.Count} 個選取的驅動程式。請確認這些驅動並非當前運行所需之關鍵核心硬體！",
+            "DELETE_BATCH");
+        if (!confirmed) return;
+
+        try
+        {
+            IsLoading = true;
+            var res = await _driverService.BatchDeleteDriversAsync(selected.Select(s => s.PublishedName), force: true);
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🗑️ 批次卸載驅動完成: 成功 {res.SuccessCount} 項，失敗 {res.FailureCount} 項");
+            AudioFeedbackService.PlaySuccess();
+            await RefreshDriversAsync();
+        }
+        catch (Exception ex)
+        {
+            AudioFeedbackService.PlayError();
+            AppendLog($"[ERROR] 批次卸載失敗: {ex.Message}");
+        }
+        finally { IsLoading = false; }
+    }
+
+    [RelayCommand]
+    public void SelectAllDrivers(bool select)
+    {
+        foreach (var d in OemDrivers) d.IsSelected = select;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  OneDrive Deep Management & Repair Commands
+    // ══════════════════════════════════════════════════════════
+
+    [RelayCommand]
+    public async Task RefreshOneDriveStatusAsync()
+    {
+        try
+        {
+            var status = await _oneDriveService.DetectOneDriveStatusAsync();
+            DispatcherHelper.RunOnUIThread(() =>
+            {
+                OneDriveStatus = status;
+                IsOneDriveInstalled = status.IsInstalled;
+                IsOneDriveRunning = status.IsRunning;
+                IsOneDriveFoldersRedirected = status.IsFoldersRedirected;
+                HasOneDriveCloudOnlyFiles = status.HasCloudOnlyFiles;
+                OneDriveCloudOnlyCount = status.CloudOnlyFileCount;
+                IsOneDrivePinned = status.IsFileExplorerPinned;
+                IsOneDrivePolicyBlocked = status.IsPolicyBlocked;
+            });
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[ERROR] 偵測 OneDrive 狀態失敗: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    public async Task DeepUninstallOneDriveAsync()
+    {
+        if (HasOneDriveCloudOnlyFiles)
+        {
+            var warnConfirm = await DialogHelper.ConfirmDestructiveOperationAsync(
+                WindowHelper.GetXamlRoot(),
+                "⚠️ 偵測到雲端脫機檔案 (Files On-Demand)",
+                $"您的 OneDrive 中有約 {OneDriveCloudOnlyCount} 個檔案僅存在於雲端 (尚未完全下載到本機硬碟)。\n解除安裝後這些檔案可能無法於本機開啟！\n強烈建議您先登入 OneDrive 下載所有檔案，或確認不需保留。\n\n確定仍要強制卸載嗎？",
+                "CONFIRM_OFFLINE_RISK");
+            if (!warnConfirm) return;
+        }
+        else
+        {
+            var confirmed = await DialogHelper.ConfirmDestructiveOperationAsync(
+                WindowHelper.GetXamlRoot(),
+                "徹底解除安裝 OneDrive (Deep Uninstall)",
+                "即將徹底移除 OneDrive、終止其背景程序、清理相關快取檔案，並自動將桌面/文件/圖片資料夾安全移回本機 %USERPROFILE% 原生路徑。\n本操作會永久封鎖 Windows Update 再次靜默安裝 OneDrive。",
+                "UNINSTALL_ONEDRIVE");
+            if (!confirmed) return;
+        }
+
+        try
+        {
+            IsOneDriveOperating = true;
+            StatusMessage = "正在徹底卸載 OneDrive 並還原原生資料夾路徑...";
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🚀 開始執行 OneDrive 深度徹底解除安裝流程...");
+
+            var (success, msg) = await _oneDriveService.DeepUninstallOneDriveAsync(
+                restoreShellFolders: true,
+                cleanResiduals: true,
+                blockReinstall: true);
+
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] {(success ? "✅" : "⚠️")} {msg}");
+            if (success) AudioFeedbackService.PlaySuccess();
+            else AudioFeedbackService.PlayWarning();
+
+            await RefreshOneDriveStatusAsync();
+            StatusMessage = msg;
+        }
+        catch (Exception ex)
+        {
+            AudioFeedbackService.PlayError();
+            AppendLog($"[ERROR] 解除安裝 OneDrive 發生例外: {ex.Message}");
+        }
+        finally { IsOneDriveOperating = false; }
+    }
+
+    [RelayCommand]
+    public async Task RestoreOneDriveShellFoldersAsync()
+    {
+        try
+        {
+            IsOneDriveOperating = true;
+            StatusMessage = "正在還原個人資料夾路徑至 %USERPROFILE%...";
+            var (success, msg) = await _oneDriveService.RestoreUserShellFoldersAsync();
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] {(success ? "✅" : "⚠️")} {msg}");
+            if (success) AudioFeedbackService.PlaySuccess();
+            await RefreshOneDriveStatusAsync();
+            StatusMessage = msg;
+        }
+        catch (Exception ex)
+        {
+            AudioFeedbackService.PlayError();
+            AppendLog($"[ERROR] 資料夾還原失敗: {ex.Message}");
+        }
+        finally { IsOneDriveOperating = false; }
+    }
+
+    [RelayCommand]
+    public async Task RemoveOneDriveGhostIconAsync()
+    {
+        try
+        {
+            IsOneDriveOperating = true;
+            var (success, msg) = await _oneDriveService.RemoveExplorerGhostIconAsync();
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] {(success ? "✅" : "⚠️")} {msg}");
+            if (success) AudioFeedbackService.PlaySuccess();
+            await RefreshOneDriveStatusAsync();
+            StatusMessage = msg;
+        }
+        catch (Exception ex)
+        {
+            AudioFeedbackService.PlayError();
+            AppendLog($"[ERROR] 清除幽靈圖示失敗: {ex.Message}");
+        }
+        finally { IsOneDriveOperating = false; }
+    }
+
+    [RelayCommand]
+    public async Task ResetOneDriveSyncEngineAsync()
+    {
+        try
+        {
+            IsOneDriveOperating = true;
+            var (success, msg) = await _oneDriveService.ResetOneDriveSyncEngineAsync();
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] {(success ? "✅" : "⚠️")} {msg}");
+            if (success) AudioFeedbackService.PlaySuccess();
+            await RefreshOneDriveStatusAsync();
+            StatusMessage = msg;
+        }
+        catch (Exception ex)
+        {
+            AudioFeedbackService.PlayError();
+            AppendLog($"[ERROR] 重設同步引擎失敗: {ex.Message}");
+        }
+        finally { IsOneDriveOperating = false; }
+    }
+
+    [RelayCommand]
+    public async Task ToggleOneDrivePolicyBlockAsync()
+    {
+        try
+        {
+            bool newTarget = !IsOneDrivePolicyBlocked;
+            var (success, msg) = await _oneDriveService.ToggleOneDrivePolicyBlockAsync(newTarget);
+            IsOneDrivePolicyBlocked = newTarget;
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🛡️ {msg}");
+            if (success) AudioFeedbackService.PlaySuccess();
+            StatusMessage = msg;
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[ERROR] 切換群組原則封鎖失敗: {ex.Message}");
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  Advanced Latency, Memory & Group Policy Tweaks
+    // ══════════════════════════════════════════════════════════
+
+    [RelayCommand]
+    public void ToggleNagleAlgorithm()
+    {
+        try
+        {
+            IsNagleDisabled = !IsNagleDisabled;
+            _optimizer.ConfigureNagleAlgorithm(IsNagleDisabled);
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🌐 Nagle's Algorithm (TcpAckFrequency / TCPNoDelay): {(IsNagleDisabled ? "已停用 (超低延遲模式)" : "已啟用 (標準模式)")}");
+        }
+        catch (Exception ex) { AppendLog($"[ERROR] {ex.Message}"); }
+    }
+
+    [RelayCommand]
+    public void ToggleDisablePagingExecutive()
+    {
+        try
+        {
+            IsDisablePagingExecutive = !IsDisablePagingExecutive;
+            _optimizer.ConfigureMemoryManagement(IsDisablePagingExecutive);
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🧠 核心常駐實體 RAM (DisablePagingExecutive): {(IsDisablePagingExecutive ? "已開啟 (常駐記憶體無分頁延遲)" : "已關閉")}");
+        }
+        catch (Exception ex) { AppendLog($"[ERROR] {ex.Message}"); }
+    }
+
+    [RelayCommand]
+    public void ToggleGroupPolicyTelemetry()
+    {
+        try
+        {
+            IsGroupPolicyTelemetryDisabled = !IsGroupPolicyTelemetryDisabled;
+            _optimizer.ConfigureGroupPolicyPrivacy(IsGroupPolicyTelemetryDisabled);
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🛡️ 本機群組原則隱私與遙測防護: {(IsGroupPolicyTelemetryDisabled ? "已套用極致隱私原則 (關閉遙測/廣告/P2P上傳)" : "已還原預設")}");
+        }
+        catch (Exception ex) { AppendLog($"[ERROR] {ex.Message}"); }
+    }
+
+    [RelayCommand]
+    public async Task ApplyCpuEppAsync()
+    {
+        try
+        {
+            var (ok, msg) = await _powerCfg.SetEnergyPerformancePreferenceAsync(CpuEppSliderValue);
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] ⚡ {msg}");
+            StatusMessage = msg;
+        }
+        catch (Exception ex) { AppendLog($"[ERROR] {ex.Message}"); }
+    }
+
+    [RelayCommand]
+    public async Task ApplyCpuCoreParkingAsync()
+    {
+        try
+        {
+            var (ok, msg) = await _powerCfg.SetCoreParkingAsync(CpuCoreParkingMinPercent);
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] ⚡ {msg}");
+            StatusMessage = msg;
+        }
+        catch (Exception ex) { AppendLog($"[ERROR] {ex.Message}"); }
+    }
+
+    [RelayCommand]
+    public async Task ApplyCpuBoostModeAsync()
+    {
+        try
+        {
+            var (ok, msg) = await _powerCfg.SetProcessorBoostModeValueAsync(SelectedCpuBoostModeIndex);
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] ⚡ {msg}");
+            StatusMessage = msg;
+        }
+        catch (Exception ex) { AppendLog($"[ERROR] {ex.Message}"); }
+    }
+
+    [RelayCommand]
+    public async Task UnhideAllCpuPowerAttributesAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            var (ok, msg) = await _powerCfg.UnhideAllProcessorAttributesAsync();
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🎛️ {msg}");
+            StatusMessage = msg;
+        }
+        catch (Exception ex) { AppendLog($"[ERROR] {ex.Message}"); }
+        finally { IsLoading = false; }
     }
 }

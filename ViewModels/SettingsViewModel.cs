@@ -69,6 +69,25 @@ public partial class SettingsViewModel : ObservableObject
     // ── Adobe Workspace Presets ──
     [ObservableProperty] private string _selectedWorkspacePreset = "大師全功能";
 
+    // ── Dual Mode & Starter Hub ──
+    [ObservableProperty] private bool _isEasyMode = false;
+
+    // ── Auto Updater ──
+    [ObservableProperty] private bool _autoCheckUpdates = true;
+    [ObservableProperty] private string _updateFrequency = "Daily";
+    [ObservableProperty] private string _updateStatusText = "";
+    [ObservableProperty] private bool _isCheckingUpdates = false;
+    [ObservableProperty] private string _latestReleaseUrl = "";
+    [ObservableProperty] private bool _hasAvailableUpdate = false;
+
+    // ── System Tray & Window Notifications ──
+    [ObservableProperty] private bool _minimizeToTray = false;
+    [ObservableProperty] private bool _closeToTray = false;
+    [ObservableProperty] private bool _enableTaskbarFlash = true;
+    [ObservableProperty] private bool _enableAudioFeedback = true;
+
+    public string[] UpdateFrequencyOptions { get; } = ["Manual", "Startup", "Daily", "Weekly"];
+
     public string[] ThemeOptions { get; } = ["System", "Dark", "Light"];
     public int[] ScaleOptions { get; } = [80, 85, 90, 100, 110, 125, 150];
     public string[] PartitionStyleOptions { get; } = ["GPT", "MBR"];
@@ -172,6 +191,14 @@ public partial class SettingsViewModel : ObservableObject
         CustomFontFamily = string.IsNullOrWhiteSpace(s.CustomFontFamily) ? "Segoe UI Variable" : s.CustomFontFamily;
         CustomFontScale = s.CustomFontScale > 0 ? s.CustomFontScale : 100;
 
+        IsEasyMode = s.IsEasyMode;
+        AutoCheckUpdates = s.AutoCheckUpdates;
+        UpdateFrequency = s.UpdateFrequency ?? "Daily";
+        MinimizeToTray = s.MinimizeToTray;
+        CloseToTray = s.CloseToTray;
+        EnableTaskbarFlash = s.EnableTaskbarFlash;
+        EnableAudioFeedback = s.EnableAudioFeedback;
+
         RefreshLocalizedOptions();
     }
 
@@ -263,6 +290,14 @@ public partial class SettingsViewModel : ObservableObject
         s.CustomFontFamily = CustomFontFamily;
         s.CustomFontScale = CustomFontScale;
 
+        s.IsEasyMode = IsEasyMode;
+        s.AutoCheckUpdates = AutoCheckUpdates;
+        s.UpdateFrequency = UpdateFrequency;
+        s.MinimizeToTray = MinimizeToTray;
+        s.CloseToTray = CloseToTray;
+        s.EnableTaskbarFlash = EnableTaskbarFlash;
+        s.EnableAudioFeedback = EnableAudioFeedback;
+
         s.WorkspacePreset = SelectedWorkspacePreset switch
         {
             var p when !string.IsNullOrEmpty(p) && (p.Contains("部署") || p.Contains("展開") || p.Contains("Deploy")) => "Deploy",
@@ -274,6 +309,41 @@ public partial class SettingsViewModel : ObservableObject
 
         SettingsService.Instance.Save();
         StatusMessage = LocalizationService.T("設定已成功儲存！", "设置已成功保存！", "Settings saved successfully!", "設定が正常に保存されました！");
+    }
+
+    [RelayCommand]
+    public async Task CheckForUpdatesAsync()
+    {
+        IsCheckingUpdates = true;
+        UpdateStatusText = LocalizationService.T("正在檢查最新版本...", "正在检查最新版本...", "Checking for updates...", "アップデートを確認中...");
+        try
+        {
+            var result = await UpdateService.Instance.CheckForUpdatesAsync();
+            HasAvailableUpdate = result.HasUpdate;
+            LatestReleaseUrl = result.ReleaseUrl;
+            if (result.HasUpdate)
+            {
+                UpdateStatusText = string.Format(LocalizationService.T("🎉 發現新版本 {0}！點擊下載更新", "🎉 发现新版本 {0}！点击下载更新", "🎉 New version {0} available! Click to update", "🎉 新バージョン {0} が利用可能です！"), result.LatestVersion);
+            }
+            else
+            {
+                UpdateStatusText = LocalizationService.T("✅ 目前已是最新版本 (v3.3.0)", "✅ 当前已是最新版本 (v3.3.0)", "✅ You are running the latest version (v3.3.0)", "✅ 最新バージョンを実行中です (v3.3.0)");
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateStatusText = $"❌ {ex.Message}";
+        }
+        finally
+        {
+            IsCheckingUpdates = false;
+        }
+    }
+
+    [RelayCommand]
+    public void OpenUpdateDownload()
+    {
+        UpdateService.OpenReleaseUrl(LatestReleaseUrl);
     }
 
     partial void OnSelectedThemeChanged(string value)

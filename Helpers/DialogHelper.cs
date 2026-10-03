@@ -62,7 +62,20 @@ public static class DialogHelper
             DefaultButton = ContentDialogButton.Close
         };
 
-        var result = await dialog.ShowAsync();
-        return result == ContentDialogResult.Primary;
+        try
+        {
+            if (SettingsService.Instance.Current.EnableTaskbarFlash)
+            {
+                TaskbarFlashService.Flash(WindowHelper.CurrentHwnd, 0);
+            }
+            AudioFeedbackService.PlayWarning();
+
+            var result = await dialog.ShowAsync();
+            return result == ContentDialogResult.Primary;
+        }
+        finally
+        {
+            TaskbarFlashService.StopFlash(WindowHelper.CurrentHwnd);
+        }
     }
 }

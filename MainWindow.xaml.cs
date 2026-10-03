@@ -14,6 +14,7 @@ namespace DiskMasterWinUI;
 
 public sealed partial class MainWindow : Window
 {
+    private StarterPage? _starterPage;
     private EasyModePage? _easyModePage;
     private WimDeployPage? _wimDeployPage;
     private BootManagerPage? _bootManagerPage;
@@ -22,7 +23,10 @@ public sealed partial class MainWindow : Window
     private NtfsPermissionsPage? _ntfsPermissionsPage;
     private AdvancedModePage? _advancedModePage;
     private SystemOptimizerPage? _systemOptimizerPage;
+    private NetworkToolsPage? _networkToolsPage;
     private SettingsPage? _settingsPage;
+
+    public TrayIconService TrayService { get; } = new();
 
     private double _currentZoom = 1.0;
     private bool _isShowingDialog = false;
@@ -33,12 +37,14 @@ public sealed partial class MainWindow : Window
 
     private static readonly Dictionary<string, string[]> WorkspaceTabTags = new()
     {
-        ["Master"] = ["EasyMode", "WimDeploy", "BootManager", "DiskTools", "SystemHealth", "NtfsPermissions", "AdvancedMode", "SystemOptimizer", "Settings"],
-        ["Deploy"] = ["WimDeploy", "BootManager", "EasyMode", "DiskTools", "Settings"],
-        ["Repair"] = ["SystemHealth", "BootManager", "DiskTools", "NtfsPermissions", "EasyMode", "Settings"],
-        ["Gaming"] = ["SystemOptimizer", "DiskTools", "SystemHealth", "Settings"],
-        ["Lite"] = ["EasyMode", "WimDeploy", "SystemHealth", "Settings"]
+        ["Master"] = ["Starter", "EasyMode", "WimDeploy", "BootManager", "DiskTools", "SystemHealth", "NtfsPermissions", "AdvancedMode", "SystemOptimizer", "NetworkTools", "Settings"],
+        ["Deploy"] = ["Starter", "WimDeploy", "BootManager", "EasyMode", "DiskTools", "Settings"],
+        ["Repair"] = ["Starter", "SystemHealth", "BootManager", "DiskTools", "NtfsPermissions", "EasyMode", "Settings"],
+        ["Gaming"] = ["Starter", "SystemOptimizer", "NetworkTools", "DiskTools", "SystemHealth", "Settings"],
+        ["Lite"] = ["Starter", "EasyMode", "NetworkTools", "SystemHealth", "Settings"]
     };
+
+    private static readonly string[] EasyModeAllowedTags = ["Starter", "EasyMode", "NetworkTools", "Settings"];
 
     public MainWindow()
     {
@@ -61,8 +67,9 @@ public sealed partial class MainWindow : Window
             catch { }
         }
 
-        // Cache all 9 original tabs for workspace filtering & floating dock-back
+        // Cache all 11 original tabs for workspace filtering & floating dock-back
         _allTabItems.AddRange([
+            TabStarter,
             TabEasyMode,
             TabWimDeploy,
             TabBootManager,
@@ -71,8 +78,40 @@ public sealed partial class MainWindow : Window
             TabNtfsPermissions,
             TabAdvancedMode,
             TabOptimizer,
+            TabNetworkTools,
             TabSettings
         ]);
+
+        try
+        {
+            TrayService.Initialize(WindowHelper.CurrentHwnd, "DiskMaster Pro");
+            TrayService.RestoreRequested += () =>
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    TrayService.RestoreFromTray();
+                });
+            };
+        }
+        catch { }
+
+        AppWindow.Closing += (sender, args) =>
+        {
+            if (SettingsService.Instance.Current.CloseToTray)
+            {
+                args.Cancel = true;
+                TrayService.MinimizeToTray();
+                TrayService.ShowNotification("DiskMaster Pro", LocalizationService.Instance["CloseToTrayNotice"] ?? "已縮小至系統匣後台執行");
+            }
+        };
+
+        AppWindow.Changed += (sender, args) =>
+        {
+            if (args.DidPresenterChange && sender.Presenter is OverlappedPresenter op && op.State == OverlappedPresenterState.Minimized && SettingsService.Instance.Current.MinimizeToTray)
+            {
+                TrayService.MinimizeToTray();
+            }
+        };
 
         // Auto-size and center window based on monitor work area
         try
@@ -326,6 +365,11 @@ public sealed partial class MainWindow : Window
             SettingsService.Instance.Save();
         }
 
+        if (s.IsEasyMode)
+        {
+            allowedTags = allowedTags.Where(tag => EasyModeAllowedTags.Contains(tag)).ToArray();
+        }
+
         if (s.CustomTabOrder != null && s.CustomTabOrder.Count > 0)
         {
             allowedTags = allowedTags
@@ -363,6 +407,43 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void ModeSwitcher_Click(object sender, RoutedEventArgs e)
+    {
+        var s = SettingsService.Instance.Current;
+        s.IsEasyMode = !s.IsEasyMode;
+        SettingsService.Instance.Save();
+        UpdateModeSwitcherUI();
+        ApplyWorkspacePreset(s.WorkspacePreset ?? "Master");
+    }
+
+    private void UpdateModeSwitcherUI()
+    {
+        var isEasy = SettingsService.Instance.Current.IsEasyMode;
+        var loc = LocalizationService.Instance;
+        if (isEasy)
+        {
+            ModeSwitcherText.Text = loc.CurrentLanguage switch
+            {
+                "zh-CN" => "🟢 简易模式",
+                "en-US" => "🟢 Easy Mode",
+                "ja-JP" => "🟢 かんたんモード",
+                _ => "🟢 簡易模式"
+            };
+            ModeSwitcherIcon.Glyph = "\uE790";
+        }
+        else
+        {
+            ModeSwitcherText.Text = loc.CurrentLanguage switch
+            {
+                "zh-CN" => "⚡ 专业进阶模式",
+                "en-US" => "⚡ Advance Mode",
+                "ja-JP" => "⚡ アドバンスモード",
+                _ => "⚡ 專業進階模式"
+            };
+            ModeSwitcherIcon.Glyph = "\uE71D";
+        }
+    }
+
     // ── Chrome Logic: Tab Detach & Floating Windows ──
 
     public void FloatTab(TabViewItem tabItem, Windows.Graphics.PointInt32? mousePos = null)
@@ -373,6 +454,7 @@ public sealed partial class MainWindow : Window
         var header = tabItem.Header?.ToString() ?? tag;
         Page page = tag switch
         {
+            "Starter" => _starterPage ??= new StarterPage(),
             "EasyMode" => _easyModePage ??= new EasyModePage(),
             "WimDeploy" => _wimDeployPage ??= new WimDeployPage(),
             "BootManager" => _bootManagerPage ??= new BootManagerPage(),
@@ -381,6 +463,7 @@ public sealed partial class MainWindow : Window
             "NtfsPermissions" => _ntfsPermissionsPage ??= new NtfsPermissionsPage(),
             "AdvancedMode" => _advancedModePage ??= new AdvancedModePage(),
             "SystemOptimizer" => _systemOptimizerPage ??= new SystemOptimizerPage(),
+            "NetworkTools" => _networkToolsPage ??= new NetworkToolsPage(),
             "Settings" => _settingsPage ??= new SettingsPage(),
             _ => new Page()
         };
@@ -583,6 +666,12 @@ public sealed partial class MainWindow : Window
         var currentTag = (MainTabs.SelectedItem as TabViewItem)?.Tag?.ToString();
         switch (currentTag)
         {
+            case "Starter":
+                if (_starterPage != null)
+                {
+                    await _starterPage.ViewModel.RefreshStatusCommand.ExecuteAsync(null);
+                }
+                break;
             case "EasyMode":
                 if (_easyModePage != null)
                 {
@@ -616,9 +705,78 @@ public sealed partial class MainWindow : Window
                     await _systemOptimizerPage.ViewModel.RefreshAllCommand.ExecuteAsync(null);
                 }
                 break;
+            case "NetworkTools":
+                if (_networkToolsPage != null)
+                {
+                    await _networkToolsPage.ViewModel.RefreshUpnpCommand.ExecuteAsync(null);
+                }
+                break;
             case "Settings":
                 _settingsPage?.ViewModel.LoadSettings();
                 break;
+        }
+    }
+
+    public async Task ShowTaskCompletedPromptAsync(string title, string message, bool isSuccess = true)
+    {
+        var s = SettingsService.Instance.Current;
+
+        try
+        {
+            TrayService.RestoreFromTray();
+        }
+        catch { }
+
+        if (s.EnableTaskbarFlash)
+        {
+            TaskbarFlashService.FlashWindow(WindowHelper.CurrentHwnd, count: 3);
+        }
+
+        if (s.EnableAudioFeedback)
+        {
+            if (isSuccess)
+            {
+                AudioFeedbackService.PlayAsterisk();
+            }
+            else
+            {
+                AudioFeedbackService.PlayExclamation();
+            }
+        }
+
+        CompanionSay(isSuccess ? $"✨ {title}" : $"⚠️ {title}");
+
+        if (WindowHelper.RootXamlRoot != null && !_isShowingDialog)
+        {
+            _isShowingDialog = true;
+            try
+            {
+                var dialog = new ContentDialog
+                {
+                    XamlRoot = WindowHelper.RootXamlRoot,
+                    Title = (isSuccess ? "✅ " : "⚠️ ") + title,
+                    Content = new TextBlock
+                    {
+                        Text = message,
+                        TextWrapping = TextWrapping.Wrap,
+                        IsTextSelectionEnabled = true
+                    },
+                    CloseButtonText = LocalizationService.Instance.CurrentLanguage switch
+                    {
+                        "en-US" => "OK",
+                        "ja-JP" => "OK",
+                        "zh-CN" => "确定",
+                        _ => "確定"
+                    },
+                    DefaultButton = ContentDialogButton.Close
+                };
+                await dialog.ShowAsync();
+            }
+            catch { }
+            finally
+            {
+                _isShowingDialog = false;
+            }
         }
     }
 
@@ -811,6 +969,13 @@ public sealed partial class MainWindow : Window
         AppTitleBar.Title = loc["AppTitle"];
         this.Title = AppTitleBar.Title;
 
+        TabStarter.Header = loc.CurrentLanguage switch
+        {
+            "zh-CN" => "入门向导",
+            "en-US" => "Starter Hub",
+            "ja-JP" => "スタートガイド",
+            _ => "入門精靈"
+        };
         TabEasyMode.Header = loc["EasyMode"];
         TabWimDeploy.Header = loc["WimDeploy"];
         TabBootManager.Header = loc["BootManager"];
@@ -819,6 +984,13 @@ public sealed partial class MainWindow : Window
         TabNtfsPermissions.Header = loc["NtfsPermissions"];
         TabAdvancedMode.Header = loc["AdvancedMode"];
         TabOptimizer.Header = loc["Optimizer"];
+        TabNetworkTools.Header = loc.CurrentLanguage switch
+        {
+            "zh-CN" => "网络工具",
+            "en-US" => "Network Tools",
+            "ja-JP" => "ネットワーク ツール",
+            _ => "網路工具"
+        };
         TabSettings.Header = loc["Settings"];
 
         LanguageToggleBtn.Content = loc.CurrentLanguage switch
@@ -838,10 +1010,12 @@ public sealed partial class MainWindow : Window
         };
         PopulateWorkspaceCombo();
         UpdateFloatingManagerUI();
+        UpdateModeSwitcherUI();
 
         AdminWarningBar.Title = loc["AdminRequired"];
         AdminWarningBar.Message = loc["AdminRequiredMsg"];
 
+        _starterPage?.ApplyLanguage();
         _easyModePage?.ApplyLanguage();
         _wimDeployPage?.ApplyLanguage();
         _bootManagerPage?.ApplyLanguage();
@@ -850,6 +1024,7 @@ public sealed partial class MainWindow : Window
         _ntfsPermissionsPage?.ApplyLanguage();
         _advancedModePage?.ApplyLanguage();
         _systemOptimizerPage?.ApplyLanguage();
+        _networkToolsPage?.ApplyLanguage();
         _settingsPage?.ApplyLanguage();
     }
 
@@ -860,6 +1035,10 @@ public sealed partial class MainWindow : Window
             var tag = item.Tag?.ToString();
             switch (tag)
             {
+                case "Starter":
+                    _starterPage ??= new StarterPage();
+                    ContentFrame.Content = _starterPage;
+                    break;
                 case "EasyMode":
                     _easyModePage ??= new EasyModePage();
                     ContentFrame.Content = _easyModePage;
@@ -891,6 +1070,10 @@ public sealed partial class MainWindow : Window
                 case "SystemOptimizer":
                     _systemOptimizerPage ??= new SystemOptimizerPage();
                     ContentFrame.Content = _systemOptimizerPage;
+                    break;
+                case "NetworkTools":
+                    _networkToolsPage ??= new NetworkToolsPage();
+                    ContentFrame.Content = _networkToolsPage;
                     break;
                 case "Settings":
                     _settingsPage ??= new SettingsPage();

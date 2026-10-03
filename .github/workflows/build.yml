@@ -35,7 +35,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Setup .NET SDK
       uses: actions/setup-dotnet@v5
@@ -57,14 +57,16 @@ jobs:
         Compress-Archive -Path publish/* -DestinationPath DiskMaster_${{ matrix.target }}_WinPE_Portable.zip
 
     - name: Upload Single-File EXE Artifact
-      uses: actions/upload-artifact@v4
+      if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+      uses: actions/upload-artifact@v5
       with:
         name: DiskMaster-${{ matrix.target }}-Portable
         path: installer_output/*.exe
         if-no-files-found: error
 
     - name: Upload Portable ZIP Artifact
-      uses: actions/upload-artifact@v4
+      if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+      uses: actions/upload-artifact@v5
       with:
         name: DiskMaster-${{ matrix.target }}-Zip
         path: DiskMaster_${{ matrix.target }}_WinPE_Portable.zip
@@ -82,7 +84,7 @@ jobs:
 
     steps:
     - name: Download all artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
 
     - name: Generate SHA256 Checksums
       run: |

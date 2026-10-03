@@ -95,7 +95,29 @@ DiskMaster Pro runs as a **self-contained unpackaged desktop application** (`Win
 - **Unprivileged Telemetry Fallback**: Graceful fallback using Windows `InstallDate` and `TickCount64` heuristics when low-level IOCTL / CIM hardware queries are restricted.
 - **Clean Health Indicators**: Guarantees zero read/write error counters display as `"0"` instead of confusing `null` / `"N/A"`.
 
-### 8. 🪟 Modern Fluent Interface & Chrome-Style Tab Tear-Off
+### 8. 🌐 Network Tools, UPnP Port Forwarding & 5-Stage Diagnostics
+- **UPnP Automatic Port Forwarding**: High-performance COM NATUPnP gateway discovery for automatic router port mapping; includes 1-click popular gaming and server presets (Minecraft 25565, Steam 27015, Palworld 8211, Terraria 7777, Remote Desktop 3389, Plex 32400).
+- **Recommended Public DNS Engine**: Rapidly test and switch system DNS to Cloudflare (1.1.1.1), Google (8.8.8.8), Quad9 Malware Blocking (9.9.9.9), AdGuard Tracker Blocking (94.140.14.14), HiNet, TWNIC, or restore router DHCP.
+- **5-Stage Smart Bottleneck Diagnosis**: Automatically assesses Gateway Ping, DNS resolution speed, Backbone Latency, Outbound TCP handshake, and Network Adapter hardware error counts.
+- **Visual Hosts File Editor**: Structured table editor for `%SystemRoot%\System32\drivers\etc\hosts` with inline toggle, comments, automated `.bak` backups, and instant DNS cache flushing.
+
+### 9. ☁️ OneDrive Deep Governance & 5-Issue Repair
+- **Real-Time Detection & Selective Display**: Detects OneDrive installations and background execution, dynamically exposing repair and uninstallation cards only when relevant.
+- **Fix Known Folder Move Hijacking**: Reverts hijacked Desktop, Documents, and Pictures folders back to clean local `%USERPROFILE%` paths.
+- **Files On-Demand Guardrail**: Automatically scans for cloud-only dehydrated placeholders before uninstallation to protect users from accidental data loss.
+- **Ghost Sidebar Icon Elimination**: Safely strips orphaned Explorer namespace registry pins (`018D5C66-4533-4307-9B53-224DE2ED1FE6`).
+- **Infinite Sync Loop Reset**: Resolves stuck "Processing Changes" loops via `onedrive.exe /reset` and local cache purges.
+- **Group Policy Reinstall Lock**: Sets `DisableFileSyncNGSC = 1` in policy registry to permanently prevent Windows Update from silently reinstalling OneDrive.
+
+### 10. 🎯 Beginner Starter Hub & Dual-Mode UI Switcher
+- **Beginner Starter Hub**: Features an automated 0-100 system health score and 1-click optimization cards (Game Latency Boost, 1-Click SSD Reclamation, System Integrity Repair, OneDrive Cleanup).
+- **Easy vs Advance Dual-Mode Switcher**: Instantly toggles between streamlined Beginner Mode and full-spectrum Advance Toolbox directly from the top tab strip.
+- **System Tray Background Minimization**: Native Win32 `Shell_NotifyIcon` integration supporting background minimization, click-to-restore, and close-to-tray.
+- **Taskbar Flash & Windows Audio Feedback**: Native `FlashWindowEx` taskbar flashing on warnings and completions, paired with native Windows `MessageBeep` audio alerts.
+- **GitHub Releases Auto-Updater**: Real-time update checks against official GitHub releases with configurable check intervals and direct asset downloads.
+
+### 11. 🪟 Modern Fluent Interface & Movable Chrome Tabs
+- **Fully Draggable & Movable Tabs**: All main tabs and sub-tabs support drag-and-drop mouse reordering (`CanReorderTabs="True"`, `CanDragTabs="True"`).
 - **Tab Tear-Off & Multi-Window Docking**: Drag tabs outside the main window to instantly detach them into standalone `FloatingTabWindow` instances; effortlessly drag back or use one-click "Dock All".
 - **Dynamic Fluent Design**: Fluent Acrylic, Mica Alt material, smooth transitions, and high-DPI crisp rendering.
 - **Full 4-Language Hot-Swap Parity**: Dynamic runtime language switching between Traditional Chinese (`zh-TW`), Simplified Chinese (`zh-CN`), English (`en-US`), and Japanese (`ja-JP`).
