@@ -95,6 +95,30 @@ public class TempCleanService
                     Description = "圖片與影片圖示縮圖資料庫 (thumbcache_*.db)",
                     Path = Path.Combine(LocalAppData, "Microsoft", "Windows", "Explorer"),
                     Icon = "🖼️"
+                },
+                new()
+                {
+                    Id = "DefenderCache",
+                    Name = "Windows Defender 病毒碼備份 (Defender Cache)",
+                    Description = "Windows Defender 病毒碼定義更新歷史備份檔案",
+                    Path = Path.Combine(ProgramData, "Microsoft", "Windows Defender", "Definition Updates", "Backup"),
+                    Icon = "🛡️"
+                },
+                new()
+                {
+                    Id = "PackageCache",
+                    Name = "軟體安裝套件快取 (Package Cache)",
+                    Description = "各類應用程式安裝快取備份 (ProgramData\\Package Cache)",
+                    Path = Path.Combine(ProgramData, "Package Cache"),
+                    Icon = "📦"
+                },
+                new()
+                {
+                    Id = "CbsLogs",
+                    Name = "系統元件維護記錄檔 (CBS Logs)",
+                    Description = "Windows 元件服務日誌 (C:\\Windows\\Logs\\CBS)",
+                    Path = Path.Combine(WinDir, "Logs", "CBS"),
+                    Icon = "📝"
                 }
             };
 
@@ -324,6 +348,40 @@ public class TempCleanService
                 deletedFiles += f;
                 freedBytes += b;
                 onOutput($"  - 已清理 {f} 個縮圖資料庫檔案 ({FormatBytes(b)})");
+            }
+
+            // Defender Cache
+            if (targetSet.Contains("DefenderCache"))
+            {
+                var defDir = Path.Combine(ProgramData, "Microsoft", "Windows Defender", "Definition Updates", "Backup");
+                onOutput("▸ 正在清理 Windows Defender 病毒碼歷史備份...");
+                var (f, b) = CleanDirectoryInternal(defDir, "*.*", ct);
+                deletedFiles += f;
+                freedBytes += b;
+                onOutput($"  - 已清理 {f} 個病毒碼備份檔 ({FormatBytes(b)})");
+            }
+
+            // Package Cache
+            if (targetSet.Contains("PackageCache"))
+            {
+                var pkgDir = Path.Combine(ProgramData, "Package Cache");
+                onOutput("▸ 正在清理安裝套件快取 (Package Cache)...");
+                var (f, b) = CleanDirectoryInternal(pkgDir, "*.*", ct);
+                deletedFiles += f;
+                freedBytes += b;
+                onOutput($"  - 已清理 {f} 個安裝快取檔 ({FormatBytes(b)})");
+            }
+
+            // CBS Logs
+            if (targetSet.Contains("CbsLogs"))
+            {
+                var cbsDir = Path.Combine(WinDir, "Logs", "CBS");
+                onOutput("▸ 正在清理系統元件維護紀錄 (CBS Logs)...");
+                var (f, b) = CleanDirectoryInternal(cbsDir, "CbsPersist_*.log", ct);
+                var (f2, b2) = CleanDirectoryInternal(cbsDir, "CbsPersist_*.cab", ct);
+                deletedFiles += f + f2;
+                freedBytes += b + b2;
+                onOutput($"  - 已清理 {f + f2} 個歷史維護記錄檔 ({FormatBytes(b + b2)})");
             }
 
             onOutput("\n══════════════════════════════════════════════════════════════");

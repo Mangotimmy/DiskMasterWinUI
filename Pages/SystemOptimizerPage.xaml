@@ -44,7 +44,8 @@
         <!-- Movable Sub TabView -->
         <TabView x:Name="OptimizerTabView" Grid.Row="1"
                  CanReorderTabs="True" CanDragTabs="True"
-                 IsAddTabButtonVisible="False">
+                 IsAddTabButtonVisible="False"
+                 SelectionChanged="OptimizerTabView_SelectionChanged">
             <TabView.TabItems>
 
                 <!-- ════ Tab 1: 電競遊戲模式 (Gaming Mode) ════ -->

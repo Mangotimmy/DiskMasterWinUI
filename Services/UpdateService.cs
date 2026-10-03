@@ -17,7 +17,15 @@ public class UpdateService
     };
 
     private const string RepoApiUrl = "https://api.github.com/repos/Mangotimmy/DiskMasterWinUI/releases/latest";
-    private const string CurrentVersion = "v3.3.0";
+    
+    public static string CurrentVersion
+    {
+        get
+        {
+            var ver = typeof(UpdateService).Assembly.GetName().Version;
+            return ver != null ? $"v{ver.Major}.{ver.Minor}.{ver.Build}" : "v1.2.2";
+        }
+    }
 
     static UpdateService()
     {

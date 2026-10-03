@@ -12,6 +12,14 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <PublishTrimmed>false</PublishTrimmed>
     <ApplicationManifest>..\..\app.manifest</ApplicationManifest>
+    <Version>1.2.2</Version>
+    <AssemblyVersion>1.2.2.0</AssemblyVersion>
+    <FileVersion>1.2.2.0</FileVersion>
+    <Company>DiskMaster Team</Company>
+    <Product>DiskMaster Pro Portable</Product>
+    <Authors>DiskMaster Team</Authors>
+    <Description>DiskMaster Pro Portable Launcher</Description>
+    <Copyright>Copyright (C) 2026 DiskMaster Team. All rights reserved.</Copyright>
   </PropertyGroup>
 
   <ItemGroup>

@@ -5,8 +5,8 @@
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
-        <!-- requireAdministrator ensures all disk, BCD, DISM, and SFC operations run with proper privileges -->
-        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+        <!-- asInvoker enables running in non-admin mode without UAC popup on launch; users can elevate on-demand -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
       </requestedPrivileges>
     </security>
   </trustInfo>
