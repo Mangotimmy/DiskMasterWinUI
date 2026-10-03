@@ -3,11 +3,13 @@ name: Build and Release Multi-Arch DiskMaster Pro
 on:
   push:
     branches: [ "main", "master" ]
+    # 忽略文檔類小更新，避免觸發 CI
     paths-ignore:
       - '**.md'
       - 'docs/**'
       - '.gitignore'
       - 'LICENSE'
+    # 推送 Tag 時一律觸發完整發布流程
     tags: 
       - 'v*'
   pull_request:
@@ -54,14 +56,18 @@ jobs:
       run: |
         Compress-Archive -Path publish/* -DestinationPath DiskMaster_${{ matrix.target }}_WinPE_Portable.zip
 
+    # 🔑 僅在推送 v* Tag 或手動觸發時上傳單一 EXE 檔案（一般 Push / PR 自動跳過）
     - name: Upload Single-File EXE Artifact
+      if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
       uses: actions/upload-artifact@v5
       with:
         name: DiskMaster-${{ matrix.target }}-Portable
         path: installer_output/*.exe
         if-no-files-found: error
 
+    # 🔑 僅在推送 v* Tag 或手動觸發時上傳 Portable ZIP 檔案（一般 Push / PR 自動跳過）
     - name: Upload Portable ZIP Artifact
+      if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
       uses: actions/upload-artifact@v5
       with:
         name: DiskMaster-${{ matrix.target }}-Zip
@@ -71,6 +77,7 @@ jobs:
   release:
     name: Create GitHub Release
     needs: build
+    # 僅在推送版本 Tag (v*) 時才執行 Release 發布
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     
@@ -81,20 +88,13 @@ jobs:
     - name: Download all artifacts
       uses: actions/download-artifact@v5
 
-    # 🔑 新增：自動計算所有檔案的 SHA256 並生成 SHA256SUMS.txt
     - name: Generate SHA256 Checksums
       run: |
         echo "## SHA256 Checksums" > checksums_summary.md
         echo '```' >> checksums_summary.md
-        
-        # 尋找所有下載下來的 .exe 與 .zip 檔案並計算 SHA256
         find . -type f \( -name "*.exe" -o -name "*.zip" \) -exec sha256sum {} + | sed 's|./[^/]*/||' > SHA256SUMS.txt
-        
         cat SHA256SUMS.txt >> checksums_summary.md
         echo '```' >> checksums_summary.md
-        
-        echo "Generated Checksums:"
-        cat SHA256SUMS.txt
 
     - name: Publish GitHub Release
       uses: softprops/action-gh-release@v2
