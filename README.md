@@ -60,14 +60,6 @@ DiskMaster Pro runs as a **self-contained unpackaged desktop application** (`Win
 
 ### 5.  Storage Directory Encyclopedia & Space Analyzer
 - **Targeted Heavy Directory Scans**: Deep recursive size and item count analysis on critical Windows system folders:
-  - `WinSxS`: Windows Component Store and update cache.
-  - `SoftwareDistribution`: Windows Update temporary download payloads.
-  - `$SystemRoot$\Installer`: Windows Installer `.msi` and `.msp` patch database.
-  - `DriverStore\FileRepository`: Staged device driver packages.
-  - `Temp` & `AppData`: System/User temporary files and software databases.
-  - `System Volume Information`: System restore points and VSS shadow copies.
-  - `hiberfil.sys` & `pagefile.sys`: Hibernation and virtual memory paging files.
-  - `$WINDOWS.~BT` & `Windows.old`: Previous Windows installation upgrade leftovers.
 - **Safety Rating Indicators**:
   - 🟢 **Safe to Purge**: Safe for immediate deletion without system impact.
   - 🟡 **Clean via System Tool / DISM**: Must be purged using native maintenance engines (`Dism /Online /Cleanup-Image /StartComponentCleanup`).
@@ -75,30 +67,13 @@ DiskMaster Pro runs as a **self-contained unpackaged desktop application** (`Win
 - **One-Click Actions**: Open directly in File Explorer, trigger native safe cleanup, or launch DISM Component Cleanup.
 
 ### 6.  Hidden Performance & CPU Power Tuning
-- **Windows Power Options Unhiding**: Reveal and configure hidden Windows Processor Power Management (`SUB_PROCESSOR`) policies:
-  - **Processor Performance Boost Mode** (`be337238-0d82-4146-a960-4f3749d470c7`): Control Aggressive, Efficient, or Disabled boost behavior.
-  - **Energy Performance Preference (EPP)** (`36687f9e-e376-49e8-b783-be5e3e3563ab`): Tune responsiveness scale from raw performance (0) to maximum efficiency (100).
-  - **Processor Autonomous Mode** (`8baa4a8a-14fc-482b-bd23-a0f0f71e11e8`): Switch between hardware-managed P-states (HWP) and OS scheduler control.
-  - **CPU Core Parking Min/Max** (`0cc5b647-c1df-4637-891a-dec35c318583`, `ea062031-0e34-4ff1-9b6d-eb1059324028`): Control unparking thresholds for multicore processors.
-  - **Heterogeneous Scheduling** (`7f24e370-7664-4642-99e3-e605185a0899`): Optimize thread allocation across Intel P-Core/E-Core hybrid designs and AMD 3D V-Cache architectures.
-  - **System Cooling Policy** (`94d3a615-a899-4ac5-ae2b-e4d8f6343d57`): Toggle between Active (fan ramp before throttling) and Passive cooling.
 - **Ultra Gaming & Latency Optimization**:
-  - **CPU Quantum Scheduling** (`Win32PrioritySeparation = 0x26`): Short, variable foreground quantum boost for ultra-low frame rendering variance.
-  - **Dynamic Ticking Disable** (`bcdedit /set disabledynamictick yes`): Eliminate timer tick latency jitter on high-refresh-rate systems.
-  - **Large System Cache & Non-Paged Pool**: `LargeSystemCache = 1` and `DisablePagingExecutive = 1` keeping kernel drivers locked in physical RAM.
 - **Complete Hiberfil.sys Purge**:
-  - Execute `powercfg /hibernate off` with verified deletion and release of `C:\hiberfil.sys`.
-  - Calculate and report reclaimed SSD disk space in gigabytes.
 
 ### 7.  S.M.A.R.T. NVMe Telemetry & Reliability Monitoring
 - **NVMe Log Page 0x02 Specification Compliance**: Fully compliant with NVM Express Base Specification 5.14.1.2 (correct byte offset 128 for `PowerOnHours`, offset 112 for `PowerCycles`, offset 3 for `AvailableSpare`).
 - **Unprivileged Telemetry Fallback**: Graceful fallback using Windows `InstallDate` and `TickCount64` heuristics when low-level IOCTL / CIM hardware queries are restricted.
 - **Clean Health Indicators**: Guarantees zero read/write error counters display as `"0"` instead of confusing `null` / `"N/A"`.
-
-### 8.  Modern Fluent Interface & Chrome-Style Tab Tear-Off
-- **Tab Tear-Off & Multi-Window Docking**: Drag tabs outside the main window to instantly detach them into standalone `FloatingTabWindow` instances; effortlessly drag back or use one-click "Dock All".
-- **Dynamic Fluent Design**: Fluent Acrylic, Mica Alt material, smooth transitions, and high-DPI crisp rendering.
-- **Full 4-Language Hot-Swap Parity**: Dynamic runtime language switching between Traditional Chinese (`zh-TW`), Simplified Chinese (`zh-CN`), English (`en-US`), and Japanese (`ja-JP`).
 
 ---
 
