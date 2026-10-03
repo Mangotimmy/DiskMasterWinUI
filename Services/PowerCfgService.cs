@@ -337,4 +337,61 @@ public class PowerCfgService
 
         return (false, string.IsNullOrWhiteSpace(stderr) ? stdout : stderr);
     }
+
+    /// <summary>
+    /// Sets Energy Performance Preference (EPP) for the active power scheme (0 = Max Performance, 100 = Max Power Saving).
+    /// </summary>
+    public async Task<(bool Success, string Message)> SetEnergyPerformancePreferenceAsync(int acValue, int dcValue = 50)
+    {
+        var (stdout1, stderr1, code1) = await ProcessHelper.RunProcessAsync("powercfg.exe", $"/setacvalueindex SCHEME_CURRENT 54533251-82be-4824-96c1-47b60b740d00 36687f9e-e376-49e8-b783-be5e3e3563ab {acValue}");
+        var (stdout2, stderr2, code2) = await ProcessHelper.RunProcessAsync("powercfg.exe", $"/setdcvalueindex SCHEME_CURRENT 54533251-82be-4824-96c1-47b60b740d00 36687f9e-e376-49e8-b783-be5e3e3563ab {dcValue}");
+        await ProcessHelper.RunProcessAsync("powercfg.exe", "/setactive SCHEME_CURRENT");
+
+        if (code1 == 0 && code2 == 0)
+        {
+            return (true, $"EPP 能源偏好已設定為 AC: {acValue} (0=極速), DC: {dcValue}");
+        }
+        return (false, $"EPP 設定失敗: {stderr1} {stderr2}");
+    }
+
+    /// <summary>
+    /// Configures CPU Core Parking minimum and maximum core percentages (100% min = unpark all cores).
+    /// </summary>
+    public async Task<(bool Success, string Message)> SetCoreParkingAsync(int minCoresPercent, int maxCoresPercent = 100)
+    {
+        var (stdout1, stderr1, code1) = await ProcessHelper.RunProcessAsync("powercfg.exe", $"/setacvalueindex SCHEME_CURRENT 54533251-82be-4824-96c1-47b60b740d00 0cc5b647-c1df-4637-891a-dec35c318583 {minCoresPercent}");
+        var (stdout2, stderr2, code2) = await ProcessHelper.RunProcessAsync("powercfg.exe", $"/setacvalueindex SCHEME_CURRENT 54533251-82be-4824-96c1-47b60b740d00 ea062031-0e34-4ff1-9b6d-eb1059324028 {maxCoresPercent}");
+        await ProcessHelper.RunProcessAsync("powercfg.exe", "/setactive SCHEME_CURRENT");
+
+        if (code1 == 0 && code2 == 0)
+        {
+            var desc = minCoresPercent >= 100 ? "已全面解鎖核心停駐 (100% 全核無休眠運行)" : $"核心停駐範圍已設定為 {minCoresPercent}% ~ {maxCoresPercent}%";
+            return (true, desc);
+        }
+        return (false, $"核心停駐設定失敗: {stderr1} {stderr2}");
+    }
+
+    /// <summary>
+    /// Configures Processor Performance Boost Mode (0=Disabled, 1=Enabled, 2=Aggressive, 3=Efficient Enabled, 4=Efficient Aggressive).
+    /// </summary>
+    public async Task<(bool Success, string Message)> SetProcessorBoostModeValueAsync(int mode)
+    {
+        var (stdout, stderr, code) = await ProcessHelper.RunProcessAsync("powercfg.exe", $"/setacvalueindex SCHEME_CURRENT 54533251-82be-4824-96c1-47b60b740d00 be337238-0d82-4146-a960-4f3749d470c7 {mode}");
+        await ProcessHelper.RunProcessAsync("powercfg.exe", "/setactive SCHEME_CURRENT");
+
+        if (code == 0)
+        {
+            var modeName = mode switch
+            {
+                0 => "已停用 (降低發熱與功耗)",
+                1 => "標準啟用",
+                2 => "極致激進 (Aggressive，鎖定高頻)",
+                3 => "節能啟用",
+                _ => "高能效激進"
+            };
+            return (true, $"處理器激進加速模式: {modeName}");
+        }
+        return (false, $"加速模式設定失敗: {stderr}");
+    }
 }
+

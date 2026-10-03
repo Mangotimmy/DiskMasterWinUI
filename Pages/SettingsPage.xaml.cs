@@ -185,6 +185,40 @@ public sealed partial class SettingsPage : Page
         RestoreTcpDefaultsBtn.Content = LocalizationService.T("🔄 還原 Windows 官方網路預設值", "🔄 还原 Windows 官方网络默认值", "🔄 Restore Windows Default Network Settings", "🔄 Windows 既定のネットワーク設定に復元");
         FlushDnsBtn.Content = LocalizationService.T("🌐 清除 DNS 快取", "🌐 清除 DNS 缓存", "🌐 Flush DNS Cache", "🌐 DNS キャッシュをクリア");
 
+        // Section 7.1: System Tray & Notifications
+        TrayCardTitle.Text = LocalizationService.T("📥 系統匣後台與操作反饋", "📥 系统托盘后台与操作反馈", "📥 System Tray & Notifications", "📥 システムトレイと通知");
+        TrayCardDesc.Text = LocalizationService.T(
+            "設定最小化至系統匣、任務完成工作列閃爍與 Windows 系統音效提示。",
+            "设置最小化至系统托盘、任务完成任务栏闪烁与 Windows 系统音效提示。",
+            "Configure minimize to system tray, taskbar flashing on completion, and audio feedback.",
+            "システムトレイへの最小化、タスク完了時のタスクバー点滅、Windows 効果音を設定します。");
+        MinimizeToTrayToggle.Header = LocalizationService.T("視窗最小化時縮小至系統匣", "窗口最小化时缩小至系统托盘", "Minimize to System Tray", "最小化時にシステムトレイへ格納");
+        MinimizeToTrayToggle.OffContent = LocalizationService.T("一般最小化", "一般最小化", "Standard Minimize", "通常最小化");
+        MinimizeToTrayToggle.OnContent = LocalizationService.T("縮小至系統匣", "缩小至系统托盘", "Minimize to Tray", "トレイへ最小化");
+        CloseToTrayToggle.Header = LocalizationService.T("點擊關閉 (X) 時縮小至系統匣", "点击关闭 (X) 时缩小至系统托盘", "Close Button (X) Minimizes to Tray", "閉じる (X) 時にトレイへ格納");
+        CloseToTrayToggle.OffContent = LocalizationService.T("直接退出", "直接退出", "Exit Application", "アプリ終了");
+        CloseToTrayToggle.OnContent = LocalizationService.T("後台保留", "后台保留", "Keep in Tray", "トレイに常駐");
+        TaskbarFlashToggle.Header = LocalizationService.T("任務完成或警告時閃爍工作列", "任务完成或警告时闪烁任务栏", "Flash Taskbar on Warning & Finish", "警告・完了時にタスクバーを点滅");
+        TaskbarFlashToggle.OffContent = LocalizationService.T("已停用", "已停用", "Disabled", "無効");
+        TaskbarFlashToggle.OnContent = LocalizationService.T("已啟用", "已启用", "Enabled", "有効");
+        AudioFeedbackToggle.Header = LocalizationService.T("操作成功與完成播放提示音效", "操作成功与完成播放提示音效", "Play System Sounds on Completion", "完了時にシステム効果音を再生");
+        AudioFeedbackToggle.OffContent = LocalizationService.T("靜音", "静音", "Mute", "ミュート");
+        AudioFeedbackToggle.OnContent = LocalizationService.T("音效啟用", "音效启用", "Enabled", "有効");
+
+        // Section 7.2: Auto Updater
+        UpdaterCardTitle.Text = LocalizationService.T("🚀 自動更新與版本管理", "🚀 自动更新与版本管理", "🚀 Auto Updater & Version Control", "🚀 自動更新とバージョン管理");
+        UpdaterCardDesc.Text = LocalizationService.T(
+            "透過 GitHub Releases 檢查最新版本，可自由設定啟動自動檢查或手動點擊更新。",
+            "通过 GitHub Releases 检查最新版本，可自由设定启动自动检查或手动点击更新。",
+            "Check for newer releases via GitHub Releases with automatic or manual updates.",
+            "GitHub Releases から最新バージョンを確認し、自動または手動でアップデートします。");
+        AutoCheckUpdatesToggle.Header = LocalizationService.T("自動檢查版本更新", "自动检查版本更新", "Auto-check for Updates", "自動更新確認");
+        AutoCheckUpdatesToggle.OffContent = LocalizationService.T("僅手動檢查", "仅手动检查", "Manual Only", "手動のみ");
+        AutoCheckUpdatesToggle.OnContent = LocalizationService.T("自動檢查", "自动检查", "Automatic", "自動");
+        UpdateFrequencyBox.Header = LocalizationService.T("檢查更新頻率", "检查更新频率", "Check Frequency", "確認頻度");
+        CheckUpdateBtn.Content = LocalizationService.T("🔍 立即檢查更新", "🔍 立即检查更新", "🔍 Check for Updates", "🔍 アップデートを確認");
+        DownloadUpdateBtn.Content = LocalizationService.T("🌐 下載最新版本", "🌐 下载最新版本", "🌐 Download Latest Release", "🌐 最新版をダウンロード");
+
         // Section 8: Maintenance & Cache
         MaintenanceHeader.Text = LocalizationService.T("🧹 維護與暫存清理", "🧹 维护与临时清理", "🧹 Maintenance & Cache Cleanup", "🧹 メンテナンスとキャッシュ削除");
         CleanTempCacheBtn.Content = LocalizationService.T("🧹 清理暫存腳本檔案", "🧹 清理临时脚本文件", "🧹 Clean Temporary Cache Files", "🧹 一時スクリプト ファイルを削除");

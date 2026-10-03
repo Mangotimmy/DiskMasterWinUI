@@ -43,7 +43,7 @@
 
         <!-- Movable Sub TabView -->
         <TabView x:Name="OptimizerTabView" Grid.Row="1"
-                 CanReorderTabs="True"
+                 CanReorderTabs="True" CanDragTabs="True"
                  IsAddTabButtonVisible="False">
             <TabView.TabItems>
 
@@ -342,6 +342,60 @@
                                     </Grid>
                                 </StackPanel>
                             </Border>
+
+                            <!-- Advanced Latency, Memory & Group Policy Tweaks Card -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="10">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE772;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        <TextBlock x:Name="AdvTweaksCardTitle" Text="⚡ 深度低延遲登錄檔與群組原則優化" FontWeight="SemiBold" />
+                                    </StackPanel>
+
+                                    <!-- Switch 1: Nagle's Algorithm -->
+                                    <Grid Padding="4,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="2">
+                                            <TextBlock x:Name="NagleLabel" Text="停用 Nagle 演算法 (TcpAckFrequency = 1 &amp; TCPNoDelay = 1)" FontWeight="SemiBold" />
+                                            <TextBlock x:Name="NagleDesc" Text="強制網卡立刻發送 TCP 封包，不進行佇列合併等待，大幅降低線上遊戲連線 Ping 與操作抖動。" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                        <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsNagleDisabled, Mode=OneWay}"
+                                                      Toggled="Nagle_Toggled" />
+                                    </Grid>
+
+                                    <!-- Switch 2: Disable Paging Executive -->
+                                    <Grid Padding="4,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="2">
+                                            <TextBlock x:Name="PagingExecLabel" Text="核心與驅動鎖定於實體 RAM (DisablePagingExecutive = 1)" FontWeight="SemiBold" />
+                                            <TextBlock x:Name="PagingExecDesc" Text="禁止 Windows 將核心系統代碼與驅動程式分頁寫入虛擬記憶體硬碟，確保 100% 於高速 RAM 運行。" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                        <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsDisablePagingExecutive, Mode=OneWay}"
+                                                      Toggled="DisablePagingExecutive_Toggled" />
+                                    </Grid>
+
+                                    <!-- Switch 3: Group Policy Privacy & Telemetry -->
+                                    <Grid Padding="4,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="2">
+                                            <TextBlock x:Name="GroupPolicyLabel" Text="本機群組原則隱私防護 (關閉遙測/開始功能表Bing/P2P上傳)" FontWeight="SemiBold" />
+                                            <TextBlock x:Name="GroupPolicyDesc" Text="關閉 AllowTelemetry、停用開始功能表網路搜尋、關閉傳遞最佳化 P2P 背景佔用。" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                        <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsGroupPolicyTelemetryDisabled, Mode=OneWay}"
+                                                      Toggled="GroupPolicyTelemetry_Toggled" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </ScrollViewer>
                 </TabViewItem>
@@ -493,6 +547,80 @@
                                         </StackPanel>
                                         <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsProcessorBoostUnhidden, Mode=OneWay}"
                                                       Toggled="ProcessorBoost_Toggled" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Deep CPU Power Management Panel (EPP, Core Parking, Boost) -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="14">
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon Grid.Column="0" Glyph="&#xE950;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Spacing="2">
+                                            <TextBlock x:Name="CpuPpmPanelTitle" Text="🎛️ CPU 底層電源管理原則 (EPP / Core Parking / Boost Mode)" FontWeight="SemiBold" FontSize="15" />
+                                            <TextBlock x:Name="CpuPpmPanelDesc" Text="直接調節 Windows ACPI 處理器電源管理 GUID，包括能量效能偏好 (EPP)、核心停駐解鎖與激進睿頻。" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Content="🎛️ 解鎖全 7 項 CPU 原則" Command="{x:Bind ViewModel.UnhideAllCpuPowerAttributesCommand}"
+                                                Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center" />
+                                    </Grid>
+
+                                    <!-- 1. EPP Slider -->
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="4">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="能量效能偏好 (EPP - Energy Performance Preference):" FontWeight="SemiBold" />
+                                                <TextBlock Text="{x:Bind ViewModel.CpuEppSliderValue, Mode=OneWay}" FontWeight="Bold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                <TextBlock Text="(0 = 最極致效能, 100 = 最極致省電)" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                            <Slider Minimum="0" Maximum="100" StepFrequency="5" Value="{x:Bind ViewModel.CpuEppSliderValue, Mode=TwoWay}" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="套用 EPP" Command="{x:Bind ViewModel.ApplyCpuEppCommand}" VerticalAlignment="Center" />
+                                    </Grid>
+
+                                    <!-- 2. Core Parking Slider -->
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="4">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="核心停駐最小核心比例 (CPMINCORES):" FontWeight="SemiBold" />
+                                                <TextBlock Text="{x:Bind ViewModel.CpuCoreParkingMinPercent, Mode=OneWay}" FontWeight="Bold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                <TextBlock Text="% (100% = 全核全開防微卡頓)" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                            <Slider Minimum="0" Maximum="100" StepFrequency="10" Value="{x:Bind ViewModel.CpuCoreParkingMinPercent, Mode=TwoWay}" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="套用停駐" Command="{x:Bind ViewModel.ApplyCpuCoreParkingCommand}" VerticalAlignment="Center" />
+                                    </Grid>
+
+                                    <!-- 3. Boost Mode Selection -->
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox Grid.Column="0" Header="處理器效能激進提升模式 (PERFBOOSTMODE)"
+                                                  SelectedIndex="{x:Bind ViewModel.SelectedCpuBoostModeIndex, Mode=TwoWay}"
+                                                  HorizontalAlignment="Stretch">
+                                            <ComboBoxItem Content="0: 已停用 (Disabled - 降低功耗與溫度)" />
+                                            <ComboBoxItem Content="1: 標準啟用 (Enabled - 正常睿頻)" />
+                                            <ComboBoxItem Content="2: 極致激進 (Aggressive - 電競極速鎖高頻)" />
+                                            <ComboBoxItem Content="3: 節能啟用 (Efficient Enabled)" />
+                                            <ComboBoxItem Content="4: 高能效激進 (Efficient Aggressive)" />
+                                        </ComboBox>
+                                        <Button Grid.Column="1" Content="套用睿頻" Command="{x:Bind ViewModel.ApplyCpuBoostModeCommand}" VerticalAlignment="Bottom" />
                                     </Grid>
                                 </StackPanel>
                             </Border>
@@ -674,6 +802,227 @@
                                                     </Grid.ColumnDefinitions>
                                                     <FontIcon Grid.Column="0" Glyph="&#xE72C;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
                                                     <TextBlock Grid.Column="1" Text="{x:Bind Summary}" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabViewItem>
+
+                <!-- ════ Tab 5: OneDrive 深度管理、修復與徹底卸載 (OneDrive Governance) ════ -->
+                <TabViewItem x:Name="TabOneDrive" Header="☁️ OneDrive 深度治理與卸載" IsClosable="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                        <StackPanel Spacing="16" MaxWidth="1000" HorizontalAlignment="Left">
+
+                            <!-- Hero Status Card -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="18">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <FontIcon Grid.Column="0" Glyph="&#xE753;" FontSize="40"
+                                              Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+
+                                    <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock x:Name="OneDriveStatusTitle" Text="Microsoft OneDrive 系統狀態" FontWeight="Bold" FontSize="16" />
+                                            <Border Background="{ThemeResource AccentFillColorTertiaryBrush}" CornerRadius="4" Padding="6,2">
+                                                <TextBlock Text="{x:Bind ViewModel.OneDriveInstalledStatusText, Mode=OneWay}" FontSize="11" FontWeight="SemiBold" />
+                                            </Border>
+                                        </StackPanel>
+
+                                        <StackPanel Orientation="Horizontal" Spacing="12">
+                                            <TextBlock Text="{x:Bind ViewModel.OneDriveRunningStatusText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" />
+                                            <TextBlock Text="•" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Text="{x:Bind ViewModel.OneDriveRedirectStatusText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" />
+                                            <TextBlock Text="•" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Text="{x:Bind ViewModel.OneDriveCloudFilesStatusText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" />
+                                            <TextBlock Text="•" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Text="{x:Bind ViewModel.OneDriveGhostIconStatusText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" />
+                                            <TextBlock Text="•" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Text="{x:Bind ViewModel.OneDrivePolicyStatusText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" />
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <Button Grid.Column="2" Content="🔄 重新整理" Command="{x:Bind ViewModel.RefreshOneDriveStatusCommand}"
+                                            VerticalAlignment="Center" Padding="12,6" />
+                                </Grid>
+                            </Border>
+
+                            <!-- Actions Card: Core Repairs & Deep Uninstall -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="OneDrive 網路社群 5 大核心災情修復與深度解除安裝" FontWeight="SemiBold" FontSize="15" />
+                                    <TextBlock Text="針對微軟 OneDrive 強制綁架桌面/個人資料夾路徑、解除安裝後側邊欄殘留幽靈圖示、同步引擎無限卡死 Processing Changes，提供一鍵安全修復與徹底卸載。"
+                                               Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+
+                                    <Grid ColumnSpacing="10" RowSpacing="10">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Action 1: Deep Uninstall -->
+                                        <Border Grid.Row="0" Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                            <StackPanel Spacing="8">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <FontIcon Glyph="&#xE74D;" FontSize="16" Foreground="Crimson" />
+                                                    <TextBlock Text="徹底解除安裝 OneDrive (Deep Uninstall)" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                                <TextBlock Text="強制終止處理程序、執行卸載精靈、清除殘留快取，自動將桌面/文件安全移回本機 %USERPROFILE% 並封鎖自動重裝。"
+                                                           Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                                <Button Content="🚀 徹底解除安裝 OneDrive" Command="{x:Bind ViewModel.DeepUninstallOneDriveCommand}"
+                                                        Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" Margin="0,4,0,0" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Action 2: Restore User Shell Folders -->
+                                        <Border Grid.Row="0" Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                            <StackPanel Spacing="8">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <FontIcon Glyph="&#xE8B7;" FontSize="16" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                    <TextBlock Text="還原桌面與個人資料夾路徑 (Fix Known Folder Move)" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                                <TextBlock Text="修復被 OneDrive 綁架之 Desktop、Documents、Pictures 路徑，安全遷移檔案回 %USERPROFILE% 原生目錄。"
+                                                           Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                                <Button Content="📁 還原個人資料夾原生路徑" Command="{x:Bind ViewModel.RestoreOneDriveShellFoldersCommand}"
+                                                        HorizontalAlignment="Stretch" Margin="0,4,0,0" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Action 3: Remove Ghost Icon -->
+                                        <Border Grid.Row="1" Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                            <StackPanel Spacing="8">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <FontIcon Glyph="&#xE74E;" FontSize="16" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                    <TextBlock Text="移除檔案總管左側幽靈圖示 (Explorer Ghost Icon)" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                                <TextBlock Text="清除 CLSID 註冊表中殘留的 OneDrive 導覽樹狀目錄釘選圖示，並重啟檔案總管生效。"
+                                                           Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                                <Button Content="🧹 清除檔案總管幽靈圖示" Command="{x:Bind ViewModel.RemoveOneDriveGhostIconCommand}"
+                                                        HorizontalAlignment="Stretch" Margin="0,4,0,0" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Action 4: Reset Sync Engine -->
+                                        <Border Grid.Row="1" Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                            <StackPanel Spacing="8">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <FontIcon Glyph="&#xE72C;" FontSize="16" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                    <TextBlock Text="重設同步引擎 (Fix Infinite Processing Changes)" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                                <TextBlock Text="執行 onedrive.exe /reset 清除損毀之內部同步資料庫與快取，解決 100% CPU 佔用或卡死迴圈。"
+                                                           Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                                <Button Content="🔄 重設同步引擎並重啟" Command="{x:Bind ViewModel.ResetOneDriveSyncEngineCommand}"
+                                                        HorizontalAlignment="Stretch" Margin="0,4,0,0" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+
+                                    <!-- Policy Block Toggle -->
+                                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12" Margin="0,4,0,0">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Spacing="2">
+                                                <TextBlock Text="群組原則永久封鎖 Windows Update 自動重新安裝 (DisableFileSyncNGSC)" FontWeight="SemiBold" />
+                                                <TextBlock Text="寫入 HKLM\SOFTWARE\Policies\Microsoft\Windows\OneDrive，徹底阻止 Windows 更新喚醒 OneDrive。" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Content="切換原則封鎖" Command="{x:Bind ViewModel.ToggleOneDrivePolicyBlockCommand}" />
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabViewItem>
+
+                <!-- ════ Tab 6: OEM 驅動程式清理 (Driver Cleanup - PnPUtil) ════ -->
+                <TabViewItem x:Name="TabDrivers" Header="🏎️ OEM 驅動清理 (PnPUtil)" IsClosable="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                        <StackPanel Spacing="16" MaxWidth="1000" HorizontalAlignment="Left">
+
+                            <!-- Control Bar Card -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <FontIcon Grid.Column="0" Glyph="&#xE7BA;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Spacing="2">
+                                            <TextBlock Text="PnPUtil OEM 協力廠商驅動程式清理與移除" FontWeight="SemiBold" FontSize="15" />
+                                            <TextBlock Text="列舉已安裝於 DriverStore 的 oem*.inf 驅動套件，支援強制卸載老舊、重複或孤立的驅動程式。"
+                                                       Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+
+                                        <Button Grid.Column="2" Content="🔄 重新整理" Command="{x:Bind ViewModel.RefreshDriversCommand}"
+                                                VerticalAlignment="Center" />
+                                        <Button Grid.Column="3" Content="☑️ 全選" Click="SelectAllDrivers_Click"
+                                                VerticalAlignment="Center" />
+                                        <Button Grid.Column="4" Content="🗑️ 批次卸載選取項" Command="{x:Bind ViewModel.BatchDeleteSelectedDriversCommand}"
+                                                Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center" />
+                                    </Grid>
+
+                                    <ProgressBar IsIndeterminate="True" Visibility="{x:Bind ViewModel.IsLoadingDrivers, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Drivers ListView Card -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="已安裝之 OEM 驅動套件清單" FontWeight="SemiBold" />
+
+                                    <ListView ItemsSource="{x:Bind ViewModel.OemDrivers, Mode=OneWay}"
+                                              SelectionMode="None" MaxHeight="450">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="models:OemDriverItem">
+                                                <Grid Padding="6,6" ColumnSpacing="12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <CheckBox Grid.Column="0" IsChecked="{x:Bind IsSelected, Mode=TwoWay}" VerticalAlignment="Center" />
+
+                                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                        <TextBlock Text="{x:Bind DisplayTitle}" FontWeight="SemiBold" FontSize="13" />
+                                                        <TextBlock Text="{x:Bind Subtitle}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                    </StackPanel>
+
+                                                    <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                                                        <TextBlock Text="{x:Bind SignerName}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                    </Border>
+
+                                                    <Button Grid.Column="3" Content="🗑️ 卸載" Click="DeleteDriverItem_Click"
+                                                            VerticalAlignment="Center" Padding="8,4" FontSize="11" />
                                                 </Grid>
                                             </DataTemplate>
                                         </ListView.ItemTemplate>

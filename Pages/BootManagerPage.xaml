@@ -62,11 +62,14 @@
                           Width="24" Height="24" />
         </Grid>
 
-        <!-- ═══ Pivot Tabs ═══ -->
-        <Pivot Grid.Row="1">
+        <!-- ═══ Movable TabView ═══ -->
+        <TabView x:Name="BootTabView" Grid.Row="1"
+                 CanReorderTabs="True" CanDragTabs="True"
+                 IsAddTabButtonVisible="False">
+            <TabView.TabItems>
 
             <!-- ── Tab 1: Visual BCD Management & Searcher ── -->
-            <PivotItem x:Name="TabBootEntries" Header="開機項目管理 (Boot Entries)">
+            <TabViewItem x:Name="TabBootEntries" Header="開機項目管理 (Boot Entries)" IsClosable="False">
                 <Grid Margin="0,10,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="380" MinWidth="260" />
@@ -188,10 +191,10 @@
                         </ScrollViewer>
                     </Border>
                 </Grid>
-            </PivotItem>
+            </TabViewItem>
 
             <!-- ── Tab 2: Build New Boot Partition Wizard ── -->
-            <PivotItem x:Name="TabBuildBoot" Header="全新分割區建置開機引導 (Build New Boot Partition)">
+            <TabViewItem x:Name="TabBuildBoot" Header="全新分割區建置開機引導 (Build New Boot Partition)" IsClosable="False">
                 <Grid Margin="0,10,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="420" />
@@ -285,10 +288,10 @@
                         </Grid>
                     </Border>
                 </Grid>
-            </PivotItem>
+            </TabViewItem>
 
             <!-- ── Tab 3: Global Boot Settings ── -->
-            <PivotItem x:Name="TabGlobalSettings" Header="全域開機設定 (Global Settings)">
+            <TabViewItem x:Name="TabGlobalSettings" Header="全域開機設定 (Global Settings)" IsClosable="False">
                 <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                         CornerRadius="8" Padding="20" Margin="0,10,0,0" MaxWidth="600" HorizontalAlignment="Left">
@@ -316,10 +319,10 @@
                                 Style="{StaticResource AccentButtonStyle}" />
                     </StackPanel>
                 </Border>
-            </PivotItem>
+            </TabViewItem>
 
             <!-- ── Tab 4: MSConfig 安全開機與旗標 (Safe Boot & Advanced Boot Flags) ── -->
-            <PivotItem x:Name="TabSafeBoot" Header="🛡️ 安全開機 (Safe Boot)">
+            <TabViewItem x:Name="TabSafeBoot" Header="🛡️ 安全開機 (Safe Boot)" IsClosable="False">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
                     <StackPanel Spacing="16" MaxWidth="800" HorizontalAlignment="Left">
                         <!-- Hero Card -->
@@ -412,7 +415,8 @@
                         </Border>
                     </StackPanel>
                 </ScrollViewer>
-            </PivotItem>
-        </Pivot>
+            </TabViewItem>
+            </TabView.TabItems>
+        </TabView>
     </Grid>
 </Page>

@@ -30,6 +30,8 @@ public sealed partial class SystemOptimizerPage : Page
         TabCpu.Header = lang switch { "zh-CN" => "⚡ CPU与调度优先级", "en-US" => "⚡ CPU & Scheduling", "ja-JP" => "⚡ CPU とスケジューリング", _ => "⚡ CPU與排程優先權" };
         TabPower.Header = lang switch { "zh-CN" => "🔋 电源计划与核心唤醒", "en-US" => "🔋 Power Plans & Core Unparking", "ja-JP" => "🔋 電源プランとコアアンパーキング", _ => "🔋 電源計畫與核心喚醒" };
         TabBackup.Header = lang switch { "zh-CN" => "💾 注册表备份与还原", "en-US" => "💾 Registry Backup & Restore", "ja-JP" => "💾 レジストリバックアップと復元", _ => "💾 登錄檔備份與還原" };
+        TabOneDrive.Header = lang switch { "zh-CN" => "☁️ OneDrive 深度治理与卸载", "en-US" => "☁️ OneDrive Governance & Uninstall", "ja-JP" => "☁️ OneDrive 管理と削除", _ => "☁️ OneDrive 深度治理與卸載" };
+        TabDrivers.Header = lang switch { "zh-CN" => "🏎️ OEM 驱动清理 (PnPUtil)", "en-US" => "🏎️ OEM Driver Cleanup (PnPUtil)", "ja-JP" => "🏎️ OEM ドライバの削除 (PnPUtil)", _ => "🏎️ OEM 驅動清理 (PnPUtil)" };
 
         HeroTitle.Text = lang switch { "zh-CN" => "电竞极致模式", "en-US" => "Ultra Gaming Mode (1-Click)", "ja-JP" => "ウルトラゲーミングモード", _ => "電競遊戲極致模式" };
         HeroSubtitle.Text = lang switch
@@ -323,6 +325,44 @@ public sealed partial class SystemOptimizerPage : Page
         if (sender is Button btn && btn.DataContext is RegistryBackupItem item)
         {
             ViewModel.DeleteBackupCommand.Execute(item);
+        }
+    }
+
+    private void Nagle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically)
+        {
+            ViewModel.ToggleNagleAlgorithmCommand.Execute(null);
+        }
+    }
+
+    private void DisablePagingExecutive_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically)
+        {
+            ViewModel.ToggleDisablePagingExecutiveCommand.Execute(null);
+        }
+    }
+
+    private void GroupPolicyTelemetry_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically)
+        {
+            ViewModel.ToggleGroupPolicyTelemetryCommand.Execute(null);
+        }
+    }
+
+    private void SelectAllDrivers_Click(object sender, RoutedEventArgs e)
+    {
+        bool anyUnselected = ViewModel.OemDrivers.Any(d => !d.IsSelected);
+        ViewModel.SelectAllDriversCommand.Execute(anyUnselected);
+    }
+
+    private async void DeleteDriverItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is OemDriverItem item)
+        {
+            await ViewModel.DeleteDriverCommand.ExecuteAsync(item);
         }
     }
 }

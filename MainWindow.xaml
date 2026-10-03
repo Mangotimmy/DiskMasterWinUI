@@ -82,6 +82,23 @@
                          TabDroppedOutside="MainTabs_TabDroppedOutside"
                          TabDragCompleted="MainTabs_TabDragCompleted">
                     <TabView.TabItems>
+                        <TabViewItem x:Name="TabStarter" Header="入門精靈" Tag="Starter" IsClosable="False"
+                                      ToolTipService.ToolTip="新手入門體檢與一鍵快速維護 — 右鍵浮動視窗">
+                            <TabViewItem.IconSource>
+                                <FontIconSource Glyph="&#xE735;" />
+                            </TabViewItem.IconSource>
+                            <TabViewItem.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="🪟 獨立浮動視窗 [Ctrl+Shift+F]" Click="TabContext_Float_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最左側" Click="TabContext_MoveFirst_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最右側" Click="TabContext_MoveLast_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
+                                    <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                </MenuFlyout>
+                            </TabViewItem.ContextFlyout>
+                        </TabViewItem>
+
                         <TabViewItem x:Name="TabEasyMode" Header="簡易模式" Tag="EasyMode" IsClosable="False"
                                       ToolTipService.ToolTip="簡易磁碟模式 — 快捷鍵: Ctrl+1 / 右鍵浮動視窗">
                             <TabViewItem.IconSource>
@@ -218,6 +235,23 @@
                             </TabViewItem.ContextFlyout>
                         </TabViewItem>
 
+                        <TabViewItem x:Name="TabNetworkTools" Header="網路工具" Tag="NetworkTools" IsClosable="False"
+                                      ToolTipService.ToolTip="UPnP連接埠轉發、推薦DNS與網路診斷 — 右鍵浮動視窗">
+                            <TabViewItem.IconSource>
+                                <FontIconSource Glyph="&#xE968;" />
+                            </TabViewItem.IconSource>
+                            <TabViewItem.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="🪟 獨立浮動視窗 [Ctrl+Shift+F]" Click="TabContext_Float_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最左側" Click="TabContext_MoveFirst_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最右側" Click="TabContext_MoveLast_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
+                                    <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                </MenuFlyout>
+                            </TabViewItem.ContextFlyout>
+                        </TabViewItem>
+
                         <TabViewItem x:Name="TabSettings" Header="設定" Tag="Settings" IsClosable="False"
                                       ToolTipService.ToolTip="偏好設定 — 快捷鍵: Ctrl+, / 右鍵浮動視窗">
                             <TabViewItem.IconSource>
@@ -238,6 +272,15 @@
 
                     <TabView.TabStripFooter>
                         <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,12,0" VerticalAlignment="Center">
+                            <!-- Dual Mode Switcher: Easy vs Advance -->
+                            <Button x:Name="ModeSwitcherBtn" Click="ModeSwitcher_Click"
+                                    Padding="8,3" FontSize="11" ToolTipService.ToolTip="切換 簡易模式 (Easy) 與 專業進階模式 (Advance)">
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <FontIcon x:Name="ModeSwitcherIcon" Glyph="&#xE790;" FontSize="12" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                    <TextBlock x:Name="ModeSwitcherText" Text="🟢 簡易模式" FontSize="11" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+
                             <!-- Adobe Workspace Preset Dropdown -->
                             <ComboBox x:Name="WorkspaceCombo" SelectionChanged="WorkspaceCombo_SelectionChanged"
                                       Padding="6,2" FontSize="11" Width="130" ToolTipService.ToolTip="工作區排版預設" />

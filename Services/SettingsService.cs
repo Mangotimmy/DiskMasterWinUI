@@ -63,6 +63,19 @@ public class AppSettings
     // ── Adobe Workspace Presets ──
     public string WorkspacePreset { get; set; } = "Master"; // "Master", "Deploy", "Repair", "Gaming", "Lite"
 
+    // ── Dual Mode & Starter Hub ──
+    public bool IsEasyMode { get; set; } = false;
+
+    // ── Auto Updater ──
+    public bool AutoCheckUpdates { get; set; } = true;
+    public string UpdateFrequency { get; set; } = "Daily"; // "Manual", "Daily", "Weekly"
+
+    // ── System Tray & Window Notifications ──
+    public bool MinimizeToTray { get; set; } = false;
+    public bool CloseToTray { get; set; } = false;
+    public bool EnableTaskbarFlash { get; set; } = true;
+    public bool EnableAudioFeedback { get; set; } = true;
+
     // ── Chrome Modular Tab & Layout Settings ──
     public List<string> CustomTabOrder { get; set; } = new();
     public Dictionary<string, bool> ComponentVisibility { get; set; } = new();
