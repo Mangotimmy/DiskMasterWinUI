@@ -5,10 +5,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "═════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host "   DiskMaster Pro True Single-File Portable Executable Builder   " -ForegroundColor Cyan
 Write-Host "   Target Architecture: $Architecture                            " -ForegroundColor Cyan
-Write-Host "═════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+Write-Host "=================================================================" -ForegroundColor Cyan
 
 $projectDir = $PSScriptRoot
 Set-Location $projectDir
@@ -40,7 +40,7 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::CreateFromDirectory($publishDir, $payloadZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
 
 $zipSizeMb = [math]::Round((Get-Item $payloadZip).Length / 1MB, 2)
-Write-Host "✓ Compressed payload size: $zipSizeMb MB" -ForegroundColor Green
+Write-Host "[OK] Compressed payload size: $zipSizeMb MB" -ForegroundColor Green
 
 # 3. Compile Launcher into single-file executable
 Write-Host "`n[3/4] Compiling Single-File Native Launcher ($Architecture)..." -ForegroundColor Yellow
@@ -69,8 +69,8 @@ Remove-Item $payloadZip -Force -ErrorAction SilentlyContinue
 Remove-Item $tempOut -Recurse -Force -ErrorAction SilentlyContinue
 
 $exeSizeMb = [math]::Round((Get-Item $finalExePath).Length / 1MB, 2)
-Write-Host "`n═════════════════════════════════════════════════════════════════" -ForegroundColor Green
+Write-Host "`n=================================================================" -ForegroundColor Green
 Write-Host "  SUCCESS: True Single-File Standalone Portable EXE Generated!" -ForegroundColor Green
 Write-Host "  Path: $finalExePath" -ForegroundColor Cyan
 Write-Host "  File Size: $exeSizeMb MB" -ForegroundColor Cyan
-Write-Host "═════════════════════════════════════════════════════════════════" -ForegroundColor Green
+Write-Host "=================================================================" -ForegroundColor Green

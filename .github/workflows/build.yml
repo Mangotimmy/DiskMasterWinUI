@@ -13,6 +13,7 @@ jobs:
     name: Build ${{ matrix.target }}
     runs-on: windows-latest
     strategy:
+      fail-fast: false
       matrix:
         target: [win-x64, win-arm64]
 
@@ -26,13 +27,16 @@ jobs:
         dotnet-version: '9.0.x'
 
     - name: Restore dependencies
+      shell: pwsh
       run: dotnet restore DiskMasterWinUI.csproj -r ${{ matrix.target }}
 
     - name: Build One-File Portable Executable (.EXE)
+      shell: pwsh
       run: |
-        powershell -ExecutionPolicy Bypass -File .\build_portable_singlefile.ps1 -Architecture ${{ matrix.target }}
+        .\build_portable_singlefile.ps1 -Architecture ${{ matrix.target }}
 
     - name: Archive WinPE Portable Zip
+      shell: pwsh
       run: |
         Compress-Archive -Path publish/* -DestinationPath DiskMaster_${{ matrix.target }}_WinPE_Portable.zip
 
