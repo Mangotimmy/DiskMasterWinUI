@@ -239,6 +239,15 @@ public class SystemRepairService
         return exitCode;
     }
 
+    public async Task<int> RunDismResetBaseAsync(Action<string> onOutput, CancellationToken ct = default)
+    {
+        onOutput($"[{DateTime.Now:HH:mm:ss}] 啟動 WinSxS 元件存放區深度重設基線 (ResetBase 清理被取代的舊版更新)...");
+        var args = "/online /cleanup-image /startcomponentcleanup /resetbase";
+        var exitCode = await RunStreamingProcessAsync("dism.exe", args, onOutput, ct);
+        onOutput($"[{DateTime.Now:HH:mm:ss}] WinSxS 重設基線清理完成 (結束代碼: {exitCode})。");
+        return exitCode;
+    }
+
     public async Task<(List<WindowsFeatureItem> Items, string RawOutput, string Error, int ExitCode)> GetFeaturesStructuredAsync()
     {
         var (output, err, exitCode) = await ProcessHelper.RunProcessAsync("dism.exe", "/online /get-features /format:table");

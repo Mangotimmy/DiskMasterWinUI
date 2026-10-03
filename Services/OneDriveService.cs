@@ -47,27 +47,57 @@ public class OneDriveService
             }
 
             // 2. Locate Uninstaller / Setup
-            var candidateSetupPaths = new[]
+            var candidateSetupPaths = new List<string>
             {
                 Path.Combine(SystemRoot, "SysWOW64", "OneDriveSetup.exe"),
                 Path.Combine(SystemRoot, "System32", "OneDriveSetup.exe"),
                 Path.Combine(LocalAppData, "Microsoft", "OneDrive", "OneDriveSetup.exe")
             };
 
+            // Search for versioned OneDriveSetup.exe in LocalAppData
+            var oneDriveBaseDir = Path.Combine(LocalAppData, "Microsoft", "OneDrive");
+            if (Directory.Exists(oneDriveBaseDir))
+            {
+                try
+                {
+                    var foundSetups = Directory.GetFiles(oneDriveBaseDir, "OneDriveSetup.exe", SearchOption.AllDirectories);
+                    if (foundSetups.Length > 0)
+                    {
+                        candidateSetupPaths.AddRange(foundSetups);
+                    }
+                }
+                catch { }
+            }
+
             foreach (var path in candidateSetupPaths)
             {
                 if (File.Exists(path))
                 {
                     info.UninstallerPath = path;
-                    if (!info.IsInstalled)
-                    {
-                        // Also check registry uninstall entry
-                        using var uninstKey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\OneDriveSetup.exe");
-                        if (uninstKey != null) info.IsInstalled = true;
-                    }
+                    info.IsInstalled = true;
                     break;
                 }
             }
+
+            // Also check registry uninstall entry directly
+            try
+            {
+                using var uninstKey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\OneDriveSetup.exe");
+                if (uninstKey != null)
+                {
+                    info.IsInstalled = true;
+                    var uninstStr = uninstKey.GetValue("UninstallString")?.ToString();
+                    if (!string.IsNullOrWhiteSpace(uninstStr) && string.IsNullOrWhiteSpace(info.UninstallerPath))
+                    {
+                        var match = Regex.Match(uninstStr, "\"([^\"]+)\"");
+                        if (match.Success && File.Exists(match.Groups[1].Value))
+                        {
+                            info.UninstallerPath = match.Groups[1].Value;
+                        }
+                    }
+                }
+            }
+            catch { }
 
             // Also check running processes
             try

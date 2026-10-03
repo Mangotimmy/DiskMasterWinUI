@@ -25,7 +25,7 @@ public class TpmService
             var info = new TpmStatusInfo();
             var sb = new StringBuilder();
 
-            // 1. Check TPM service in registry (fast, non-blocking)
+            // 1. Check TPM service and WMI status in registry (fast, non-blocking, works even without admin)
             try
             {
                 using var tpmKey = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\TPM");
@@ -33,16 +33,36 @@ public class TpmService
                 {
                     sb.AppendLine("[TPM Registry Service] tpm.sys driver service is registered.");
                 }
+
+                using var wmiKey = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\TPM\WMI");
+                if (wmiKey != null)
+                {
+                    var taskMfgId = wmiKey.GetValue("TaskManufacturerId");
+                    var taskFwVer = wmiKey.GetValue("TaskFirmwareVersion")?.ToString();
+                    if (taskMfgId != null)
+                    {
+                        info.IsPresent = true;
+                        info.IsEnabled = true;
+                        info.IsActivated = true;
+                        info.SpecVersion = "2.0";
+                        if (!string.IsNullOrWhiteSpace(taskFwVer))
+                        {
+                            info.ManufacturerVersion = taskFwVer;
+                        }
+                        info.ManufacturerName = DecodeTpmManufacturer(taskMfgId);
+                        sb.AppendLine($"[TPM WMI Registry] Manufacturer: {info.ManufacturerName}, FW: {info.ManufacturerVersion}");
+                    }
+                }
             }
             catch { }
 
-            // 2. Query PowerShell Get-Tpm / Win32_Tpm
+            // 2. Query PowerShell Get-Tpm / Win32_Tpm for live runtime status
             try
             {
                 var psi = new ProcessStartInfo
                 {
                     FileName = "powershell.exe",
-                    Arguments = "-NoProfile -ExecutionPolicy Bypass -Command \"try { $t = Get-Tpm -ErrorAction SilentlyContinue; if ($t) { [PSCustomObject]@{ Present = $t.TpmPresent; Ready = $t.TpmReady; Version = $t.ManufacturerVersion; Id = $t.ManufacturerId } | ConvertTo-Json -Compress } else { [PSCustomObject]@{ Present = $false } | ConvertTo-Json -Compress } } catch { [PSCustomObject]@{ Present = $false } | ConvertTo-Json -Compress }\"",
+                    Arguments = "-NoProfile -ExecutionPolicy Bypass -Command \"try { $t = Get-Tpm -ErrorAction SilentlyContinue; if ($t) { [PSCustomObject]@{ Present = $t.TpmPresent; Ready = $t.TpmReady; Version = $t.ManufacturerVersion; Id = $t.ManufacturerId; IdTxt = $t.ManufacturerIdTxt } | ConvertTo-Json -Compress } else { [PSCustomObject]@{ Present = $false } | ConvertTo-Json -Compress } } catch { [PSCustomObject]@{ Present = $false } | ConvertTo-Json -Compress }\"",
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     CreateNoWindow = true
@@ -69,14 +89,37 @@ public class TpmService
                             {
                                 info.IsOwned = rElem.GetBoolean();
                             }
-                            if (root.TryGetProperty("Version", out var vElem))
+                            if (root.TryGetProperty("Version", out var vElem) && vElem.ValueKind == JsonValueKind.String)
                             {
-                                info.ManufacturerVersion = vElem.GetString() ?? "";
+                                var ver = vElem.GetString();
+                                if (!string.IsNullOrWhiteSpace(ver)) info.ManufacturerVersion = ver;
                             }
+
+                            string? idTxt = null;
+                            if (root.TryGetProperty("IdTxt", out var txtElem) && txtElem.ValueKind == JsonValueKind.String)
+                            {
+                                idTxt = txtElem.GetString();
+                            }
+
+                            object? rawId = null;
                             if (root.TryGetProperty("Id", out var idElem))
                             {
-                                info.ManufacturerName = idElem.GetString() ?? "Discrete / Firmware TPM";
+                                if (idElem.ValueKind == JsonValueKind.Number && idElem.TryGetInt64(out var numId))
+                                {
+                                    rawId = numId;
+                                }
+                                else if (idElem.ValueKind == JsonValueKind.String)
+                                {
+                                    rawId = idElem.GetString();
+                                }
                             }
+
+                            var decodedName = DecodeTpmManufacturer(rawId, idTxt);
+                            if (!string.IsNullOrWhiteSpace(decodedName) && decodedName != "Unknown")
+                            {
+                                info.ManufacturerName = decodedName;
+                            }
+
                             sb.AppendLine($"[PowerShell Get-Tpm] Present: {info.IsPresent}, Version: {info.ManufacturerVersion}, ID: {info.ManufacturerName}");
                         }
                     }
@@ -204,4 +247,77 @@ public class TpmService
         }
         catch { }
     }
+
+    /// <summary>
+    /// Decodes a raw TPM Manufacturer ID (Big-Endian ASCII packed integer or string) into a user-friendly vendor brand.
+    /// </summary>
+    public static string DecodeTpmManufacturer(object? rawId, string? idTxt = null)
+    {
+        string tag = string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(idTxt))
+        {
+            tag = idTxt.Trim('\0', ' ');
+        }
+        else if (rawId != null)
+        {
+            if (rawId is int intVal)
+            {
+                tag = UnpackAscii((uint)intVal);
+            }
+            else if (rawId is long longVal)
+            {
+                tag = UnpackAscii((uint)longVal);
+            }
+            else if (rawId is uint uVal)
+            {
+                tag = UnpackAscii(uVal);
+            }
+            else if (uint.TryParse(rawId.ToString(), out var parsedVal))
+            {
+                tag = UnpackAscii(parsedVal);
+            }
+            else
+            {
+                tag = rawId.ToString()?.Trim('\0', ' ') ?? string.Empty;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(tag))
+        {
+            return "Unknown";
+        }
+
+        return tag.ToUpperInvariant() switch
+        {
+            "IFX" => "Infineon Technologies (英飛凌)",
+            "INTC" => "Intel PTT (英特爾)",
+            "AMD" => "AMD fTPM (超微)",
+            "MSFT" => "Microsoft (微軟)",
+            "NTC" => "Nuvoton Technology (新唐科技)",
+            "STM" => "STMicroelectronics (意法半導體)",
+            "QCOM" => "Qualcomm (高通)",
+            "ATML" => "Atmel (愛特梅爾)",
+            "BRCM" => "Broadcom (博通)",
+            "SMSC" => "SMSC (微芯)",
+            "TI" => "Texas Instruments (德州儀器)",
+            "WEC" => "Winbond (華邦電子)",
+            "NSM" => "National Semiconductor",
+            "ETHZ" => "ETH Zürich",
+            "FSL" => "Freescale",
+            "GOOG" => "Google",
+            "HPE" => "HPE",
+            _ => tag
+        };
+    }
+
+    private static string UnpackAscii(uint val)
+    {
+        char c1 = (char)((val >> 24) & 0xFF);
+        char c2 = (char)((val >> 16) & 0xFF);
+        char c3 = (char)((val >> 8) & 0xFF);
+        char c4 = (char)(val & 0xFF);
+        return $"{c1}{c2}{c3}{c4}".Trim('\0', ' ');
+    }
 }
+

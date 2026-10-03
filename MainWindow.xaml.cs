@@ -31,6 +31,7 @@ public sealed partial class MainWindow : Window
     private double _currentZoom = 1.0;
     private bool _isShowingDialog = false;
     private bool _suppressWorkspaceSelectionChanged = false;
+    private bool _isApplyingWorkspacePreset = false;
 
     private readonly List<TabViewItem> _allTabItems = new();
     private readonly Dictionary<string, FloatingTabWindow> _floatingWindows = new();
@@ -122,11 +123,8 @@ public sealed partial class MainWindow : Window
         }
         catch { }
 
-        // Check Administrator privilege status
-        if (!AdminHelper.IsRunningAsAdmin())
-        {
-            AdminWarningBar.IsOpen = true;
-        }
+        // Check Administrator privilege status and update title bar badge
+        UpdateAdminStatusUI();
 
         PopulateWorkspaceCombo();
         ApplyWorkspacePreset(SettingsService.Instance.Current.WorkspacePreset);
@@ -162,9 +160,12 @@ public sealed partial class MainWindow : Window
                 {
                     SetZoom(savedScale / 100.0);
                 }
-                var currentWorkspace = SettingsService.Instance.Current.WorkspacePreset ?? "Master";
-                ApplyWorkspacePreset(currentWorkspace);
-                PopulateWorkspaceCombo();
+                if (!_isApplyingWorkspacePreset)
+                {
+                    var currentWorkspace = SettingsService.Instance.Current.WorkspacePreset ?? "Master";
+                    ApplyWorkspacePreset(currentWorkspace);
+                    PopulateWorkspaceCombo(forceRebuild: false);
+                }
             });
         };
 
@@ -313,7 +314,7 @@ public sealed partial class MainWindow : Window
         catch { }
     }
 
-    private void PopulateWorkspaceCombo()
+    private void PopulateWorkspaceCombo(bool forceRebuild = false)
     {
         var loc = LocalizationService.Instance;
         var presets = new (string Key, string Name)[]
@@ -327,19 +328,32 @@ public sealed partial class MainWindow : Window
 
         var currentPreset = SettingsService.Instance.Current.WorkspacePreset ?? "Master";
         _suppressWorkspaceSelectionChanged = true;
-        WorkspaceCombo.Items.Clear();
-        int selectIndex = 0;
-        for (int i = 0; i < presets.Length; i++)
+        try
         {
-            var item = new ComboBoxItem { Content = presets[i].Name, Tag = presets[i].Key, FontSize = 11 };
-            WorkspaceCombo.Items.Add(item);
-            if (presets[i].Key.Equals(currentPreset, StringComparison.OrdinalIgnoreCase))
+            if (forceRebuild || WorkspaceCombo.Items.Count != presets.Length)
             {
-                selectIndex = i;
+                WorkspaceCombo.Items.Clear();
+                for (int i = 0; i < presets.Length; i++)
+                {
+                    var item = new ComboBoxItem { Content = presets[i].Name, Tag = presets[i].Key, FontSize = 11 };
+                    WorkspaceCombo.Items.Add(item);
+                }
+            }
+
+            for (int i = 0; i < WorkspaceCombo.Items.Count; i++)
+            {
+                if (WorkspaceCombo.Items[i] is ComboBoxItem cbi && cbi.Tag is string key &&
+                    key.Equals(currentPreset, StringComparison.OrdinalIgnoreCase))
+                {
+                    WorkspaceCombo.SelectedIndex = i;
+                    break;
+                }
             }
         }
-        WorkspaceCombo.SelectedIndex = selectIndex;
-        _suppressWorkspaceSelectionChanged = false;
+        finally
+        {
+            _suppressWorkspaceSelectionChanged = false;
+        }
     }
 
     private void WorkspaceCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -353,58 +367,73 @@ public sealed partial class MainWindow : Window
 
     private void ApplyWorkspacePreset(string presetKey)
     {
-        if (!WorkspaceTabTags.TryGetValue(presetKey, out var allowedTags))
+        if (_isApplyingWorkspacePreset) return;
+        _isApplyingWorkspacePreset = true;
+
+        try
         {
-            allowedTags = WorkspaceTabTags["Master"];
-            presetKey = "Master";
-        }
-
-        var s = SettingsService.Instance.Current;
-        if (s.WorkspacePreset != presetKey)
-        {
-            s.WorkspacePreset = presetKey;
-            SettingsService.Instance.Save();
-        }
-
-        if (s.IsEasyMode)
-        {
-            allowedTags = allowedTags.Where(tag => EasyModeAllowedTags.Contains(tag)).ToArray();
-        }
-
-        if (s.CustomTabOrder != null && s.CustomTabOrder.Count > 0)
-        {
-            allowedTags = allowedTags
-                .OrderBy(tag =>
-                {
-                    int idx = s.CustomTabOrder.IndexOf(tag);
-                    return idx >= 0 ? idx : int.MaxValue;
-                })
-                .ToArray();
-        }
-
-        var currentSelectedTag = (MainTabs.SelectedItem as TabViewItem)?.Tag?.ToString();
-
-        MainTabs.TabItems.Clear();
-        TabViewItem? toSelect = null;
-
-        foreach (var tag in allowedTags)
-        {
-            if (_floatingWindows.ContainsKey(tag)) continue;
-
-            var tabItem = _allTabItems.FirstOrDefault(t => t.Tag?.ToString() == tag);
-            if (tabItem != null)
+            if (!WorkspaceTabTags.TryGetValue(presetKey, out var allowedTags))
             {
-                MainTabs.TabItems.Add(tabItem);
-                if (tag == currentSelectedTag)
+                allowedTags = WorkspaceTabTags["Master"];
+                presetKey = "Master";
+            }
+
+            var s = SettingsService.Instance.Current;
+            if (s.WorkspacePreset != presetKey)
+            {
+                s.WorkspacePreset = presetKey;
+                SettingsService.Instance.Save();
+            }
+
+            if (s.IsEasyMode)
+            {
+                allowedTags = allowedTags.Where(tag => EasyModeAllowedTags.Contains(tag)).ToArray();
+            }
+
+            if (s.CustomTabOrder != null && s.CustomTabOrder.Count > 0)
+            {
+                allowedTags = allowedTags
+                    .OrderBy(tag =>
+                    {
+                        int idx = s.CustomTabOrder.IndexOf(tag);
+                        return idx >= 0 ? idx : int.MaxValue;
+                    })
+                    .ToArray();
+            }
+
+            var currentSelectedTag = (MainTabs.SelectedItem as TabViewItem)?.Tag?.ToString();
+
+            MainTabs.TabItems.Clear();
+            TabViewItem? toSelect = null;
+
+            foreach (var tag in allowedTags)
+            {
+                if (_floatingWindows.ContainsKey(tag)) continue;
+
+                var tabItem = _allTabItems.FirstOrDefault(t => t.Tag?.ToString() == tag);
+                if (tabItem != null)
                 {
-                    toSelect = tabItem;
+                    MainTabs.TabItems.Add(tabItem);
+                    if (tag == currentSelectedTag)
+                    {
+                        toSelect = tabItem;
+                    }
+                }
+            }
+
+            if (MainTabs.TabItems.Count > 0)
+            {
+                var target = toSelect ?? (MainTabs.TabItems[0] as TabViewItem);
+                MainTabs.SelectedItem = target;
+                if (target?.Tag is string targetTag)
+                {
+                    NavigateToTag(targetTag);
                 }
             }
         }
-
-        if (MainTabs.TabItems.Count > 0)
+        finally
         {
-            MainTabs.SelectedItem = toSelect ?? MainTabs.TabItems[0];
+            _isApplyingWorkspacePreset = false;
         }
     }
 
@@ -451,6 +480,7 @@ public sealed partial class MainWindow : Window
     {
         var tag = tabItem.Tag?.ToString();
         if (string.IsNullOrEmpty(tag) || _floatingWindows.ContainsKey(tag)) return;
+        if (MainTabs.TabItems.Count <= 1) return; // Prevent detaching the last remaining tab
 
         var header = tabItem.Header?.ToString() ?? tag;
         Page page = tag switch
@@ -539,20 +569,24 @@ public sealed partial class MainWindow : Window
         }
 
         var tabItem = _allTabItems.FirstOrDefault(t => t.Tag?.ToString() == tag);
-        if (tabItem != null && allowedTags.Contains(tag) && !MainTabs.TabItems.Contains(tabItem))
+        if (tabItem != null && !MainTabs.TabItems.Contains(tabItem))
         {
-            int insertIndex = 0;
-            int tagIndexInAllowed = Array.IndexOf(allowedTags, tag);
-            for (int i = 0; i < MainTabs.TabItems.Count; i++)
+            int insertIndex = MainTabs.TabItems.Count;
+            if (allowedTags.Contains(tag))
             {
-                var otherTag = (MainTabs.TabItems[i] as TabViewItem)?.Tag?.ToString() ?? "";
-                int otherIndexInAllowed = Array.IndexOf(allowedTags, otherTag);
-                if (otherIndexInAllowed < tagIndexInAllowed)
+                insertIndex = 0;
+                int tagIndexInAllowed = Array.IndexOf(allowedTags, tag);
+                for (int i = 0; i < MainTabs.TabItems.Count; i++)
                 {
-                    insertIndex = i + 1;
+                    var otherTag = (MainTabs.TabItems[i] as TabViewItem)?.Tag?.ToString() ?? "";
+                    int otherIndexInAllowed = Array.IndexOf(allowedTags, otherTag);
+                    if (otherIndexInAllowed < tagIndexInAllowed)
+                    {
+                        insertIndex = i + 1;
+                    }
                 }
+                insertIndex = Math.Clamp(insertIndex, 0, MainTabs.TabItems.Count);
             }
-            insertIndex = Math.Clamp(insertIndex, 0, MainTabs.TabItems.Count);
             MainTabs.TabItems.Insert(insertIndex, tabItem);
             MainTabs.SelectedItem = tabItem;
             ContentFrame.Content = win.HostedPage;
@@ -1009,9 +1043,10 @@ public sealed partial class MainWindow : Window
             "ja-JP" => "🪟 分離",
             _ => "🪟 浮動"
         };
-        PopulateWorkspaceCombo();
+        PopulateWorkspaceCombo(forceRebuild: true);
         UpdateFloatingManagerUI();
         UpdateModeSwitcherUI();
+        UpdateAdminStatusUI();
 
         AdminWarningBar.Title = loc["AdminRequired"];
         AdminWarningBar.Message = loc["AdminRequiredMsg"];
@@ -1029,58 +1064,63 @@ public sealed partial class MainWindow : Window
         _settingsPage?.ApplyLanguage();
     }
 
+    public void NavigateToTag(string? tag)
+    {
+        if (string.IsNullOrEmpty(tag)) return;
+        switch (tag)
+        {
+            case "Starter":
+                _starterPage ??= new StarterPage();
+                ContentFrame.Content = _starterPage;
+                break;
+            case "EasyMode":
+                _easyModePage ??= new EasyModePage();
+                ContentFrame.Content = _easyModePage;
+                break;
+            case "WimDeploy":
+                _wimDeployPage ??= new WimDeployPage();
+                ContentFrame.Content = _wimDeployPage;
+                break;
+            case "BootManager":
+                _bootManagerPage ??= new BootManagerPage();
+                ContentFrame.Content = _bootManagerPage;
+                break;
+            case "DiskTools":
+                _diskToolsPage ??= new DiskToolsPage();
+                ContentFrame.Content = _diskToolsPage;
+                break;
+            case "SystemHealth":
+                _systemHealthPage ??= new SystemHealthPage();
+                ContentFrame.Content = _systemHealthPage;
+                break;
+            case "NtfsPermissions":
+                _ntfsPermissionsPage ??= new NtfsPermissionsPage();
+                ContentFrame.Content = _ntfsPermissionsPage;
+                break;
+            case "AdvancedMode":
+                _advancedModePage ??= new AdvancedModePage();
+                ContentFrame.Content = _advancedModePage;
+                break;
+            case "SystemOptimizer":
+                _systemOptimizerPage ??= new SystemOptimizerPage();
+                ContentFrame.Content = _systemOptimizerPage;
+                break;
+            case "NetworkTools":
+                _networkToolsPage ??= new NetworkToolsPage();
+                ContentFrame.Content = _networkToolsPage;
+                break;
+            case "Settings":
+                _settingsPage ??= new SettingsPage();
+                ContentFrame.Content = _settingsPage;
+                break;
+        }
+    }
+
     private void MainTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (MainTabs.SelectedItem is TabViewItem item)
         {
-            var tag = item.Tag?.ToString();
-            switch (tag)
-            {
-                case "Starter":
-                    _starterPage ??= new StarterPage();
-                    ContentFrame.Content = _starterPage;
-                    break;
-                case "EasyMode":
-                    _easyModePage ??= new EasyModePage();
-                    ContentFrame.Content = _easyModePage;
-                    break;
-                case "WimDeploy":
-                    _wimDeployPage ??= new WimDeployPage();
-                    ContentFrame.Content = _wimDeployPage;
-                    break;
-                case "BootManager":
-                    _bootManagerPage ??= new BootManagerPage();
-                    ContentFrame.Content = _bootManagerPage;
-                    break;
-                case "DiskTools":
-                    _diskToolsPage ??= new DiskToolsPage();
-                    ContentFrame.Content = _diskToolsPage;
-                    break;
-                case "SystemHealth":
-                    _systemHealthPage ??= new SystemHealthPage();
-                    ContentFrame.Content = _systemHealthPage;
-                    break;
-                case "NtfsPermissions":
-                    _ntfsPermissionsPage ??= new NtfsPermissionsPage();
-                    ContentFrame.Content = _ntfsPermissionsPage;
-                    break;
-                case "AdvancedMode":
-                    _advancedModePage ??= new AdvancedModePage();
-                    ContentFrame.Content = _advancedModePage;
-                    break;
-                case "SystemOptimizer":
-                    _systemOptimizerPage ??= new SystemOptimizerPage();
-                    ContentFrame.Content = _systemOptimizerPage;
-                    break;
-                case "NetworkTools":
-                    _networkToolsPage ??= new NetworkToolsPage();
-                    ContentFrame.Content = _networkToolsPage;
-                    break;
-                case "Settings":
-                    _settingsPage ??= new SettingsPage();
-                    ContentFrame.Content = _settingsPage;
-                    break;
-            }
+            NavigateToTag(item.Tag?.ToString());
         }
     }
 
@@ -1184,6 +1224,58 @@ public sealed partial class MainWindow : Window
     private void AdminRestart_Click(object sender, RoutedEventArgs e)
     {
         AdminHelper.RestartAsAdmin();
+    }
+
+    private void UpdateAdminStatusUI()
+    {
+        bool isAdmin = AdminHelper.IsRunningAsAdmin();
+        AdminWarningBar.IsOpen = !isAdmin;
+
+        var loc = LocalizationService.Instance;
+        if (isAdmin)
+        {
+            AdminStatusIcon.Text = "🛡️";
+            AdminStatusText.Text = loc.CurrentLanguage switch
+            {
+                "zh-CN" => "系统管理员模式",
+                "en-US" => "Administrator Mode",
+                "ja-JP" => "管理者モード",
+                _ => "系統管理員模式"
+            };
+            ToolTipService.SetToolTip(AdminStatusBtn, loc.CurrentLanguage switch
+            {
+                "zh-CN" => "当前以管理员权限运行，所有底层磁盘与系统配置功能完全可用",
+                "en-US" => "Running with Administrator privileges. All advanced disk & system features enabled.",
+                "ja-JP" => "管理者権限で実行中。すべての機能が利用可能です。",
+                _ => "目前以系統管理員身分執行，所有底層磁碟與系統配置功能完全可用"
+            });
+        }
+        else
+        {
+            AdminStatusIcon.Text = "👤";
+            AdminStatusText.Text = loc.CurrentLanguage switch
+            {
+                "zh-CN" => "普通用户模式 (点击提权)",
+                "en-US" => "Standard User (Click to Elevate)",
+                "ja-JP" => "標準ユーザー (クリックして昇格)",
+                _ => "一般使用者模式 (點擊提權)"
+            };
+            ToolTipService.SetToolTip(AdminStatusBtn, loc.CurrentLanguage switch
+            {
+                "zh-CN" => "点击立即以管理员身份重启，解锁全部高级底层磁盘功能",
+                "en-US" => "Click to restart as Administrator and unlock all advanced disk features",
+                "ja-JP" => "クリックして管理者として再起動し、すべての高度な機能を解放します",
+                _ => "點擊立即以系統管理員身分重啟，解鎖全部底層功能"
+            });
+        }
+    }
+
+    private void AdminStatusBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (!AdminHelper.IsRunningAsAdmin())
+        {
+            AdminRestart_Click(sender, e);
+        }
     }
 
     private void CopyErrorDetails_Click(object sender, RoutedEventArgs e)

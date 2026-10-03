@@ -105,15 +105,22 @@ internal static class Program
                 TryCleanOldVersions(baseCacheDir, versionTag);
             }
 
-            // 2. Launch application
+            // 2. Launch application (default asInvoker; elevate if requested)
+            bool requestAdmin = args.Any(a => string.Equals(a, "--elevate", StringComparison.OrdinalIgnoreCase) ||
+                                              string.Equals(a, "/elevate", StringComparison.OrdinalIgnoreCase));
+
             var psi = new ProcessStartInfo
             {
                 FileName = targetExePath,
-                Arguments = string.Join(" ", args.Select(a => $"\"{a}\"")),
+                Arguments = string.Join(" ", args.Where(a => !a.Equals("--elevate", StringComparison.OrdinalIgnoreCase) && !a.Equals("/elevate", StringComparison.OrdinalIgnoreCase)).Select(a => $"\"{a}\"")),
                 WorkingDirectory = versionDir,
-                UseShellExecute = true,
-                Verb = "runas"
+                UseShellExecute = true
             };
+
+            if (requestAdmin)
+            {
+                psi.Verb = "runas";
+            }
 
             using var proc = Process.Start(psi);
             if (proc == null)

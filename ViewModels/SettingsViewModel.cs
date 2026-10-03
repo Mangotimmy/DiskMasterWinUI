@@ -327,7 +327,7 @@ public partial class SettingsViewModel : ObservableObject
             }
             else
             {
-                UpdateStatusText = LocalizationService.T("✅ 目前已是最新版本 (v3.3.0)", "✅ 当前已是最新版本 (v3.3.0)", "✅ You are running the latest version (v3.3.0)", "✅ 最新バージョンを実行中です (v3.3.0)");
+                UpdateStatusText = string.Format(LocalizationService.T("✅ 目前已是最新版本 ({0})", "✅ 当前已是最新版本 ({0})", "✅ You are running the latest version ({0})", "✅ 最新バージョンを実行中です ({0})"), UpdateService.CurrentVersion);
             }
         }
         catch (Exception ex)

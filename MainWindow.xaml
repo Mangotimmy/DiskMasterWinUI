@@ -272,6 +272,15 @@
 
                     <TabView.TabStripFooter>
                         <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,12,0" VerticalAlignment="Center">
+                            <!-- Admin Status & 1-Click Elevation Button -->
+                            <Button x:Name="AdminStatusBtn" Click="AdminStatusBtn_Click"
+                                    Padding="8,3" FontSize="11">
+                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                    <TextBlock x:Name="AdminStatusIcon" Text="🛡️" FontSize="11" />
+                                    <TextBlock x:Name="AdminStatusText" Text="系統管理員模式" FontSize="11" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+
                             <!-- Dual Mode Switcher: Easy vs Advance -->
                             <Button x:Name="ModeSwitcherBtn" Click="ModeSwitcher_Click"
                                     Padding="8,3" FontSize="11" ToolTipService.ToolTip="切換 簡易模式 (Easy) 與 專業進階模式 (Advance)">

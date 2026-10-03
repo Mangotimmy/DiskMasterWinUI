@@ -366,4 +366,17 @@ public sealed partial class SystemOptimizerPage : Page
             await ViewModel.DeleteDriverCommand.ExecuteAsync(item);
         }
     }
+
+    private void OptimizerTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ReferenceEquals(OptimizerTabView.SelectedItem, TabOneDrive))
+        {
+            ViewModel.RefreshOneDriveStatusCommand.Execute(null);
+        }
+        else if (ReferenceEquals(OptimizerTabView.SelectedItem, TabDrivers) && ViewModel.OemDrivers.Count == 0 && !ViewModel.IsLoadingDrivers)
+        {
+            ViewModel.RefreshDriversCommand.Execute(null);
+        }
+    }
 }
+

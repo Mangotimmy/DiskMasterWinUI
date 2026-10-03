@@ -75,13 +75,34 @@ public partial class SystemOptimizerViewModel : ObservableObject
     // ── OneDrive Deep Management & Repair ──
     private readonly OneDriveService _oneDriveService = new();
     [ObservableProperty] private OneDriveStatusInfo _oneDriveStatus = new();
-    [ObservableProperty] private bool _isOneDriveInstalled;
-    [ObservableProperty] private bool _isOneDriveRunning;
-    [ObservableProperty] private bool _isOneDriveFoldersRedirected;
-    [ObservableProperty] private bool _hasOneDriveCloudOnlyFiles;
-    [ObservableProperty] private int _oneDriveCloudOnlyCount;
-    [ObservableProperty] private bool _isOneDrivePinned;
-    [ObservableProperty] private bool _isOneDrivePolicyBlocked;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OneDriveInstalledStatusText))]
+    private bool _isOneDriveInstalled;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OneDriveRunningStatusText))]
+    private bool _isOneDriveRunning;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OneDriveRedirectStatusText))]
+    private bool _isOneDriveFoldersRedirected;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OneDriveCloudFilesStatusText))]
+    private bool _hasOneDriveCloudOnlyFiles;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OneDriveCloudFilesStatusText))]
+    private int _oneDriveCloudOnlyCount;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OneDriveGhostIconStatusText))]
+    private bool _isOneDrivePinned;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(OneDrivePolicyStatusText))]
+    private bool _isOneDrivePolicyBlocked;
+
     [ObservableProperty] private bool _isOneDriveOperating;
 
     public string OneDriveInstalledStatusText => IsOneDriveInstalled ? "已安裝 (Installed)" : "未安裝 / 已徹底清除 (Clean)";
@@ -1086,6 +1107,13 @@ public partial class SystemOptimizerViewModel : ObservableObject
                 OneDriveCloudOnlyCount = status.CloudOnlyFileCount;
                 IsOneDrivePinned = status.IsFileExplorerPinned;
                 IsOneDrivePolicyBlocked = status.IsPolicyBlocked;
+
+                OnPropertyChanged(nameof(OneDriveInstalledStatusText));
+                OnPropertyChanged(nameof(OneDriveRunningStatusText));
+                OnPropertyChanged(nameof(OneDriveRedirectStatusText));
+                OnPropertyChanged(nameof(OneDriveCloudFilesStatusText));
+                OnPropertyChanged(nameof(OneDriveGhostIconStatusText));
+                OnPropertyChanged(nameof(OneDrivePolicyStatusText));
             });
         }
         catch (Exception ex)

@@ -67,15 +67,104 @@ public class NetworkDiagnosticService
     }
 
     /// <summary>
+    /// Checks whether the network interface is a virtual adapter (VPN, Tailscale, WSL, VM, etc.).
+    /// </summary>
+    public static bool IsVirtualAdapter(NetworkInterface ni)
+    {
+        if (ni == null) return true;
+        if (ni.OperationalStatus != OperationalStatus.Up ||
+            ni.NetworkInterfaceType == NetworkInterfaceType.Loopback ||
+            ni.NetworkInterfaceType == NetworkInterfaceType.Tunnel ||
+            ni.NetworkInterfaceType == NetworkInterfaceType.Ppp)
+        {
+            return true;
+        }
+
+        string nameLower = ni.Name.ToLowerInvariant();
+        string descLower = ni.Description.ToLowerInvariant();
+
+        return nameLower.Contains("tailscale") || nameLower.Contains("tap") ||
+               nameLower.Contains("tun") || nameLower.Contains("vpn") ||
+               nameLower.Contains("wsl") || nameLower.Contains("hyper-v") ||
+               nameLower.Contains("vethernet") || nameLower.Contains("vmware") ||
+               nameLower.Contains("vmnet") || nameLower.Contains("virtual") ||
+               nameLower.Contains("pseudo") || nameLower.Contains("bluetooth") ||
+               nameLower.Contains("npcap") || nameLower.Contains("pcap") ||
+               nameLower.Contains("filter") || nameLower.Contains("ndis") ||
+               nameLower.Contains("multiplexor") ||
+               descLower.Contains("tailscale") || descLower.Contains("tap") ||
+               descLower.Contains("tun") || descLower.Contains("vpn") ||
+               descLower.Contains("wsl") || descLower.Contains("hyper-v") ||
+               descLower.Contains("virtual") || descLower.Contains("pseudo") ||
+               descLower.Contains("bluetooth") || descLower.Contains("vmware") ||
+               descLower.Contains("npcap") || descLower.Contains("filter");
+    }
+
+    /// <summary>
+    /// Determines the primary physical Internet adapter by checking physical NICs with active default gateway routes.
+    /// </summary>
+    public static NetworkInterface? GetPrimaryPhysicalInternetAdapter()
+    {
+        try
+        {
+            var interfaces = NetworkInterface.GetAllNetworkInterfaces()
+                .Where(ni => ni.OperationalStatus == OperationalStatus.Up)
+                .ToList();
+
+            // 1. Physical adapter with an active IPv4 Default Gateway
+            var withGateway = interfaces
+                .Where(ni => !IsVirtualAdapter(ni))
+                .Select(ni =>
+                {
+                    var ipProps = ni.GetIPProperties();
+                    var gw = ipProps.GatewayAddresses
+                        .FirstOrDefault(g => g.Address.AddressFamily == AddressFamily.InterNetwork
+                                          && !g.Address.Equals(IPAddress.Any)
+                                          && !g.Address.Equals(IPAddress.None));
+                    return new { Nic = ni, Gateway = gw };
+                })
+                .Where(x => x.Gateway != null)
+                .OrderBy(x => (x.Nic.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 ||
+                               x.Nic.NetworkInterfaceType == NetworkInterfaceType.Ethernet) ? 0 : 1)
+                .Select(x => x.Nic)
+                .FirstOrDefault();
+
+            if (withGateway != null) return withGateway;
+
+            // 2. Any physical adapter that is UP
+            var anyPhysical = interfaces.FirstOrDefault(ni => !IsVirtualAdapter(ni));
+            if (anyPhysical != null) return anyPhysical;
+
+            // 3. Fallback: Any interface with a gateway
+            var anyWithGw = interfaces.FirstOrDefault(ni =>
+                ni.NetworkInterfaceType != NetworkInterfaceType.Loopback &&
+                ni.GetIPProperties().GatewayAddresses.Any(g => g.Address.AddressFamily == AddressFamily.InterNetwork && !g.Address.Equals(IPAddress.Any)));
+            if (anyWithGw != null) return anyWithGw;
+
+            // 4. Fallback: First non-loopback UP interface
+            return interfaces.FirstOrDefault(ni => ni.NetworkInterfaceType != NetworkInterfaceType.Loopback);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Gets physical, non-virtual network adapters filtered and sorted by active IPv4 default gateway.
     /// Excludes Tailscale, VPN, WSL, Hyper-V, and pseudo tunnel interfaces.
     /// </summary>
     public static List<NetworkAdapterItem> GetAvailableNetworkAdapters()
     {
-        var list = new List<NetworkAdapterItem>();
+        var physicalWithGw = new List<NetworkAdapterItem>();
+        var physicalWithoutGw = new List<NetworkAdapterItem>();
+        var virtualAdapters = new List<NetworkAdapterItem>();
+
         try
         {
+            var primaryNic = GetPrimaryPhysicalInternetAdapter();
             var interfaces = NetworkInterface.GetAllNetworkInterfaces();
+
             foreach (var ni in interfaces)
             {
                 if (ni.OperationalStatus != OperationalStatus.Up ||
@@ -85,20 +174,14 @@ public class NetworkDiagnosticService
                     continue;
                 }
 
-                string nameLower = ni.Name.ToLowerInvariant();
-                string descLower = ni.Description.ToLowerInvariant();
-                bool isVirtual = nameLower.Contains("tailscale") || nameLower.Contains("tap") ||
-                                 nameLower.Contains("tun") || nameLower.Contains("vpn") ||
-                                 nameLower.Contains("wsl") || nameLower.Contains("hyper-v") ||
-                                 nameLower.Contains("vethernet") || nameLower.Contains("vmware") ||
-                                 nameLower.Contains("vmnet") || descLower.Contains("virtual") ||
-                                 descLower.Contains("pseudo") || descLower.Contains("bluetooth");
-
+                bool isVirtual = IsVirtualAdapter(ni);
                 var ipProps = ni.GetIPProperties();
                 var ipv4 = ipProps.UnicastAddresses
                     .FirstOrDefault(u => u.Address.AddressFamily == AddressFamily.InterNetwork)?.Address.ToString() ?? "";
                 var gw = ipProps.GatewayAddresses
                     .FirstOrDefault(g => g.Address.AddressFamily == AddressFamily.InterNetwork && !g.Address.Equals(IPAddress.Any) && !g.Address.Equals(IPAddress.None))?.Address.ToString() ?? "";
+
+                bool isPrimary = (primaryNic != null && ni.Id == primaryNic.Id);
 
                 var item = new NetworkAdapterItem
                 {
@@ -107,27 +190,40 @@ public class NetworkDiagnosticService
                     Description = ni.Description,
                     IPv4Address = ipv4,
                     GatewayAddress = gw,
-                    IsPrimary = false
+                    IsPrimary = isPrimary
                 };
 
-                // Prioritize physical adapters with active default gateway
                 if (!isVirtual && !string.IsNullOrEmpty(gw))
                 {
-                    list.Insert(0, item);
+                    physicalWithGw.Add(item);
+                }
+                else if (!isVirtual)
+                {
+                    physicalWithoutGw.Add(item);
                 }
                 else
                 {
-                    list.Add(item);
+                    virtualAdapters.Add(item);
                 }
             }
 
-            if (list.Count > 0)
+            var result = new List<NetworkAdapterItem>();
+            result.AddRange(physicalWithGw);
+            result.AddRange(physicalWithoutGw);
+            result.AddRange(virtualAdapters);
+
+            // Ensure exactly one is marked primary
+            if (result.Count > 0 && !result.Any(r => r.IsPrimary))
             {
-                list[0].IsPrimary = true;
+                result[0].IsPrimary = true;
             }
+
+            return result;
         }
-        catch { }
-        return list;
+        catch
+        {
+            return new List<NetworkAdapterItem>();
+        }
     }
 
     /// <summary>
@@ -187,17 +283,37 @@ public class NetworkDiagnosticService
         try
         {
             string? gatewayIp = null;
-            foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+            var primaryNic = GetPrimaryPhysicalInternetAdapter();
+            if (primaryNic != null)
             {
-                if (ni.OperationalStatus != OperationalStatus.Up || ni.NetworkInterfaceType == NetworkInterfaceType.Loopback)
-                    continue;
-
-                var props = ni.GetIPProperties();
-                var gw = props.GatewayAddresses.FirstOrDefault();
-                if (gw != null && gw.Address.AddressFamily == AddressFamily.InterNetwork)
+                var props = primaryNic.GetIPProperties();
+                var gw = props.GatewayAddresses
+                    .FirstOrDefault(g => g.Address.AddressFamily == AddressFamily.InterNetwork
+                                      && !g.Address.Equals(IPAddress.Any)
+                                      && !g.Address.Equals(IPAddress.None));
+                if (gw != null)
                 {
                     gatewayIp = gw.Address.ToString();
-                    break;
+                }
+            }
+
+            if (string.IsNullOrEmpty(gatewayIp))
+            {
+                foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    if (ni.OperationalStatus != OperationalStatus.Up || ni.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+                        continue;
+
+                    var props = ni.GetIPProperties();
+                    var gw = props.GatewayAddresses
+                        .FirstOrDefault(g => g.Address.AddressFamily == AddressFamily.InterNetwork
+                                          && !g.Address.Equals(IPAddress.Any)
+                                          && !g.Address.Equals(IPAddress.None));
+                    if (gw != null)
+                    {
+                        gatewayIp = gw.Address.ToString();
+                        break;
+                    }
                 }
             }
 
@@ -363,9 +479,10 @@ public class NetworkDiagnosticService
         var step = new DiagnosticStepResult { Name = "5. Network Adapter Health" };
         try
         {
-            var activeNic = NetworkInterface.GetAllNetworkInterfaces()
-                .FirstOrDefault(ni => ni.OperationalStatus == OperationalStatus.Up &&
-                                      ni.NetworkInterfaceType != NetworkInterfaceType.Loopback);
+            var activeNic = GetPrimaryPhysicalInternetAdapter() ??
+                            NetworkInterface.GetAllNetworkInterfaces()
+                                .FirstOrDefault(ni => ni.OperationalStatus == OperationalStatus.Up &&
+                                                      ni.NetworkInterfaceType != NetworkInterfaceType.Loopback);
 
             if (activeNic != null)
             {
@@ -373,8 +490,11 @@ public class NetworkDiagnosticService
                 long errors = ipStats.IncomingPacketsWithErrors + ipStats.OutgoingPacketsWithErrors;
                 long discarded = ipStats.IncomingPacketsDiscarded + ipStats.OutgoingPacketsDiscarded;
 
+                long speedMbps = activeNic.Speed / 1_000_000;
+                string speedText = speedMbps > 0 ? $"{speedMbps} Mbps" : "N/A";
+
                 step.Success = true;
-                step.Details = $"{activeNic.Name} ({activeNic.Speed / 1_000_000} Mbps) | Errors: {errors}, Discarded: {discarded}";
+                step.Details = $"{activeNic.Name} ({activeNic.Description}, {speedText}) | Errors: {errors}, Discarded: {discarded}";
                 if (errors > 100 || discarded > 500)
                 {
                     step.Recommendation = "High packet errors detected. Update network adapter drivers or replace cable.";
@@ -387,8 +507,8 @@ public class NetworkDiagnosticService
             else
             {
                 step.Success = false;
-                step.Details = "No active network adapter found.";
-                step.Recommendation = "Enable network adapter in Windows Device Manager.";
+                step.Details = "No active physical network adapter found.";
+                step.Recommendation = "Enable Wi-Fi or Ethernet adapter in Windows Device Manager.";
             }
         }
         catch (Exception ex)
@@ -420,9 +540,8 @@ public class NetworkDiagnosticService
                 if (string.IsNullOrEmpty(alias))
                 {
                     alias = adapters.FirstOrDefault(a => a.IsPrimary)?.Name ??
-                            adapters.FirstOrDefault()?.Name ??
-                            NetworkInterface.GetAllNetworkInterfaces()
-                                .FirstOrDefault(ni => ni.OperationalStatus == OperationalStatus.Up && ni.NetworkInterfaceType != NetworkInterfaceType.Loopback)?.Name;
+                            GetPrimaryPhysicalInternetAdapter()?.Name ??
+                            adapters.FirstOrDefault()?.Name;
                 }
 
                 if (string.IsNullOrEmpty(alias))

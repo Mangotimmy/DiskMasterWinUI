@@ -109,18 +109,18 @@ public sealed partial class FloatingTabWindow : Window
 
     private void DockBack_Click(object sender, RoutedEventArgs e)
     {
-        PerformDock();
+        PerformDock(closeWindow: true);
     }
 
     private void FloatingTabWindow_Closed(object sender, WindowEventArgs e)
     {
         if (!_isDocking)
         {
-            PerformDock();
+            PerformDock(closeWindow: false);
         }
     }
 
-    public void PerformDock()
+    public void PerformDock(bool closeWindow = true)
     {
         if (_isDocking) return;
         _isDocking = true;
@@ -132,10 +132,13 @@ public sealed partial class FloatingTabWindow : Window
         FloatingContentFrame.Content = null;
         DockRequested?.Invoke(this);
 
-        try
+        if (closeWindow)
         {
-            this.Close();
+            try
+            {
+                this.Close();
+            }
+            catch { }
         }
-        catch { }
     }
 }
