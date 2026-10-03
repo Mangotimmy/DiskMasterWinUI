@@ -278,4 +278,146 @@ public class BcdManagerService
 
         return sb.ToString();
     }
+
+    // ══════════════════════════════════════════════════════════════
+    // MSConfig-Style Safe Boot & Advanced Boot Options
+    // ══════════════════════════════════════════════════════════════
+
+    public async Task<SafeBootConfig> GetSafeBootConfigAsync(CancellationToken cancellationToken = default)
+    {
+        var config = new SafeBootConfig();
+        try
+        {
+            var output = await RunCommandAsync("bcdedit.exe", "/enum {current}", cancellationToken);
+            var lines = output.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var line in lines)
+            {
+                var trimmed = line.Trim();
+                var parts = Regex.Split(trimmed, @"\s{2,}");
+                if (parts.Length < 2)
+                {
+                    var match = Regex.Match(trimmed, @"^([a-zA-Z0-9_-]+)\s+(.+)$");
+                    if (match.Success)
+                    {
+                        parts = new[] { match.Groups[1].Value, match.Groups[2].Value };
+                    }
+                    else
+                    {
+                        continue;
+                    }
+                }
+
+                var key = parts[0].Trim().ToLowerInvariant();
+                var val = parts[1].Trim().ToLowerInvariant();
+
+                switch (key)
+                {
+                    case "safeboot":
+                        config.SafeBootMode = val switch
+                        {
+                            "minimal" => "Minimal",
+                            "network" => "Network",
+                            "alternateshell" => "AlternateShell",
+                            "dsrepair" => "DsRepair",
+                            _ => "Normal"
+                        };
+                        break;
+                    case "noguiboot":
+                        config.NoGuiBoot = val is "yes" or "true" or "on";
+                        break;
+                    case "bootlog":
+                        config.BootLog = val is "yes" or "true" or "on";
+                        break;
+                    case "basevideo":
+                        config.BaseVideo = val is "yes" or "true" or "on";
+                        break;
+                    case "sos":
+                        config.Sos = val is "yes" or "true" or "on";
+                        break;
+                    case "testsigning":
+                        config.TestSigning = val is "yes" or "true" or "on";
+                        break;
+                    case "nointegritychecks":
+                        config.NoIntegrityChecks = val is "yes" or "true" or "on";
+                        break;
+                    case "hypervisorlaunchtype":
+                        config.HypervisorLaunchType = val;
+                        break;
+                }
+            }
+        }
+        catch { }
+
+        return config;
+    }
+
+    public async Task<string> SetSafeBootModeAsync(string mode, CancellationToken cancellationToken = default)
+    {
+        var m = mode?.Trim().ToLowerInvariant() ?? "normal";
+        var sb = new StringBuilder();
+
+        switch (m)
+        {
+            case "minimal":
+                await RunCommandAsync("bcdedit.exe", "/deletevalue {current} safebootalternateshell", cancellationToken);
+                var resMin = await RunCommandAsync("bcdedit.exe", "/set {current} safeboot minimal", cancellationToken);
+                sb.AppendLine(resMin);
+                break;
+            case "alternateshell":
+                var resAlt = await RunCommandAsync("bcdedit.exe", "/set {current} safeboot alternateshell", cancellationToken);
+                sb.AppendLine(resAlt);
+                break;
+            case "network":
+                await RunCommandAsync("bcdedit.exe", "/deletevalue {current} safebootalternateshell", cancellationToken);
+                var resNet = await RunCommandAsync("bcdedit.exe", "/set {current} safeboot network", cancellationToken);
+                sb.AppendLine(resNet);
+                break;
+            case "dsrepair":
+                await RunCommandAsync("bcdedit.exe", "/deletevalue {current} safebootalternateshell", cancellationToken);
+                var resDs = await RunCommandAsync("bcdedit.exe", "/set {current} safeboot dsrepair", cancellationToken);
+                sb.AppendLine(resDs);
+                break;
+            case "normal":
+                var resNorm = await RunCommandAsync("bcdedit.exe", "/deletevalue {current} safeboot", cancellationToken);
+                await RunCommandAsync("bcdedit.exe", "/deletevalue {current} safebootalternateshell", cancellationToken);
+                sb.AppendLine(resNorm);
+                break;
+            default:
+                throw new ArgumentException($"Unknown safe boot mode: {mode}");
+        }
+
+        return sb.ToString().Trim();
+    }
+
+    public async Task<string> SetBootFlagAsync(string flag, bool enable, CancellationToken cancellationToken = default)
+    {
+        var f = flag?.Trim().ToLowerInvariant() ?? "";
+        string args = f switch
+        {
+            "testsigning" => $"/set {{current}} testsigning {(enable ? "on" : "off")}",
+            "nointegritychecks" => $"/set {{current}} nointegritychecks {(enable ? "on" : "off")}",
+            "hypervisorlaunchtype" => $"/set {{current}} hypervisorlaunchtype {(enable ? "auto" : "off")}",
+            _ => enable ? $"/set {{current}} {f} yes" : $"/deletevalue {{current}} {f}"
+        };
+
+        return await RunCommandAsync("bcdedit.exe", args, cancellationToken);
+    }
+
+    public async Task<string> ApplySafeBootConfigAsync(SafeBootConfig config, CancellationToken cancellationToken = default)
+    {
+        var sb = new StringBuilder();
+        var modeResult = await SetSafeBootModeAsync(config.SafeBootMode, cancellationToken);
+        sb.AppendLine(modeResult);
+
+        sb.AppendLine(await SetBootFlagAsync("noguiboot", config.NoGuiBoot, cancellationToken));
+        sb.AppendLine(await SetBootFlagAsync("bootlog", config.BootLog, cancellationToken));
+        sb.AppendLine(await SetBootFlagAsync("basevideo", config.BaseVideo, cancellationToken));
+        sb.AppendLine(await SetBootFlagAsync("sos", config.Sos, cancellationToken));
+        sb.AppendLine(await SetBootFlagAsync("testsigning", config.TestSigning, cancellationToken));
+        sb.AppendLine(await SetBootFlagAsync("nointegritychecks", config.NoIntegrityChecks, cancellationToken));
+        sb.AppendLine(await SetBootFlagAsync("hypervisorlaunchtype", config.HypervisorLaunchType.Equals("auto", StringComparison.OrdinalIgnoreCase), cancellationToken));
+
+        return sb.ToString().Trim();
+    }
 }

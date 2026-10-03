@@ -1074,11 +1074,19 @@ public partial class WimDeployViewModel : ObservableObject
             dp.SetText(DeployLog);
             Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
             Windows.ApplicationModel.DataTransfer.Clipboard.Flush();
-            StatusMessage = LocalizationService.Instance.IsChinese ? "日誌已複製至剪貼簿！" : "Deployment log copied to clipboard!";
+            StatusMessage = LocalizationService.T(
+                "日誌已複製至剪貼簿！",
+                "日志已复制到剪贴板！",
+                "Deployment log copied to clipboard!",
+                "展開ログをクリップボードにコピーしました！");
         }
         catch (Exception ex)
         {
-            StatusMessage = $"複製失敗: {ex.Message}";
+            StatusMessage = LocalizationService.T(
+                $"複製失敗: {ex.Message}",
+                $"复制失败: {ex.Message}",
+                $"Copy failed: {ex.Message}",
+                $"コピー失敗: {ex.Message}");
         }
     }
 
@@ -1164,9 +1172,11 @@ public partial class WimDeployViewModel : ObservableObject
     {
         try
         {
-            var url = LocalizationService.Instance.IsChinese
-                ? "https://www.microsoft.com/zh-tw/software-download/windows11"
-                : "https://www.microsoft.com/en-us/software-download/windows11";
+            var url = LocalizationService.T(
+                "https://www.microsoft.com/zh-tw/software-download/windows11",
+                "https://www.microsoft.com/zh-cn/software-download/windows11",
+                "https://www.microsoft.com/en-us/software-download/windows11",
+                "https://www.microsoft.com/ja-jp/software-download/windows11");
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = url, UseShellExecute = true });
         }
         catch { }

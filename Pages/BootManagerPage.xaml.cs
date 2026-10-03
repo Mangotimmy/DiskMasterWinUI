@@ -150,12 +150,63 @@ public sealed partial class BootManagerPage : Page
             "ja-JP" => "💾 グローバル設定を適用",
             _ => "💾 套用全域設定"
         };
+
+        TabSafeBoot.Header = lang switch
+        {
+            "zh-CN" => "🛡️ 安全引导与旗标",
+            "en-US" => "🛡️ Safe Boot & Flags",
+            "ja-JP" => "🛡️ セーフブートとフラグ",
+            _ => "🛡️ 安全開機與旗標"
+        };
+        SafeBootTitleText.Text = lang switch
+        {
+            "zh-CN" => "MSConfig 系统安全引导模式与高级引导旗标",
+            "en-US" => "MSConfig Safe Boot Modes & Advanced Boot Flags",
+            "ja-JP" => "MSConfig セーフブートモードと詳細ブートフラグ",
+            _ => "MSConfig 系統安全開機模式與進階開機旗標"
+        };
+        SafeBootSubtitleText.Text = lang switch
+        {
+            "zh-CN" => "直接调用 Windows BCD 控制底层启动参数，支持 Minimal、Network、AlternateShell、DsRepair 安全模式，以及无 GUI 引导、引导日志与测试签名。",
+            "en-US" => "Directly controls low-level Windows BCD startup parameters. Supports Minimal, Network, AlternateShell, DsRepair safe boot modes, No GUI boot, Boot log, and Test signing.",
+            "ja-JP" => "Windows BCDを制御して起動パラメータを設定します。最小構成、ネットワーク、コマンドプロンプト、ディレクトリ復旧のセーフモード、No GUI起動、ブートログなどをサポートします。",
+            _ => "直接調用 Windows BCD 控制底層啟動參數，支援 Minimal、Network、AlternateShell、DsRepair 安全模式，以及無 GUI 開機、開機記錄檔與測試簽署。"
+        };
+        LoadSafeBootBtnText.Text = lang switch
+        {
+            "zh-CN" => "🔄 读取当前设置",
+            "en-US" => "🔄 Read Settings",
+            "ja-JP" => "🔄 設定を再読込",
+            _ => "🔄 讀取當前設定"
+        };
+        ApplySafeBootBtnText.Text = lang switch
+        {
+            "zh-CN" => "💾 应用安全引导设置",
+            "en-US" => "💾 Apply Safe Boot Settings",
+            "ja-JP" => "💾 セーフブート設定を適用",
+            _ => "💾 套用安全開機設定"
+        };
+        SafeBootModeHeader.Text = lang switch
+        {
+            "zh-CN" => "安全引导模式 (Safe Boot Mode)",
+            "en-US" => "Safe Boot Mode",
+            "ja-JP" => "セーフブートモード (Safe Boot Mode)",
+            _ => "安全開機模式 (Safe Boot Mode)"
+        };
+        AdvancedFlagsHeader.Text = lang switch
+        {
+            "zh-CN" => "高级引导旗标与诊断 (Advanced Boot Flags)",
+            "en-US" => "Advanced Boot Flags & Diagnostics",
+            "ja-JP" => "詳細ブートフラグと診断 (Advanced Boot Flags)",
+            _ => "進階開機旗標與診斷開機 (Advanced Boot Flags)"
+        };
     }
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
         ApplyLanguage();
         await ViewModel.RefreshEntriesCommand.ExecuteAsync(null);
+        await ViewModel.LoadSafeBootConfigCommand.ExecuteAsync(null);
     }
     private void AddToBcd_Click(object sender, RoutedEventArgs e)
     {

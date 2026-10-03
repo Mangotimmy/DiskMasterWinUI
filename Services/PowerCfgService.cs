@@ -226,7 +226,7 @@ public class PowerCfgService
     public async Task<(bool Success, string Message)> SetProcessorBoostModeUnhideAsync(bool unhide)
     {
         var flag = unhide ? "-ATTRIB_HIDE" : "+ATTRIB_HIDE";
-        var arg = $"-attributes SUB_PROCESSOR 54533251-82be-4824-96c1-47b60b740d00 {flag}";
+        var arg = $"-attributes 54533251-82be-4824-96c1-47b60b740d00 be337238-0d82-4146-a960-4f3749d470c7 {flag}";
         var (stdout, stderr, exitCode) = await ProcessHelper.RunProcessAsync("powercfg.exe", arg);
 
         if (exitCode == 0)
@@ -237,6 +237,73 @@ public class PowerCfgService
 
         var err = string.IsNullOrWhiteSpace(stderr) ? stdout : stderr;
         return (false, $"設定失敗: {err.Trim()}");
+    }
+
+    public async Task<(bool Success, string Message)> UnhideProcessorAttributeAsync(string attributeGuid)
+    {
+        var arg = $"-attributes 54533251-82be-4824-96c1-47b60b740d00 {attributeGuid} -ATTRIB_HIDE";
+        var (stdout, stderr, exitCode) = await ProcessHelper.RunProcessAsync("powercfg.exe", arg);
+        return (exitCode == 0, exitCode == 0 ? "已解鎖處理器電源屬性" : stderr);
+    }
+
+    public async Task<(bool Success, string Message)> UnhideAllProcessorAttributesAsync()
+    {
+        var guids = new[]
+        {
+            "be337238-0d82-4146-a960-4f3749d470c7", // BoostMode
+            "36687f9e-e376-49e8-b783-be5e3e3563ab", // EnergyPerformancePreference
+            "8baa4a8a-14fc-482b-bd23-a0f0f71e11e8", // AutonomousMode
+            "0cc5b647-c1df-4637-891a-dec35c318583", // CoreParkingMinCores
+            "ea062031-0e34-4ff1-9b6d-eb1059324028", // CoreParkingMaxCores
+            "7f24e370-7664-4642-99e3-e605185a0899", // HeterogeneousScheduling
+            "94d3a615-a899-4ac5-ae2b-e4d8f6343d57"  // SystemCoolingPolicy
+        };
+
+        var errors = new List<string>();
+        foreach (var guid in guids)
+        {
+            var (ok, msg) = await UnhideProcessorAttributeAsync(guid);
+            if (!ok) errors.Add(msg);
+        }
+
+        return errors.Count == 0
+            ? (true, "已成功解鎖全部 7 項處理器進階電源管理原則！")
+            : (false, $"部分屬性解鎖失敗: {string.Join("; ", errors)}");
+    }
+
+    /// <summary>
+    /// Purges hiberfil.sys by disabling hibernation, verifies release, and returns reclaimed GB.
+    /// </summary>
+    public async Task<(bool Success, double ReclaimedGb, string Message)> PurgeHibernationFileAndFreeSpaceAsync()
+    {
+        string sysDrive = Environment.GetEnvironmentVariable("SystemDrive") ?? "C:";
+        string hiberPath = Path.Combine(sysDrive, "hiberfil.sys");
+
+        long originalBytes = 0;
+        try
+        {
+            if (File.Exists(hiberPath))
+            {
+                var fi = new FileInfo(hiberPath);
+                originalBytes = fi.Length;
+            }
+        }
+        catch { }
+
+        var (stdout, stderr, exitCode) = await ProcessHelper.RunProcessAsync("powercfg.exe", "/hibernate off");
+
+        double reclaimedGb = originalBytes > 0 ? (double)originalBytes / 1073741824.0 : 0.0;
+
+        if (exitCode == 0)
+        {
+            string msg = originalBytes > 0
+                ? $"已成功關閉系統休眠並清除 hiberfil.sys，成功釋放 {reclaimedGb:F2} GB SSD 空間！"
+                : "系統休眠已關閉，目前無 hiberfil.sys 佔用空間。";
+            return (true, reclaimedGb, msg);
+        }
+
+        string err = string.IsNullOrWhiteSpace(stderr) ? stdout : stderr;
+        return (false, 0.0, $"休眠關閉失敗: {err.Trim()}");
     }
 
     /// <summary>

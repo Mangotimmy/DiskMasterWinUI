@@ -97,8 +97,10 @@ public partial class SettingsViewModel : ObservableObject
         ["微軟正黑體"] = "Microsoft JhengHei UI",
         ["Microsoft JhengHei UI"] = "Microsoft JhengHei UI",
         ["微軟雅黑"] = "Microsoft YaHei UI",
+        ["微软雅黑"] = "Microsoft YaHei UI",
         ["Microsoft YaHei UI"] = "Microsoft YaHei UI",
         ["Meiryo UI"] = "Meiryo UI",
+        ["Yu Gothic UI"] = "Yu Gothic UI",
         ["Cascadia Code"] = "Cascadia Code",
         ["Consolas"] = "Consolas",
         ["JetBrains Mono"] = "JetBrains Mono"
@@ -175,10 +177,13 @@ public partial class SettingsViewModel : ObservableObject
 
     public void RefreshLocalizedOptions()
     {
-        bool isZh = LocalizationService.Instance.IsChinese;
-        FontOptionList = isZh
-            ? ["Segoe UI Variable", "微軟正黑體", "微軟雅黑", "Meiryo UI", "Cascadia Code", "Consolas", "JetBrains Mono", "自訂字型名稱..."]
-            : ["Segoe UI Variable", "Microsoft JhengHei UI", "Microsoft YaHei UI", "Meiryo UI", "Cascadia Code", "Consolas", "JetBrains Mono", "Custom Font Name..."];
+        FontOptionList = LocalizationService.Instance.CurrentLanguage switch
+        {
+            "zh-TW" => ["Segoe UI Variable", "微軟正黑體", "微軟雅黑", "Meiryo UI", "Cascadia Code", "Consolas", "JetBrains Mono", "自訂字型名稱..."],
+            "zh-CN" => ["Segoe UI Variable", "微软雅黑", "微软正黑体", "Meiryo UI", "Cascadia Code", "Consolas", "JetBrains Mono", "自定义字体名称..."],
+            "ja-JP" => ["Segoe UI Variable", "Meiryo UI", "Yu Gothic UI", "Cascadia Code", "Consolas", "JetBrains Mono", "カスタムフォント名..."],
+            _ => ["Segoe UI Variable", "Microsoft JhengHei UI", "Microsoft YaHei UI", "Meiryo UI", "Cascadia Code", "Consolas", "JetBrains Mono", "Custom Font Name..."]
+        };
 
         WorkspacePresetOptions = [
             LocalizationService.Instance["WorkspaceMaster"],
@@ -188,10 +193,11 @@ public partial class SettingsViewModel : ObservableObject
             LocalizationService.Instance["WorkspaceLite"]
         ];
 
+        string customPlaceholder = LocalizationService.T("自訂字型名稱...", "自定义字体名称...", "Custom Font Name...", "カスタムフォント名...");
         var match = FontOptionList.FirstOrDefault(f =>
             s_fontOptionToFamily.TryGetValue(f, out var fam) && string.Equals(fam, CustomFontFamily, StringComparison.OrdinalIgnoreCase));
-        SelectedFontOption = match ?? (isZh ? "自訂字型名稱..." : "Custom Font Name...");
-        IsCustomFontInputVisible = SelectedFontOption.StartsWith("自訂") || SelectedFontOption.StartsWith("Custom");
+        SelectedFontOption = match ?? customPlaceholder;
+        IsCustomFontInputVisible = SelectedFontOption.StartsWith("自訂") || SelectedFontOption.StartsWith("自定义") || SelectedFontOption.StartsWith("Custom") || SelectedFontOption.StartsWith("カスタム");
 
         var s = SettingsService.Instance.Current;
         SelectedWorkspacePreset = (s.WorkspacePreset ?? "Master") switch
@@ -259,15 +265,15 @@ public partial class SettingsViewModel : ObservableObject
 
         s.WorkspacePreset = SelectedWorkspacePreset switch
         {
-            var p when !string.IsNullOrEmpty(p) && (p.StartsWith("系統部署") || p.StartsWith("系统部署") || p.Contains("Deploy")) => "Deploy",
-            var p when !string.IsNullOrEmpty(p) && (p.StartsWith("系統修復") || p.StartsWith("系统修复") || p.Contains("Repair")) => "Repair",
-            var p when !string.IsNullOrEmpty(p) && (p.StartsWith("電競") || p.StartsWith("电竞") || p.Contains("Gaming")) => "Gaming",
-            var p when !string.IsNullOrEmpty(p) && (p.StartsWith("極簡") || p.StartsWith("极简") || p.Contains("Lite")) => "Lite",
+            var p when !string.IsNullOrEmpty(p) && (p.Contains("部署") || p.Contains("展開") || p.Contains("Deploy")) => "Deploy",
+            var p when !string.IsNullOrEmpty(p) && (p.Contains("修復") || p.Contains("修复") || p.Contains("Repair")) => "Repair",
+            var p when !string.IsNullOrEmpty(p) && (p.Contains("電競") || p.Contains("电竞") || p.Contains("Gaming") || p.Contains("ゲーム")) => "Gaming",
+            var p when !string.IsNullOrEmpty(p) && (p.Contains("極簡") || p.Contains("极简") || p.Contains("Lite") || p.Contains("ミニマル")) => "Lite",
             _ => "Master"
         };
 
         SettingsService.Instance.Save();
-        StatusMessage = LocalizationService.Instance.IsChinese ? "設定已成功儲存！" : "Settings saved successfully!";
+        StatusMessage = LocalizationService.T("設定已成功儲存！", "设置已成功保存！", "Settings saved successfully!", "設定が正常に保存されました！");
     }
 
     partial void OnSelectedThemeChanged(string value)
@@ -295,7 +301,7 @@ public partial class SettingsViewModel : ObservableObject
     partial void OnSelectedFontOptionChanged(string value)
     {
         if (string.IsNullOrEmpty(value)) return;
-        IsCustomFontInputVisible = value.StartsWith("自訂") || value.StartsWith("Custom");
+        IsCustomFontInputVisible = value.StartsWith("自訂") || value.StartsWith("自定义") || value.StartsWith("Custom") || value.StartsWith("カスタム");
         if (s_fontOptionToFamily.TryGetValue(value, out var fontFam))
         {
             CustomFontFamily = fontFam;

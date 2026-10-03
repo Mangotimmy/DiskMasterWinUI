@@ -19,8 +19,6 @@ public static class DialogHelper
 
         if (xamlRoot == null) return true;
 
-        bool isZh = LocalizationService.Instance.IsChinese;
-
         var panel = new StackPanel { Spacing = 12 };
         panel.Children.Add(new TextBlock
         {
@@ -40,7 +38,7 @@ public static class DialogHelper
             };
             targetCard.Child = new TextBlock
             {
-                Text = (isZh ? "受影響對象: " : "Target: ") + targetItemName,
+                Text = LocalizationService.Instance["TargetItem"] + " " + targetItemName,
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
             };
             panel.Children.Add(targetCard);
@@ -48,7 +46,7 @@ public static class DialogHelper
 
         var warningText = new TextBlock
         {
-            Text = isZh ? "⚠️ 此操作將永久修改或抹除資料，請確認後再繼續！" : "⚠️ This operation modifies or wipes data permanently. Confirm to proceed!",
+            Text = LocalizationService.Instance["WarningDestructive"],
             Foreground = Application.Current.Resources["SystemFillColorCriticalBrush"] as Microsoft.UI.Xaml.Media.Brush,
             FontWeight = Microsoft.UI.Text.FontWeights.Bold
         };
@@ -59,8 +57,8 @@ public static class DialogHelper
             XamlRoot = xamlRoot,
             Title = "🔴 " + title,
             Content = panel,
-            PrimaryButtonText = isZh ? "確認執行" : "Proceed",
-            CloseButtonText = isZh ? "取消" : "Cancel",
+            PrimaryButtonText = LocalizationService.T("確認執行", "确认执行", "Proceed", "続行"),
+            CloseButtonText = LocalizationService.Instance["Cancel"],
             DefaultButton = ContentDialogButton.Close
         };
 
