@@ -68,6 +68,19 @@ Copy-Item "$tempOut\DiskMasterPortableLauncher.exe" -Destination $finalExePath -
 Remove-Item $payloadZip -Force -ErrorAction SilentlyContinue
 Remove-Item $tempOut -Recurse -Force -ErrorAction SilentlyContinue
 
+# 5. Sign binary with Authenticode certificate
+$signScript = "$projectDir\tools\Sign-ReleaseBinary.ps1"
+if (Test-Path $signScript) {
+    Write-Host "`n[5/5] Signing portable binary with Authenticode..." -ForegroundColor Yellow
+    try {
+        & $signScript -TargetPath $finalExePath
+    } catch {
+        Write-Warning "Signing failed or skipped: $_"
+    }
+}
+
+Unblock-File $finalExePath -ErrorAction SilentlyContinue
+
 $exeSizeMb = [math]::Round((Get-Item $finalExePath).Length / 1MB, 2)
 Write-Host "`n=================================================================" -ForegroundColor Green
 Write-Host "  SUCCESS: True Single-File Standalone Portable EXE Generated!" -ForegroundColor Green

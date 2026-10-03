@@ -39,6 +39,8 @@ public class TpmService
                 {
                     var taskMfgId = wmiKey.GetValue("TaskManufacturerId");
                     var taskFwVer = wmiKey.GetValue("TaskFirmwareVersion")?.ToString();
+                    var provFw = wmiKey.GetValue("FirmwareVersionAtLastProvision")?.ToString();
+
                     if (taskMfgId != null)
                     {
                         info.IsPresent = true;
@@ -49,6 +51,11 @@ public class TpmService
                         {
                             info.ManufacturerVersion = taskFwVer;
                         }
+                        else if (!string.IsNullOrWhiteSpace(provFw))
+                        {
+                            info.ManufacturerVersion = provFw;
+                        }
+
                         info.ManufacturerName = DecodeTpmManufacturer(taskMfgId);
                         sb.AppendLine($"[TPM WMI Registry] Manufacturer: {info.ManufacturerName}, FW: {info.ManufacturerVersion}");
                     }
@@ -56,13 +63,13 @@ public class TpmService
             }
             catch { }
 
-            // 2. Query PowerShell Get-Tpm / Win32_Tpm for live runtime status
+            // 2. Query PowerShell Get-Tpm for live runtime status
             try
             {
                 var psi = new ProcessStartInfo
                 {
                     FileName = "powershell.exe",
-                    Arguments = "-NoProfile -ExecutionPolicy Bypass -Command \"try { $t = Get-Tpm -ErrorAction SilentlyContinue; if ($t) { [PSCustomObject]@{ Present = $t.TpmPresent; Ready = $t.TpmReady; Version = $t.ManufacturerVersion; Id = $t.ManufacturerId; IdTxt = $t.ManufacturerIdTxt } | ConvertTo-Json -Compress } else { [PSCustomObject]@{ Present = $false } | ConvertTo-Json -Compress } } catch { [PSCustomObject]@{ Present = $false } | ConvertTo-Json -Compress }\"",
+                    Arguments = "-NoProfile -ExecutionPolicy Bypass -Command \"try { $t = Get-Tpm -ErrorAction SilentlyContinue; if ($t -and ($t.TpmPresent -eq $true)) { [PSCustomObject]@{ Present = $true; Ready = [bool]$t.TpmReady; Version = [string]$t.ManufacturerVersion; Id = $t.ManufacturerId; IdTxt = [string]$t.ManufacturerIdTxt } | ConvertTo-Json -Compress } else { [PSCustomObject]@{ Present = $false } | ConvertTo-Json -Compress } } catch { [PSCustomObject]@{ Present = $false } | ConvertTo-Json -Compress }\"",
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     CreateNoWindow = true
@@ -78,14 +85,14 @@ public class TpmService
                     {
                         using var doc = JsonDocument.Parse(output);
                         var root = doc.RootElement;
-                        if (root.TryGetProperty("Present", out var pElem) && pElem.GetBoolean())
+                        if (root.TryGetProperty("Present", out var pElem) && pElem.ValueKind == JsonValueKind.True)
                         {
                             info.IsPresent = true;
                             info.IsEnabled = true;
                             info.IsActivated = true;
                             info.SpecVersion = "2.0";
 
-                            if (root.TryGetProperty("Ready", out var rElem))
+                            if (root.TryGetProperty("Ready", out var rElem) && (rElem.ValueKind == JsonValueKind.True || rElem.ValueKind == JsonValueKind.False))
                             {
                                 info.IsOwned = rElem.GetBoolean();
                             }
@@ -249,7 +256,7 @@ public class TpmService
     }
 
     /// <summary>
-    /// Decodes a raw TPM Manufacturer ID (Big-Endian ASCII packed integer or string) into a user-friendly vendor brand.
+    /// Decodes a raw TPM Manufacturer ID (Big-Endian/Little-Endian ASCII packed integer, hex or string) into a user-friendly vendor brand.
     /// </summary>
     public static string DecodeTpmManufacturer(object? rawId, string? idTxt = null)
     {
@@ -273,13 +280,22 @@ public class TpmService
             {
                 tag = UnpackAscii(uVal);
             }
-            else if (uint.TryParse(rawId.ToString(), out var parsedVal))
-            {
-                tag = UnpackAscii(parsedVal);
-            }
             else
             {
-                tag = rawId.ToString()?.Trim('\0', ' ') ?? string.Empty;
+                var rawStr = rawId.ToString()?.Trim() ?? string.Empty;
+                if (rawStr.StartsWith("0x", StringComparison.OrdinalIgnoreCase) &&
+                    uint.TryParse(rawStr.Substring(2), System.Globalization.NumberStyles.HexNumber, null, out var hexVal))
+                {
+                    tag = UnpackAscii(hexVal);
+                }
+                else if (uint.TryParse(rawStr, out var parsedVal))
+                {
+                    tag = UnpackAscii(parsedVal);
+                }
+                else
+                {
+                    tag = rawStr.Trim('\0', ' ');
+                }
             }
         }
 
@@ -288,28 +304,54 @@ public class TpmService
             return "Unknown";
         }
 
-        return tag.ToUpperInvariant() switch
+        var upper = tag.ToUpperInvariant();
+        var mapped = MapVendorTag(upper);
+        if (mapped != null) return mapped;
+
+        // Try little-endian reverse if 3-4 chars
+        if (upper.Length is 3 or 4)
         {
-            "IFX" => "Infineon Technologies (英飛凌)",
-            "INTC" => "Intel PTT (英特爾)",
-            "AMD" => "AMD fTPM (超微)",
-            "MSFT" => "Microsoft (微軟)",
-            "NTC" => "Nuvoton Technology (新唐科技)",
-            "STM" => "STMicroelectronics (意法半導體)",
-            "QCOM" => "Qualcomm (高通)",
-            "ATML" => "Atmel (愛特梅爾)",
-            "BRCM" => "Broadcom (博通)",
-            "SMSC" => "SMSC (微芯)",
-            "TI" => "Texas Instruments (德州儀器)",
-            "WEC" => "Winbond (華邦電子)",
-            "NSM" => "National Semiconductor",
-            "ETHZ" => "ETH Zürich",
-            "FSL" => "Freescale",
-            "GOOG" => "Google",
-            "HPE" => "HPE",
-            _ => tag
-        };
+            var reversed = new string(upper.Reverse().ToArray());
+            var revMapped = MapVendorTag(reversed);
+            if (revMapped != null) return revMapped;
+        }
+
+        // If tag is a plausible vendor acronym/name, return it rather than "Unknown"
+        if (tag.Length <= 10 && tag.All(c => char.IsLetterOrDigit(c) || c == '_' || c == '-' || c == ' '))
+        {
+            return tag;
+        }
+
+        return "Unknown";
     }
+
+    private static string? MapVendorTag(string tag) => tag switch
+    {
+        "IFX" => "Infineon Technologies (英飛凌)",
+        "INTC" => "Intel PTT (英特爾)",
+        "AMD" => "AMD fTPM (超微)",
+        "MSFT" => "Microsoft (微軟)",
+        "NTC" => "Nuvoton Technology (新唐科技)",
+        "STM" => "STMicroelectronics (意法半導體)",
+        "QCOM" => "Qualcomm (高通)",
+        "ATML" => "Atmel (愛特梅爾)",
+        "BRCM" => "Broadcom (博通)",
+        "SMSC" => "SMSC (微芯科技)",
+        "TI" => "Texas Instruments (德州儀器)",
+        "WEC" => "Winbond (華邦電子)",
+        "NSM" => "National Semiconductor (國家半導體)",
+        "ETHZ" => "ETH Zürich",
+        "FSL" => "Freescale (飛思卡爾)",
+        "GOOG" => "Google (谷歌 Titan)",
+        "HPE" => "Hewlett Packard Enterprise (慧與)",
+        "IBM" => "IBM",
+        "CSCO" => "Cisco (思科)",
+        "LEN" => "Lenovo (聯想)",
+        "DELL" => "Dell (戴爾)",
+        "HP" => "HP (惠普)",
+        "AAPL" or "APPLE" => "Apple (蘋果 Secure Enclave)",
+        _ => null
+    };
 
     private static string UnpackAscii(uint val)
     {
