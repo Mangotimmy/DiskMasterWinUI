@@ -1,81 +1,4 @@
-name: Build and Release Multi-Arch DiskMaster Pro
-
-on:
-  push:
-    branches: [ "main", "master" ]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
-      - 'LICENSE'
-    tags: 
-      - 'v*'
-  pull_request:
-    branches: [ "main", "master" ]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.gitignore'
-      - 'LICENSE'
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-jobs:
-  build:
-    name: Build ${{ matrix.target }}
-    runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [win-x64, win-arm64]
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v5
-
-    - name: Setup .NET SDK
-      uses: actions/setup-dotnet@v5
-      with:
-        dotnet-version: '9.0.x'
-
-    - name: Restore dependencies
-      shell: pwsh
-      run: dotnet restore DiskMasterWinUI.csproj -r ${{ matrix.target }}
-
-    - name: Build One-File Portable Executable (.EXE)
-      shell: pwsh
-      run: |
-        .\build_portable_singlefile.ps1 -Architecture ${{ matrix.target }}
-
-    - name: Build Windows Setup Installer (.EXE)
-      shell: pwsh
-      run: |
-        .\build_installer.ps1 -Architecture ${{ matrix.target }}
-
-    - name: Archive WinPE Portable Zip
-      shell: pwsh
-      run: |
-        Compress-Archive -Path publish/* -DestinationPath DiskMaster_${{ matrix.target }}_WinPE_Portable.zip
-
-    - name: Upload Binaries and Certificate Artifact
-      if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-      uses: actions/upload-artifact@v5
-      with:
-        name: DiskMaster-${{ matrix.target }}-Release
-        path: installer_output/*
-        if-no-files-found: error
-
-    - name: Upload Portable ZIP Artifact
-      if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-      uses: actions/upload-artifact@v5
-      with:
-        name: DiskMaster-${{ matrix.target }}-Zip
-        path: DiskMaster_${{ matrix.target }}_WinPE_Portable.zip
-        if-no-files-found: error
-
-  release:
+release:
     name: Create GitHub Release
     needs: build
     # 支援版本 Tag (v*) 或手動觸發 workflow_dispatch 發布
@@ -88,21 +11,63 @@ jobs:
     steps:
     - name: Download all artifacts
       uses: actions/download-artifact@v5
+      with:
+        path: downloaded_artifacts
+
+    - name: Prepare Release Directory and Resolve Name Conflicts
+      run: |
+        mkdir -p release_assets
+        
+        # 逐一處理各 Matrix 產物，為重複檔名（如憑證 .cer）加上架構字尾
+        for dir in downloaded_artifacts/*; do
+          if [ -d "$dir" ]; then
+            arch=$(echo "$dir" | sed -E 's/.*-(win-[^/]+)-.*/\1/')
+            for file in "$dir"/*; do
+              if [ -f "$file" ]; then
+                filename=$(basename "$file")
+                # 若為憑證檔，加上架構標籤避免覆蓋
+                if [[ "$filename" == *.cer ]]; {
+                  ext="${filename##*.}"
+                  base="${filename%.*}"
+                  mv "$file" "release_assets/${base}_${arch}.${ext}"
+                } else {
+                  mv "$file" "release_assets/"
+                }
+              fi
+            done
+          fi
+        done
 
     - name: Generate SHA256 Checksums
       run: |
-        echo "## SHA256 Checksums" > checksums_summary.md
-        echo '```' >> checksums_summary.md
-        find . -type f \( -name "*.exe" -o -name "*.zip" -o -name "*.cer" \) -exec sha256sum {} + | sed 's|./[^/]*/||' > SHA256SUMS.txt
+        cd release_assets
+        
+        # 1. 產生乾淨的 SHA256SUMS.txt
+        sha256sum * > SHA256SUMS.txt
+        
+        # 2. 產生 Markdown 格式摘要供 Release Body 使用
+        echo "## 🔒 SHA256 Checksums" > checksums_summary.md
+        echo '```text' >> checksums_summary.md
         cat SHA256SUMS.txt >> checksums_summary.md
         echo '```' >> checksums_summary.md
+
+    - name: Determine Tag Name for Release
+      id: get_tag
+      run: |
+        if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          echo "TAG_NAME=${github.ref_name}" >> $GITHUB_OUTPUT
+        else
+          # 手動觸發 (workflow_dispatch) 時，自動生成含時間戳的 Nightly Tag
+          echo "TAG_NAME=v1.0.0-manual-$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+        fi
 
     - name: Publish GitHub Release
       uses: softprops/action-gh-release@v2
       with:
+        tag_name: ${{ steps.get_tag.outputs.TAG_NAME }}
         files: |
-          DiskMaster-*-Release/*
-          DiskMaster-*-Zip/*.zip
-          SHA256SUMS.txt
-        body_path: checksums_summary.md
+          release_assets/*
+        body_path: release_assets/checksums_summary.md
         generate_release_notes: true
+        draft: false
+        prerelease: ${{ contains(steps.get_tag.outputs.TAG_NAME, 'manual') || contains(steps.get_tag.outputs.TAG_NAME, 'beta') || contains(steps.get_tag.outputs.TAG_NAME, 'rc') }}
