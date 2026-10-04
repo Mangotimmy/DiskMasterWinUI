@@ -31,6 +31,14 @@ jobs:
       matrix:
         target: [win-x64, win-arm64]
 
+    env:
+      # Optional GitHub Repository Secrets for official Authenticode signing
+      # If not configured, the builder automatically falls back to generating
+      # a dedicated self-signed Code Signing certificate and exports .cer
+      SIGNING_CERT_BASE64: ${{ secrets.SIGNING_CERT_BASE64 }}
+      SIGNING_CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
+      SIGNING_CERT_THUMBPRINT: ${{ secrets.SIGNING_CERT_THUMBPRINT }}
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v5
@@ -44,12 +52,12 @@ jobs:
       shell: pwsh
       run: dotnet restore DiskMasterWinUI.csproj -r ${{ matrix.target }}
 
-    - name: Build One-File Portable Executable (.EXE)
+    - name: Build and Sign True Single-File Portable Executable (.EXE)
       shell: pwsh
       run: |
         .\build_portable_singlefile.ps1 -Architecture ${{ matrix.target }}
 
-    - name: Build Windows Setup Installer (.EXE)
+    - name: Build and Sign Windows Setup Installer (.EXE)
       shell: pwsh
       run: |
         .\build_installer.ps1 -Architecture ${{ matrix.target }}
@@ -57,14 +65,15 @@ jobs:
     - name: Archive WinPE Portable Zip
       shell: pwsh
       run: |
-        Compress-Archive -Path publish/* -DestinationPath DiskMaster_${{ matrix.target }}_WinPE_Portable.zip
+        Compress-Archive -Path publish/* -DestinationPath "DiskMaster_${{ matrix.target }}_WinPE_Portable.zip" -Force
 
-    - name: Upload Binaries and Certificate Artifact
+    - name: Upload Binaries and Certificate Artifacts
       if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
       uses: actions/upload-artifact@v5
       with:
         name: DiskMaster-${{ matrix.target }}-Release
-        path: installer_output/*
+        path: |
+          installer_output/*
         if-no-files-found: error
 
     - name: Upload Portable ZIP Artifact
@@ -78,7 +87,6 @@ jobs:
   release:
     name: Create GitHub Release
     needs: build
-    # 支援版本 Tag (v*) 或手動觸發 workflow_dispatch 發布
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     
@@ -95,18 +103,25 @@ jobs:
       run: |
         mkdir -p release_assets
         
-        # 逐一處理各 Matrix 產物，為重複檔名（如憑證 .cer）加上架構字尾
+        # Process each matrix artifact folder
         for dir in downloaded_artifacts/*; do
           if [ -d "$dir" ]; then
             arch=$(echo "$dir" | sed -E 's/.*-(win-[^/]+)-.*/\1/')
             for file in "$dir"/*; do
               if [ -f "$file" ]; then
                 filename=$(basename "$file")
-                # 若為憑證檔，加上架構標籤避免覆蓋
+                # Append architecture suffix to .cer files to prevent collision
                 if [[ "$filename" == *.cer ]]; then
                   ext="${filename##*.}"
                   base="${filename%.*}"
-                  mv "$file" "release_assets/${base}_${arch}.${ext}"
+                  cp "$file" "release_assets/${base}_${arch}.${ext}"
+                  # Keep default certificate name if not yet copied
+                  if [ ! -f "release_assets/${filename}" ]; then
+                    cp "$file" "release_assets/${filename}"
+                  fi
+                elif [[ "$filename" == Install-Certificate.* ]]; then
+                  # Shared helper scripts
+                  cp "$file" "release_assets/"
                 else
                   mv "$file" "release_assets/"
                 fi
@@ -119,23 +134,26 @@ jobs:
       run: |
         cd release_assets
         
-        # 1. 產生乾淨的 SHA256SUMS.txt
+        # 1. Generate clean SHA256SUMS.txt
         sha256sum * > SHA256SUMS.txt
         
-        # 2. 產生 Markdown 格式摘要供 Release Body 使用
-        echo "## 🔒 SHA256 Checksums" > checksums_summary.md
+        # 2. Generate Markdown summary for Release notes
+        echo "## 🔒 SHA256 Checksums & Verification" > checksums_summary.md
         echo '```text' >> checksums_summary.md
         cat SHA256SUMS.txt >> checksums_summary.md
         echo '```' >> checksums_summary.md
+        echo "" >> checksums_summary.md
+        echo "### 🛡️ Code Signing Certificate Installation" >> checksums_summary.md
+        echo "If Windows SmartScreen or Unknown Publisher warning appears, run \`Install-Certificate.cmd\` or \`Install-Certificate.ps1\` as administrator to trust the certificate." >> checksums_summary.md
 
     - name: Determine Tag Name for Release
       id: get_tag
       run: |
         if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-          echo "TAG_NAME=${github.ref_name}" >> $GITHUB_OUTPUT
+          echo "TAG_NAME=${{ github.ref_name }}" >> $GITHUB_OUTPUT
         else
-          # 手動觸發 (workflow_dispatch) 時，自動生成含時間戳的 Nightly Tag
-          echo "TAG_NAME=v1.0.0-manual-$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+          # Fallback for manual workflow_dispatch runs
+          echo "TAG_NAME=v1.3.0-build-$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
         fi
 
     - name: Publish GitHub Release
@@ -147,4 +165,4 @@ jobs:
         body_path: release_assets/checksums_summary.md
         generate_release_notes: true
         draft: false
-        prerelease: ${{ contains(steps.get_tag.outputs.TAG_NAME, 'manual') || contains(steps.get_tag.outputs.TAG_NAME, 'beta') || contains(steps.get_tag.outputs.TAG_NAME, 'rc') }}
+        prerelease: ${{ contains(steps.get_tag.outputs.TAG_NAME, 'build') || contains(steps.get_tag.outputs.TAG_NAME, 'beta') || contains(steps.get_tag.outputs.TAG_NAME, 'rc') }}
