@@ -63,17 +63,25 @@ else {
 }
 
 # Trust certificate in current user root and trusted publisher to eliminate 'Unknown Publisher'
-try {
-    $rootStore = New-Object System.Security.Cryptography.X509Certificates.X509Store "Root", "CurrentUser"
-    $rootStore.Open("ReadWrite")
-    $rootStore.Add($cert)
-    $rootStore.Close()
+if ($env:GITHUB_ACTIONS -ne 'true') {
+    try {
+        $rootStore = New-Object System.Security.Cryptography.X509Certificates.X509Store "Root", "CurrentUser"
+        $rootStore.Open("ReadWrite")
+        $rootStore.Add($cert)
+        $rootStore.Close()
 
-    $pubStore = New-Object System.Security.Cryptography.X509Certificates.X509Store "TrustedPublisher", "CurrentUser"
-    $pubStore.Open("ReadWrite")
-    $pubStore.Add($cert)
-    $pubStore.Close()
-    Write-Host "Registered certificate in CurrentUser Root and TrustedPublisher stores." -ForegroundColor Green
+        $pubStore = New-Object System.Security.Cryptography.X509Certificates.X509Store "TrustedPublisher", "CurrentUser"
+        $pubStore.Open("ReadWrite")
+        $pubStore.Add($cert)
+        $pubStore.Close()
+        Write-Host "Registered certificate in CurrentUser Root and TrustedPublisher stores." -ForegroundColor Green
+    }
+    catch {
+        Write-Warning "Could not register certificate to TrustedPublisher: $_"
+    }
+}
+else {
+    Write-Host "CI Environment detected: Skipping Root store registration to prevent interactive security prompts." -ForegroundColor Yellow
 }
 catch {
     Write-Warning "Could not register certificate to TrustedPublisher: $_"
