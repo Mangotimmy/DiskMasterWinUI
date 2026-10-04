@@ -65,8 +65,7 @@ public class RufusDownloadService
         {
             Path.Combine(AppContext.BaseDirectory, "Scripts", "Fido.ps1"),
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Scripts", "Fido.ps1"),
-            Path.Combine(Directory.GetCurrentDirectory(), "Scripts", "Fido.ps1"),
-            Path.Combine(Directory.GetCurrentDirectory(), "Fido_full.ps1")
+            Path.Combine(Directory.GetCurrentDirectory(), "Scripts", "Fido.ps1")
         };
 
         foreach (var path in possiblePaths)
