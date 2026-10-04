@@ -1,4 +1,81 @@
-release:
+name: Build and Release Multi-Arch DiskMaster Pro
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+    tags: 
+      - 'v*'
+  pull_request:
+    branches: [ "main", "master" ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [win-x64, win-arm64]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Restore dependencies
+      shell: pwsh
+      run: dotnet restore DiskMasterWinUI.csproj -r ${{ matrix.target }}
+
+    - name: Build One-File Portable Executable (.EXE)
+      shell: pwsh
+      run: |
+        .\build_portable_singlefile.ps1 -Architecture ${{ matrix.target }}
+
+    - name: Build Windows Setup Installer (.EXE)
+      shell: pwsh
+      run: |
+        .\build_installer.ps1 -Architecture ${{ matrix.target }}
+
+    - name: Archive WinPE Portable Zip
+      shell: pwsh
+      run: |
+        Compress-Archive -Path publish/* -DestinationPath DiskMaster_${{ matrix.target }}_WinPE_Portable.zip
+
+    - name: Upload Binaries and Certificate Artifact
+      if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+      uses: actions/upload-artifact@v5
+      with:
+        name: DiskMaster-${{ matrix.target }}-Release
+        path: installer_output/*
+        if-no-files-found: error
+
+    - name: Upload Portable ZIP Artifact
+      if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+      uses: actions/upload-artifact@v5
+      with:
+        name: DiskMaster-${{ matrix.target }}-Zip
+        path: DiskMaster_${{ matrix.target }}_WinPE_Portable.zip
+        if-no-files-found: error
+
+  release:
     name: Create GitHub Release
     needs: build
     # 支援版本 Tag (v*) 或手動觸發 workflow_dispatch 發布
@@ -26,13 +103,13 @@ release:
               if [ -f "$file" ]; then
                 filename=$(basename "$file")
                 # 若為憑證檔，加上架構標籤避免覆蓋
-                if [[ "$filename" == *.cer ]]; {
+                if [[ "$filename" == *.cer ]]; then
                   ext="${filename##*.}"
                   base="${filename%.*}"
                   mv "$file" "release_assets/${base}_${arch}.${ext}"
-                } else {
+                else
                   mv "$file" "release_assets/"
-                }
+                fi
               fi
             done
           fi
