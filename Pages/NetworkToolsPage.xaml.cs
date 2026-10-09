@@ -126,4 +126,13 @@ public sealed partial class NetworkToolsPage : Page
             await ViewModel.DeletePortMappingCommand.ExecuteAsync(item);
         }
     }
+
+    private async void OpenSmartDiagDialog_Click(object sender, RoutedEventArgs e)
+    {
+        var dlg = new Controls.SmartNetworkDiagnosticDialog
+        {
+            XamlRoot = this.XamlRoot
+        };
+        await dlg.ShowAsync();
+    }
 }

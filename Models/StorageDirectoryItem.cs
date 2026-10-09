@@ -27,6 +27,9 @@ public partial class StorageDirectoryItem : ObservableObject
     [ObservableProperty] private long _sizeBytes;
     [ObservableProperty] private int _itemCount;
     public int FileCount { get => ItemCount; set => ItemCount = value; }
+    [ObservableProperty] private int _directoryCount;
+    [ObservableProperty] private double _usedPercentage;
+    [ObservableProperty] private string _percentageDisplay = "";
     [ObservableProperty] private bool _isCalculated;
     [ObservableProperty] private bool _isCalculating;
     [ObservableProperty] private bool _exists;

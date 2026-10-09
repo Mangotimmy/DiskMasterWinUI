@@ -55,9 +55,49 @@ public partial class NetworkToolsViewModel : ObservableObject
     [ObservableProperty] private string _newHostDomain = "";
     [ObservableProperty] private string _newHostComment = "";
 
+    // ── 5. NetShare & File Sharing Wizard ──
+    private readonly NetShareService _netShareService = new();
+    public ObservableCollection<NetShareItem> NetShares { get; } = new();
+    [ObservableProperty] private string _newShareName = "SharedFolder";
+    [ObservableProperty] private string _newSharePath = @"C:\Share";
+    [ObservableProperty] private string _newShareRemark = "DiskMaster LAN Share";
+    [ObservableProperty] private string _dedicatedUserName = "ShareUser";
+    [ObservableProperty] private string _dedicatedUserPassword = "Password123!";
+    [ObservableProperty] private bool _isMsAccountPolicyFixed;
+    [ObservableProperty] private string _netShareStatusMessage = "";
+
+    // ── 6. Remote Desktop (RDP Server) ──
+    private readonly RdpServerService _rdpService = new();
+    [ObservableProperty] private RdpStatusInfo _rdpStatus = new();
+    public ObservableCollection<RdpSessionItem> RdpSessions { get; } = new();
+    [ObservableProperty] private string _rdpStatusMessage = "";
+
+    // ── 7. CMD CLI Network Tools (Ping, Netstat, OpenFiles, Nbtstat) ──
+    private readonly CliToolsService _cliToolsService = new();
+    [ObservableProperty] private PingOptionsModel _pingOptions = new();
+    [ObservableProperty] private string _pingOutputLog = "";
+    [ObservableProperty] private bool _isPinging;
+    [ObservableProperty] private int _detectedMtu = 1500;
+    [ObservableProperty] private bool _isDetectingMtu;
+
+    public ObservableCollection<NetstatConnectionItem> NetstatConnections { get; } = new();
+    [ObservableProperty] private int? _filterPort;
+    [ObservableProperty] private bool _isLoadingNetstat;
+
+    public ObservableCollection<OpenSharedFileItem> OpenFiles { get; } = new();
+    [ObservableProperty] private bool _isLoadingOpenFiles;
+
+    // ── 8. DNS Pollution Detection & Anti-Pollution ──
+    private readonly DnsPollutionService _dnsPollutionService = new();
+    public ObservableCollection<DnsPollutionItem> PollutionResults { get; } = new();
+    [ObservableProperty] private string _testPollutionDomain = "github.com";
+    [ObservableProperty] private bool _isTestingPollution;
+
     public NetworkToolsViewModel()
     {
         LocalIpAddress = _upnpService.GetLocalIpAddress();
+        IsMsAccountPolicyFixed = _netShareService.IsMicrosoftAccountSharingPolicyFixed();
+        RdpStatus = _rdpService.GetStatus();
         foreach (var preset in UpnpService.GetGamePresets())
         {
             GamePresets.Add(preset);
@@ -505,5 +545,274 @@ public partial class NetworkToolsViewModel : ObservableObject
         {
             IsLoadingHosts = false;
         }
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  5. NetShare & File Sharing Commands
+    // ══════════════════════════════════════════════════════════
+
+    [RelayCommand]
+    public async Task RefreshSharesAsync()
+    {
+        try
+        {
+            var shares = await _netShareService.GetActiveSharesAsync();
+            NetShares.Clear();
+            foreach (var s in shares) NetShares.Add(s);
+            IsMsAccountPolicyFixed = _netShareService.IsMicrosoftAccountSharingPolicyFixed();
+            NetShareStatusMessage = $"已列出 {NetShares.Count} 個共用資源";
+        }
+        catch (Exception ex)
+        {
+            NetShareStatusMessage = $"讀取共用失敗: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    public async Task CreateShareAsync()
+    {
+        var (ok, msg, uncIp, uncHost) = await _netShareService.CreateShareAsync(NewShareName, NewSharePath, "FULL", NewShareRemark);
+        NetShareStatusMessage = msg;
+        if (ok)
+        {
+            AudioFeedbackService.PlaySuccess();
+            await RefreshSharesAsync();
+        }
+        else
+        {
+            AudioFeedbackService.PlayError();
+        }
+    }
+
+    [RelayCommand]
+    public async Task DeleteShareAsync(NetShareItem? item)
+    {
+        if (item == null) return;
+        var (ok, msg) = await _netShareService.DeleteShareAsync(item.ShareName);
+        NetShareStatusMessage = msg;
+        if (ok) await RefreshSharesAsync();
+    }
+
+    [RelayCommand]
+    public void FixMsAccountPolicy()
+    {
+        var (ok, msg) = _netShareService.FixMicrosoftAccountSharingPolicy();
+        IsMsAccountPolicyFixed = _netShareService.IsMicrosoftAccountSharingPolicyFixed();
+        NetShareStatusMessage = msg;
+        if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+    }
+
+    [RelayCommand]
+    public async Task SetPrivateNetworkAsync()
+    {
+        var (ok, msg) = await _netShareService.SetNetworkProfilePrivateAsync();
+        NetShareStatusMessage = msg;
+    }
+
+    [RelayCommand]
+    public async Task EnableSharingFirewallAsync()
+    {
+        var (ok, msg) = await _netShareService.EnableFileSharingFirewallAsync();
+        NetShareStatusMessage = msg;
+        if (ok) AudioFeedbackService.PlaySuccess();
+    }
+
+    [RelayCommand]
+    public async Task CreateDedicatedUserAsync()
+    {
+        var (ok, msg) = await _netShareService.CreateDedicatedShareUserAsync(DedicatedUserName, DedicatedUserPassword);
+        NetShareStatusMessage = msg;
+        if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  6. Remote Desktop (RDP Server) Commands
+    // ══════════════════════════════════════════════════════════
+
+    [RelayCommand]
+    public async Task RefreshRdpStatusAsync()
+    {
+        RdpStatus = _rdpService.GetStatus();
+        var sessions = await _rdpService.GetActiveSessionsAsync();
+        RdpSessions.Clear();
+        foreach (var s in sessions) RdpSessions.Add(s);
+        RdpStatusMessage = $"RDP 狀態已更新 ({RdpStatus.EditionName})";
+    }
+
+    [RelayCommand]
+    public async Task EnableRdpAsync()
+    {
+        RdpStatusMessage = "正在啟用遠端桌面並設定防火牆與服務...";
+        var (ok, msg) = await _rdpService.EnableRdpServerAsync(RdpStatus.IsHomeEdition);
+        RdpStatusMessage = msg;
+        if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+        await RefreshRdpStatusAsync();
+    }
+
+    [RelayCommand]
+    public async Task DisableRdpAsync()
+    {
+        var (ok, msg) = await _rdpService.DisableRdpServerAsync();
+        RdpStatusMessage = msg;
+        await RefreshRdpStatusAsync();
+    }
+
+    [RelayCommand]
+    public void LaunchRdpLoopback()
+    {
+        _rdpService.LaunchLoopbackTest();
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  7. CMD CLI Network Tools Commands (Ping, Netstat, OpenFiles, Nbtstat)
+    // ══════════════════════════════════════════════════════════
+
+    [RelayCommand]
+    public async Task RunPingAsync()
+    {
+        if (IsPinging) return;
+        IsPinging = true;
+        PingOutputLog = "";
+        try
+        {
+            await _cliToolsService.RunPingAsync(PingOptions, line =>
+            {
+                DispatcherHelper.UIDispatcher?.TryEnqueue(() =>
+                {
+                    PingOutputLog += line + "\r\n";
+                });
+            });
+        }
+        finally
+        {
+            IsPinging = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task DetectMtuAsync()
+    {
+        if (IsDetectingMtu) return;
+        IsDetectingMtu = true;
+        PingOutputLog += $"[MTU] 開始探測 {PingOptions.TargetHost} 最佳路徑 MTU...\r\n";
+        try
+        {
+            var (mtu, summary) = await _cliToolsService.DetectPathMtuAsync(PingOptions.TargetHost, line =>
+            {
+                DispatcherHelper.UIDispatcher?.TryEnqueue(() =>
+                {
+                    PingOutputLog += line + "\r\n";
+                });
+            });
+            DetectedMtu = mtu;
+        }
+        finally
+        {
+            IsDetectingMtu = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task RefreshNetstatAsync()
+    {
+        IsLoadingNetstat = true;
+        try
+        {
+            var list = await _cliToolsService.GetActiveConnectionsAsync(FilterPort);
+            NetstatConnections.Clear();
+            foreach (var c in list) NetstatConnections.Add(c);
+            StatusMessage = $"連線清單已更新：共 {NetstatConnections.Count} 條記錄";
+        }
+        finally
+        {
+            IsLoadingNetstat = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task KillPortOccupantAsync(int? port)
+    {
+        int p = port ?? FilterPort ?? 0;
+        if (p <= 0) return;
+        var (ok, msg) = await _cliToolsService.KillProcessHoldingPortAsync(p);
+        StatusMessage = msg;
+        if (ok) AudioFeedbackService.PlaySuccess();
+        await RefreshNetstatAsync();
+    }
+
+    [RelayCommand]
+    public async Task RefreshOpenFilesAsync()
+    {
+        IsLoadingOpenFiles = true;
+        try
+        {
+            var list = await _cliToolsService.GetOpenSharedFilesAsync();
+            OpenFiles.Clear();
+            foreach (var f in list) OpenFiles.Add(f);
+            StatusMessage = $"遠端鎖定檔案清單已更新：共 {OpenFiles.Count} 筆";
+        }
+        finally
+        {
+            IsLoadingOpenFiles = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task DisconnectOpenFileAsync(OpenSharedFileItem? item)
+    {
+        if (item == null) return;
+        var (ok, msg) = await _cliToolsService.DisconnectOpenFileAsync(item.Id);
+        StatusMessage = msg;
+        await RefreshOpenFilesAsync();
+    }
+
+    [RelayCommand]
+    public async Task FlushNetBiosAsync()
+    {
+        var (ok, msg) = await _cliToolsService.FlushAndRefreshNetBiosCacheAsync();
+        StatusMessage = msg;
+        if (ok) AudioFeedbackService.PlaySuccess();
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  8. DNS Pollution Detection & Anti-Pollution Commands
+    // ══════════════════════════════════════════════════════════
+
+    [RelayCommand]
+    public async Task TestPollutionAsync()
+    {
+        if (IsTestingPollution) return;
+        IsTestingPollution = true;
+        PollutionResults.Clear();
+        try
+        {
+            var domain = string.IsNullOrWhiteSpace(TestPollutionDomain) ? "github.com" : TestPollutionDomain.Trim();
+            var res = await _dnsPollutionService.CheckDomainPollutionAsync(domain);
+            PollutionResults.Add(res);
+
+            // Also test default major domains if none specified
+            if (string.IsNullOrWhiteSpace(TestPollutionDomain))
+            {
+                foreach (var d in DnsPollutionService.DefaultTestDomains.Skip(1))
+                {
+                    var r = await _dnsPollutionService.CheckDomainPollutionAsync(d);
+                    PollutionResults.Add(r);
+                }
+            }
+
+            StatusMessage = "DNS 污染檢測分析完成！";
+        }
+        finally
+        {
+            IsTestingPollution = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task ConfigureWindowsDoHAsync()
+    {
+        var (ok, msg) = await _dnsPollutionService.ConfigureWindowsDoHAsync();
+        StatusMessage = msg;
+        if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
     }
 }

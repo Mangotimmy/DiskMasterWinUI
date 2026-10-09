@@ -67,6 +67,25 @@ public class NetworkDiagnosticService
     }
 
     /// <summary>
+    /// Synchronously pings a host or IP and returns roundtrip latency in ms (-1 on failure).
+    /// </summary>
+    public static long PingHost(string hostOrIp, int timeoutMs = 1500)
+    {
+        if (string.IsNullOrWhiteSpace(hostOrIp)) return -1;
+        try
+        {
+            using var ping = new Ping();
+            var reply = ping.Send(hostOrIp, timeoutMs);
+            if (reply.Status == IPStatus.Success)
+            {
+                return reply.RoundtripTime;
+            }
+        }
+        catch { }
+        return -1;
+    }
+
+    /// <summary>
     /// Checks whether the network interface is a virtual adapter (VPN, Tailscale, WSL, VM, etc.).
     /// </summary>
     public static bool IsVirtualAdapter(NetworkInterface ni)
@@ -83,21 +102,15 @@ public class NetworkDiagnosticService
         string nameLower = ni.Name.ToLowerInvariant();
         string descLower = ni.Description.ToLowerInvariant();
 
-        return nameLower.Contains("tailscale") || nameLower.Contains("tap") ||
-               nameLower.Contains("tun") || nameLower.Contains("vpn") ||
-               nameLower.Contains("wsl") || nameLower.Contains("hyper-v") ||
-               nameLower.Contains("vethernet") || nameLower.Contains("vmware") ||
-               nameLower.Contains("vmnet") || nameLower.Contains("virtual") ||
-               nameLower.Contains("pseudo") || nameLower.Contains("bluetooth") ||
-               nameLower.Contains("npcap") || nameLower.Contains("pcap") ||
-               nameLower.Contains("filter") || nameLower.Contains("ndis") ||
-               nameLower.Contains("multiplexor") ||
-               descLower.Contains("tailscale") || descLower.Contains("tap") ||
-               descLower.Contains("tun") || descLower.Contains("vpn") ||
-               descLower.Contains("wsl") || descLower.Contains("hyper-v") ||
-               descLower.Contains("virtual") || descLower.Contains("pseudo") ||
-               descLower.Contains("bluetooth") || descLower.Contains("vmware") ||
-               descLower.Contains("npcap") || descLower.Contains("filter");
+        string[] virtualKeywords =
+        [
+            "tailscale", "tap", "tun", "vpn", "wsl", "hyper-v", "vethernet",
+            "vmware", "vmnet", "virtual", "pseudo", "bluetooth", "npcap", "pcap",
+            "filter", "ndis", "multiplexor", "docker", "container", "wireguard",
+            "zerotier", "hamachi", "radmin", "vbox", "virtualbox", "teredo", "isatap"
+        ];
+
+        return virtualKeywords.Any(k => nameLower.Contains(k) || descLower.Contains(k));
     }
 
     /// <summary>
@@ -210,7 +223,12 @@ public class NetworkDiagnosticService
             var result = new List<NetworkAdapterItem>();
             result.AddRange(physicalWithGw);
             result.AddRange(physicalWithoutGw);
-            result.AddRange(virtualAdapters);
+
+            // Only add virtual adapters if no physical adapters exist at all (e.g. VM sandbox fallback)
+            if (result.Count == 0)
+            {
+                result.AddRange(virtualAdapters);
+            }
 
             // Ensure exactly one is marked primary
             if (result.Count > 0 && !result.Any(r => r.IsPrimary))

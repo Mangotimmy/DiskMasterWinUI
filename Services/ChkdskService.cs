@@ -103,6 +103,26 @@ public class ChkdskService
         return code;
     }
 
+    /// <summary>Turbo online scan using maximum system resources to finish as quickly as possible</summary>
+    public async Task<int> ScanWithPerfAsync(string drive, Action<string> onOutput, CancellationToken ct = default)
+    {
+        var cleanDrive = drive.TrimEnd(':', '\\') + ":";
+        onOutput($"[{DateTime.Now:HH:mm:ss}] Starting chkdsk {cleanDrive} /scan /perf (High-Performance Turbo Scan)...");
+        var code = await RunStreamingProcessAsync("chkdsk.exe", $"{cleanDrive} /scan /perf", onOutput, ct);
+        onOutput($"[{DateTime.Now:HH:mm:ss}] chkdsk /scan /perf finished with exit code {code}.");
+        return code;
+    }
+
+    /// <summary>Offline scan and fix</summary>
+    public async Task<int> OfflineScanAndFixAsync(string drive, Action<string> onOutput, CancellationToken ct = default)
+    {
+        var cleanDrive = drive.TrimEnd(':', '\\') + ":";
+        onOutput($"[{DateTime.Now:HH:mm:ss}] Starting chkdsk {cleanDrive} /offlinescanandfix...");
+        var code = await RunStreamingProcessAsync("chkdsk.exe", $"{cleanDrive} /offlinescanandfix", onOutput, ct);
+        onOutput($"[{DateTime.Now:HH:mm:ss}] chkdsk /offlinescanandfix finished with exit code {code}.");
+        return code;
+    }
+
     /// <summary>Query dirty bit status of a volume</summary>
     public async Task<string> QueryDirtyBitAsync(string drive)
     {
@@ -116,6 +136,14 @@ public class ChkdskService
     {
         var cleanDrive = drive.TrimEnd(':', '\\') + ":";
         var (output, err, code) = await Helpers.ProcessHelper.RunProcessAsync("chkntfs.exe", $"/c {cleanDrive}");
+        return string.IsNullOrWhiteSpace(output) ? err : output.Trim();
+    }
+
+    /// <summary>Cancel scheduled chkdsk check on next system reboot</summary>
+    public async Task<string> CancelBootCheckAsync(string drive)
+    {
+        var cleanDrive = drive.TrimEnd(':', '\\') + ":";
+        var (output, err, code) = await Helpers.ProcessHelper.RunProcessAsync("chkntfs.exe", $"/x {cleanDrive}");
         return string.IsNullOrWhiteSpace(output) ? err : output.Trim();
     }
 }

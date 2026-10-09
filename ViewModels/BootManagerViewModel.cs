@@ -10,6 +10,7 @@ namespace DiskMasterWinUI.ViewModels;
 public partial class BootManagerViewModel : ObservableObject
 {
     private readonly BcdManagerService _bcdService = new();
+    private readonly WinReRecoveryService _winReService = new();
 
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private string _statusMessage = "Ready";
@@ -18,6 +19,13 @@ public partial class BootManagerViewModel : ObservableObject
     [ObservableProperty] private string _editDescriptionText = "";
     [ObservableProperty] private int _timeoutSeconds = 30;
     [ObservableProperty] private bool _isModernMenuPolicy = true;
+
+    // WinRE Recovery Environment Manager
+    [ObservableProperty] private WinReStatusInfo _winReStatus = new();
+    [ObservableProperty] private string _winReOperationStatus = "準備就緒";
+    [ObservableProperty] private int _winReDiskNumber = 0;
+    [ObservableProperty] private int _winRePartitionSizeMB = 1000;
+    [ObservableProperty] private string _winReCustomImageLocation = "";
 
     // Build New Boot Partition Wizard
     [ObservableProperty] private string _newBootSourcePath = @"C:\Windows";
@@ -503,6 +511,141 @@ public partial class BootManagerViewModel : ObservableObject
     public void OpenTpmMsc()
     {
         _tpmService.OpenTpmManagementConsole();
+    }
+
+    [RelayCommand]
+    public async Task RefreshWinReStatusAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            WinReOperationStatus = "正在探測 Windows RE (WinRE) 修復環境狀態...";
+            WinReStatus = await _winReService.GetStatusAsync();
+            WinReOperationStatus = WinReStatus.IsEnabled ? "Windows RE 已啟用" : "Windows RE 目前為停用狀態";
+        }
+        catch (Exception ex)
+        {
+            WinReOperationStatus = $"WinRE 查詢失敗: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task EnableWinReAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            WinReOperationStatus = "正在啟用 Windows RE (reagentc /enable)...";
+            var (ok, msg) = await _winReService.EnableWinReAsync();
+            WinReOperationStatus = msg;
+            if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+            await RefreshWinReStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            WinReOperationStatus = $"啟用失敗: {ex.Message}";
+            AudioFeedbackService.PlayError();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task DisableWinReAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            WinReOperationStatus = "正在停用 Windows RE (reagentc /disable)...";
+            var (ok, msg) = await _winReService.DisableWinReAsync();
+            WinReOperationStatus = msg;
+            if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+            await RefreshWinReStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            WinReOperationStatus = $"停用失敗: {ex.Message}";
+            AudioFeedbackService.PlayError();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task BootToWinReAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            WinReOperationStatus = "正在設定重開機導向 WinRE 修復模式 (reagentc /boottore)...";
+            var (ok, msg) = await _winReService.BootToRecoveryEnvironmentAsync();
+            WinReOperationStatus = msg;
+            if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+        }
+        catch (Exception ex)
+        {
+            WinReOperationStatus = $"設定開機修復失敗: {ex.Message}";
+            AudioFeedbackService.PlayError();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task SetReimagePathAsync()
+    {
+        if (string.IsNullOrWhiteSpace(WinReCustomImageLocation)) return;
+        try
+        {
+            IsLoading = true;
+            WinReOperationStatus = $"正在重新配置 WinRE 映像路徑: {WinReCustomImageLocation}...";
+            var (ok, msg) = await _winReService.SetReimagePathAsync(WinReCustomImageLocation);
+            WinReOperationStatus = msg;
+            if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+            await RefreshWinReStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            WinReOperationStatus = $"配置失敗: {ex.Message}";
+            AudioFeedbackService.PlayError();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task CreateDedicatedRecoveryPartitionAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            WinReOperationStatus = $"正在磁碟 {WinReDiskNumber} 建立 {WinRePartitionSizeMB} MB 專用修復分割區...";
+            var (ok, msg) = await _winReService.CreateDedicatedRecoveryPartitionAsync(WinReDiskNumber, WinRePartitionSizeMB);
+            WinReOperationStatus = msg;
+            if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+            await RefreshWinReStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            WinReOperationStatus = $"建立修復磁區失敗: {ex.Message}";
+            AudioFeedbackService.PlayError();
+        }
+        finally
+        {
+            IsLoading = false;
+        }
     }
 }
 

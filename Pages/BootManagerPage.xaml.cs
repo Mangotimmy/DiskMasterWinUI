@@ -202,6 +202,13 @@ public sealed partial class BootManagerPage : Page
             "ja-JP" => "詳細ブートフラグと診断 (Advanced Boot Flags)",
             _ => "進階開機旗標與診斷開機 (Advanced Boot Flags)"
         };
+        TabWinRe.Header = lang switch
+        {
+            "zh-CN" => "🩹 Windows 修复环境 (WinRE)",
+            "en-US" => "🩹 Windows Recovery (WinRE)",
+            "ja-JP" => "🩹 Windows 回復環境 (WinRE)",
+            _ => "🩹 Windows 修復環境 (WinRE)"
+        };
     }
 
     private async void Page_Loaded(object sender, RoutedEventArgs e)
@@ -210,6 +217,7 @@ public sealed partial class BootManagerPage : Page
         await ViewModel.RefreshEntriesCommand.ExecuteAsync(null);
         await ViewModel.LoadSafeBootConfigCommand.ExecuteAsync(null);
         await ViewModel.LoadTpmStatusCommand.ExecuteAsync(null);
+        await ViewModel.RefreshWinReStatusCommand.ExecuteAsync(null);
     }
     private void AddToBcd_Click(object sender, RoutedEventArgs e)
     {

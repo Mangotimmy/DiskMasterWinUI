@@ -5,21 +5,21 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="using:DiskMasterWinUI.Models"
     xmlns:vm="using:DiskMasterWinUI.ViewModels"
     mc:Ignorable="d">
 
-    <Grid Padding="24" RowSpacing="16">
+    <Grid Padding="16" RowSpacing="12">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- ═══ Top Path Selection & Elevation ═══ -->
+        <!-- ═══ Top Path Selection & Elevation Bar ═══ -->
         <Grid Grid.Row="0" ColumnSpacing="12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
@@ -31,7 +31,11 @@
             <Button x:Name="BrowseFolderBtn" Grid.Column="1" Content="📁 Browse Folder" VerticalAlignment="Bottom"
                     Click="BrowseFolder_Click" />
 
-            <InfoBar x:Name="AdminInfoBar" Grid.Column="2" IsOpen="{x:Bind ViewModel.IsAdmin, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}"
+            <Button Grid.Column="2" Content="🔍 深度探測 NTFS" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Bottom"
+                    Command="{x:Bind ViewModel.InspectNtfsFeaturesCommand}"
+                    IsEnabled="{x:Bind ViewModel.IsSummaryLoading, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}" />
+
+            <InfoBar x:Name="AdminInfoBar" Grid.Column="3" IsOpen="{x:Bind ViewModel.IsAdmin, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}"
                      Severity="Warning" Title="Not Admin" IsClosable="False"
                      Message="Taking ownership and modifying ACLs requires Administrator." VerticalAlignment="Bottom">
                 <InfoBar.ActionButton>
@@ -40,137 +44,393 @@
             </InfoBar>
         </Grid>
 
-        <!-- ═══ Quick Batch Presets ═══ -->
-        <Border Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                CornerRadius="8" Padding="16">
-            <StackPanel Spacing="12">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE72E;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                    <TextBlock x:Name="BatchPresetsTitle" Text="Quick Batch Presets (Recursive /T /C)" Style="{StaticResource BodyStrongTextBlockStyle}" FontSize="15" />
-                </StackPanel>
+        <!-- ═══ Movable Sub TabView ═══ -->
+        <TabView x:Name="NtfsTabView" Grid.Row="1"
+                 CanReorderTabs="True" CanDragTabs="True"
+                 IsAddTabButtonVisible="False">
+            <TabView.TabItems>
 
-                <Grid ColumnSpacing="12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
+                <!-- ════ Tab 1: 常用快捷操作 (Quick Actions) ════ -->
+                <TabViewItem x:Name="TabQuickActions" Header="⚡ 常用快捷操作 (Quick Actions)" IsClosable="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                        <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
+                            
+                            <!-- Presets Grid -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE72E;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        <TextBlock x:Name="BatchPresetsTitle" Text="Quick Batch Presets (Recursive /T /C)" Style="{StaticResource BodyStrongTextBlockStyle}" FontSize="15" />
+                                    </StackPanel>
 
-                    <Button Grid.Column="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Command="{x:Bind ViewModel.ApplyTakeOwnershipCommand}"
-                            IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}">
-                        <StackPanel Spacing="2">
-                            <TextBlock x:Name="TakeOwnershipTitle" Text="🛡️ 取得擁有權" FontWeight="SemiBold" />
-                            <TextBlock x:Name="TakeOwnershipDesc" Text="修復「存取被拒」問題" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <Grid ColumnSpacing="12" RowSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <Button Grid.Row="0" Grid.Column="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                                Command="{x:Bind ViewModel.ApplyTakeOwnershipCommand}"
+                                                IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}" Padding="12">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock x:Name="TakeOwnershipTitle" Text="🛡️ 取得擁有權 (Take Ownership)" FontWeight="SemiBold" />
+                                                <TextBlock x:Name="TakeOwnershipDesc" Text="透過 takeown /F 搶回所有權，修復「存取被拒」" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                        </Button>
+
+                                        <Button Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                                Command="{x:Bind ViewModel.ApplyGrantEveryoneCommand}"
+                                                IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}" Padding="12">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock x:Name="GrantEveryoneTitle" Text="👥 賦予所有人權限 (Grant Everyone)" FontWeight="SemiBold" />
+                                                <TextBlock x:Name="GrantEveryoneDesc" Text="賦予 Everyone 讀寫完全控制 (F) 權限" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                        </Button>
+
+                                        <Button Grid.Row="1" Grid.Column="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                                Command="{x:Bind ViewModel.RemoveDenyAclsCommand}"
+                                                IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}" Padding="12">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="🚫 清除 DENY 拒絕存取規則 (Remove Deny ACLs)" FontWeight="SemiBold" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                                                <TextBlock Text="清除覆蓋優先的拒絕規則，解決管理員依然無法讀寫的問題" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                        </Button>
+
+                                        <Button Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                                Command="{x:Bind ViewModel.UnblockZoneIdentifierCommand}"
+                                                IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}" Padding="12">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="🌐 解除網路下載鎖定 (Unblock Zone.Identifier)" FontWeight="SemiBold" />
+                                                <TextBlock Text="清除 Alternate Data Stream 網路危險標記，解除 SmartScreen 封鎖" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                        </Button>
+
+                                        <Button Grid.Row="2" Grid.Column="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                                Command="{x:Bind ViewModel.ApplyResetDefaultsCommand}"
+                                                IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}" Padding="12">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock x:Name="ResetDefaultsTitle" Text="🔄 重設為預設繼承 (Reset Inheritance)" FontWeight="SemiBold" />
+                                                <TextBlock x:Name="ResetDefaultsDesc" Text="清除所有自訂權限，重設繼承上層目錄 ACL 規則" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                        </Button>
+
+                                        <Button Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                                Command="{x:Bind ViewModel.ApplyStrictAdminOnlyCommand}"
+                                                IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}" Padding="12">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock x:Name="AdminOnlyTitle" Text="🔒 僅限管理員與 SYSTEM (Strict Admin Only)" FontWeight="SemiBold" />
+                                                <TextBlock x:Name="AdminOnlyDesc" Text="移除所有一般使用者，僅保留 Administrators 與 SYSTEM" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- ACL Backup & Restore Card -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE753;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        <TextBlock Text="安全描述元備份與還原 (ACL Backup &amp; Restore)" Style="{StaticResource BodyStrongTextBlockStyle}" FontSize="15" />
+                                    </StackPanel>
+                                    <TextBlock Text="使用 icacls /save 與 /restore 完整備份或套用目錄結構之安全性存取控制清單 (DACL)。"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0" Header="備份存檔檔案路徑"
+                                                 Text="{x:Bind ViewModel.AclBackupPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 PlaceholderText="例如 C:\AclBackup.txt" />
+                                        <Button Grid.Column="1" Content="💾 備份 ACL (/save)" VerticalAlignment="Bottom"
+                                                Command="{x:Bind ViewModel.BackupAclsCommand}"
+                                                IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}" />
+                                        <Button Grid.Column="2" Content="📥 還原 ACL (/restore)" VerticalAlignment="Bottom"
+                                                Command="{x:Bind ViewModel.RestoreAclsCommand}"
+                                                IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
                         </StackPanel>
-                    </Button>
+                    </ScrollViewer>
+                </TabViewItem>
 
-                    <Button Grid.Column="1" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Command="{x:Bind ViewModel.ApplyGrantEveryoneCommand}"
-                            IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}">
-                        <StackPanel Spacing="2">
-                            <TextBlock x:Name="GrantEveryoneTitle" Text="👥 賦予所有人權限" FontWeight="SemiBold" />
-                            <TextBlock x:Name="GrantEveryoneDesc" Text="完全讀寫控制存取權" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <!-- ════ Tab 2: NTFS 深度特性探索 (NTFS Explorer) ════ -->
+                <TabViewItem x:Name="TabNtfsExplorer" Header="🔍 NTFS 深度特性探索" IsClosable="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                        <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
+
+                            <!-- Status & Quick Stats Overview -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="📁 檔案系統進階屬性 (NTFS Attributes)" Style="{StaticResource SubtitleTextBlockStyle}" />
+                                            <TextBlock Text="檢查該項目在 NTFS 檔案系統中的專屬旗標、硬連結 (Hardlinks) 與網路安全標記。"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="🔄 重新整理探測"
+                                                Command="{x:Bind ViewModel.InspectNtfsFeaturesCommand}"
+                                                IsEnabled="{x:Bind ViewModel.IsSummaryLoading, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}" />
+                                    </Grid>
+
+                                    <Grid ColumnSpacing="12" RowSpacing="12" Margin="0,4,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <Border Grid.Row="0" Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="壓縮狀態 (Compressed)" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" />
+                                                <TextBlock Text="{x:Bind ViewModel.CurrentNtfsSummary.IsCompressed, Mode=OneWay}" FontWeight="SemiBold" FontSize="15" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Grid.Row="0" Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="EFS 加密 (Encrypted)" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" />
+                                                <TextBlock Text="{x:Bind ViewModel.CurrentNtfsSummary.IsEncrypted, Mode=OneWay}" FontWeight="SemiBold" FontSize="15" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Grid.Row="0" Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="稀疏檔案 (Sparse File)" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" />
+                                                <TextBlock Text="{x:Bind ViewModel.CurrentNtfsSummary.IsSparse, Mode=OneWay}" FontWeight="SemiBold" FontSize="15" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Grid.Row="0" Grid.Column="3" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="重分析點 (Reparse / Junction)" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" />
+                                                <TextBlock Text="{x:Bind ViewModel.CurrentNtfsSummary.IsReparsePoint, Mode=OneWay}" FontWeight="SemiBold" FontSize="15" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="硬連結數量 (Hardlinks / MFT References)" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" />
+                                                <TextBlock Text="{x:Bind ViewModel.CurrentNtfsSummary.HardlinkCount, Mode=OneWay}" FontWeight="SemiBold" FontSize="15" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="Zone.Identifier 下載鎖定標記" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" />
+                                                <TextBlock Text="{x:Bind ViewModel.CurrentNtfsSummary.HasZoneIdentifier, Mode=OneWay}" FontWeight="SemiBold" FontSize="15" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Alternate Data Streams (ADS) Explorer -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="10">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE7C3;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        <TextBlock Text="替代資料流探索 (Alternate Data Streams / ADS)" Style="{StaticResource BodyStrongTextBlockStyle}" FontSize="15" />
+                                    </StackPanel>
+                                    <TextBlock Text="NTFS 允許單一檔案附加多個隱藏資料流。許多惡意軟體或 SmartScreen 標記 (Zone.Identifier) 均存放於此。"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+
+                                    <ListView ItemsSource="{x:Bind ViewModel.CurrentNtfsSummary.AlternateStreams, Mode=OneWay}"
+                                              SelectionMode="None" MaxHeight="220" Margin="0,4,0,0">
+                                        <ListView.Header>
+                                            <Grid Padding="12,6" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="140" />
+                                                    <ColumnDefinition Width="140" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="資料流名稱 (Stream Name)" FontWeight="SemiBold" FontSize="12" />
+                                                <TextBlock Grid.Column="1" Text="佔用大小" FontWeight="SemiBold" FontSize="12" />
+                                                <TextBlock Grid.Column="2" Text="類型標記" FontWeight="SemiBold" FontSize="12" />
+                                            </Grid>
+                                        </ListView.Header>
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="models:AlternateDataStreamItem">
+                                                <Grid Padding="12,8" ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="140" />
+                                                        <ColumnDefinition Width="140" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{x:Bind StreamName}" FontFamily="Consolas" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind DisplaySize}" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="2" Text="{x:Bind IsZoneIdentifier}" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- ACE List Explorer -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="10">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE774;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        <TextBlock Text="存取控制項目清單 (Access Control Entries / ACEs)" Style="{StaticResource BodyStrongTextBlockStyle}" FontSize="15" />
+                                    </StackPanel>
+                                    <TextBlock Text="列出該目標目前生效之所有 DACL 安全規則，包含主體、允許/拒絕類型與繼承狀態。"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+
+                                    <ListView ItemsSource="{x:Bind ViewModel.CurrentNtfsSummary.AclEntries, Mode=OneWay}"
+                                              SelectionMode="None" MaxHeight="300" Margin="0,4,0,0">
+                                        <ListView.Header>
+                                            <Grid Padding="12,6" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="220" />
+                                                    <ColumnDefinition Width="100" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="100" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="主體 / 帳號 (Principal)" FontWeight="SemiBold" FontSize="12" />
+                                                <TextBlock Grid.Column="1" Text="類型" FontWeight="SemiBold" FontSize="12" />
+                                                <TextBlock Grid.Column="2" Text="權限遮罩 (Permissions)" FontWeight="SemiBold" FontSize="12" />
+                                                <TextBlock Grid.Column="3" Text="繼承 (Inherited)" FontWeight="SemiBold" FontSize="12" />
+                                            </Grid>
+                                        </ListView.Header>
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="models:NtfsAceItem">
+                                                <Grid Padding="12,8" ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="220" />
+                                                        <ColumnDefinition Width="100" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="100" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{x:Bind Principal}" FontWeight="Medium" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind AccessType}" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="2" Text="{x:Bind Permissions}" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="3" Text="{x:Bind IsInherited}" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </Border>
+
                         </StackPanel>
-                    </Button>
+                    </ScrollViewer>
+                </TabViewItem>
 
-                    <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Command="{x:Bind ViewModel.ApplyResetDefaultsCommand}"
-                            IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}">
-                        <StackPanel Spacing="2">
-                            <TextBlock x:Name="ResetDefaultsTitle" Text="🔄 重設為預設繼承" FontWeight="SemiBold" />
-                            <TextBlock x:Name="ResetDefaultsDesc" Text="繼承上層目錄 ACL 規則" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <!-- ════ Tab 3: 自訂 icacls 規則建置器 ════ -->
+                <TabViewItem x:Name="TabRuleBuilder" Header="🛠️ 自訂 icacls 規則建置器" IsClosable="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                        <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="16">
+                                    <TextBlock x:Name="CustomRuleBuilderTitle" Text="自訂 icacls 規則建置器" Style="{StaticResource BodyStrongTextBlockStyle}" FontSize="15" />
+
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <ComboBox x:Name="UserPrincipalCombo" Grid.Column="0" Header="使用者 / 群組主體" HorizontalAlignment="Stretch"
+                                                  ItemsSource="{x:Bind ViewModel.PrincipalOptions}"
+                                                  SelectedItem="{x:Bind ViewModel.SelectedPrincipal, Mode=TwoWay}" />
+
+                                        <ComboBox x:Name="AccessLevelCombo" Grid.Column="1" Header="權限等級" HorizontalAlignment="Stretch"
+                                                  ItemsSource="{x:Bind ViewModel.AccessOptions}"
+                                                  SelectedItem="{x:Bind ViewModel.SelectedAccess, Mode=TwoWay}" />
+
+                                        <ComboBox x:Name="InheritanceScopeCombo" Grid.Column="2" Header="繼承作用範圍" HorizontalAlignment="Stretch"
+                                                  ItemsSource="{x:Bind ViewModel.InheritanceOptions}"
+                                                  SelectedItem="{x:Bind ViewModel.SelectedInheritance, Mode=TwoWay}" />
+
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+                                            <CheckBox x:Name="RecursiveCheck" Content="遞迴 (/T)" IsChecked="{x:Bind ViewModel.IsRecursive, Mode=TwoWay}" Margin="0,0,0,4" />
+                                            <CheckBox x:Name="ContinueOnErrorCheck" Content="略過錯誤 (/C)" IsChecked="{x:Bind ViewModel.ContinueOnError, Mode=TwoWay}" Margin="0,0,0,4" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="GeneratedPreviewBox" Grid.Column="0" Header="產生的 icacls 命令預覽" IsReadOnly="True"
+                                                 Text="{x:Bind ViewModel.GeneratedPreviewCommand, Mode=OneWay}"
+                                                 FontFamily="Consolas" FontSize="13" />
+                                        <Button x:Name="RunBatchApplyBtn" Grid.Column="1" Style="{StaticResource AccentButtonStyle}" Content="▶️ 執行批次套用"
+                                                Command="{x:Bind ViewModel.RunCustomBatchApplyCommand}" VerticalAlignment="Bottom"
+                                                IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
-                    </Button>
+                    </ScrollViewer>
+                </TabViewItem>
 
-                    <Button Grid.Column="3" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                            Command="{x:Bind ViewModel.ApplyStrictAdminOnlyCommand}"
-                            IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}">
-                        <StackPanel Spacing="2">
-                            <TextBlock x:Name="AdminOnlyTitle" Text="🔒 僅限管理員" FontWeight="SemiBold" />
-                            <TextBlock x:Name="AdminOnlyDesc" Text="移除一般使用者權限" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        </StackPanel>
-                    </Button>
-                </Grid>
-            </StackPanel>
-        </Border>
+                <!-- ════ Tab 4: 執行記錄終端機 ════ -->
+                <TabViewItem x:Name="TabTerminal" Header="💻 執行記錄終端機" IsClosable="False">
+                    <Grid RowSpacing="8" Margin="0,10,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
 
-        <!-- ═══ Custom Rule Builder & Command Preview ═══ -->
-        <Border Grid.Row="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                CornerRadius="8" Padding="16">
-            <StackPanel Spacing="12">
-                <TextBlock x:Name="CustomRuleBuilderTitle" Text="自訂 icacls 規則建置器" Style="{StaticResource BodyStrongTextBlockStyle}" FontSize="15" />
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                                       Style="{StaticResource BodyStrongTextBlockStyle}" VerticalAlignment="Center" />
+                            <Button x:Name="StopNtfsBtn" Grid.Column="1" Content="⏹️ 停止" Command="{x:Bind ViewModel.CancelOperationCommand}"
+                                    IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay}" Margin="0,0,8,0" />
+                            <Button x:Name="ClearTerminalBtn" Grid.Column="2" Content="清除終端記錄" Command="{x:Bind ViewModel.ClearTerminalCommand}" />
+                        </Grid>
 
-                <Grid ColumnSpacing="12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+                        <ScrollViewer Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                      CornerRadius="8" Padding="12">
+                            <TextBlock Text="{x:Bind ViewModel.TerminalOutput, Mode=OneWay}"
+                                       FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"
+                                       IsTextSelectionEnabled="True" />
+                        </ScrollViewer>
+                    </Grid>
+                </TabViewItem>
 
-                    <ComboBox x:Name="UserPrincipalCombo" Grid.Column="0" Header="使用者 / 群組主體" HorizontalAlignment="Stretch"
-                              ItemsSource="{x:Bind ViewModel.PrincipalOptions}"
-                              SelectedItem="{x:Bind ViewModel.SelectedPrincipal, Mode=TwoWay}" />
-
-                    <ComboBox x:Name="AccessLevelCombo" Grid.Column="1" Header="權限等級" HorizontalAlignment="Stretch"
-                              ItemsSource="{x:Bind ViewModel.AccessOptions}"
-                              SelectedItem="{x:Bind ViewModel.SelectedAccess, Mode=TwoWay}" />
-
-                    <ComboBox x:Name="InheritanceScopeCombo" Grid.Column="2" Header="繼承作用範圍" HorizontalAlignment="Stretch"
-                              ItemsSource="{x:Bind ViewModel.InheritanceOptions}"
-                              SelectedItem="{x:Bind ViewModel.SelectedInheritance, Mode=TwoWay}" />
-
-                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
-                        <CheckBox x:Name="RecursiveCheck" Content="遞迴 (/T)" IsChecked="{x:Bind ViewModel.IsRecursive, Mode=TwoWay}" Margin="0,0,0,4" />
-                        <CheckBox x:Name="ContinueOnErrorCheck" Content="略過錯誤 (/C)" IsChecked="{x:Bind ViewModel.ContinueOnError, Mode=TwoWay}" Margin="0,0,0,4" />
-                    </StackPanel>
-                </Grid>
-
-                <Grid ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBox x:Name="GeneratedPreviewBox" Grid.Column="0" Header="產生的 icacls 命令預覽" IsReadOnly="True"
-                             Text="{x:Bind ViewModel.GeneratedPreviewCommand, Mode=OneWay}"
-                             FontFamily="Consolas" FontSize="13" />
-                    <Button x:Name="RunBatchApplyBtn" Grid.Column="1" Style="{StaticResource AccentButtonStyle}" Content="▶️ 執行批次套用"
-                            Command="{x:Bind ViewModel.RunCustomBatchApplyCommand}" VerticalAlignment="Bottom"
-                            IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}" />
-                </Grid>
-            </StackPanel>
-        </Border>
-
-        <!-- ═══ Execution Output Terminal ═══ -->
-        <Grid Grid.Row="3" RowSpacing="6">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-
-            <Grid Grid.Row="0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
-                           Style="{StaticResource BodyStrongTextBlockStyle}" VerticalAlignment="Center" />
-                <Button x:Name="StopNtfsBtn" Grid.Column="1" Content="⏹️ 停止" Command="{x:Bind ViewModel.CancelOperationCommand}"
-                        IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay}" Margin="0,0,8,0" />
-                <Button x:Name="ClearTerminalBtn" Grid.Column="2" Content="清除終端記錄" Command="{x:Bind ViewModel.ClearTerminalCommand}" />
-            </Grid>
-
-            <ScrollViewer Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                          CornerRadius="8" Padding="12">
-                <TextBlock Text="{x:Bind ViewModel.TerminalOutput, Mode=OneWay}"
-                           FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"
-                           IsTextSelectionEnabled="True" />
-            </ScrollViewer>
-        </Grid>
+            </TabView.TabItems>
+        </TabView>
     </Grid>
 </Page>

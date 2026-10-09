@@ -1,4 +1,4 @@
-﻿{
+{
   "AppTitle": "DiskMaster Pro 磁盘大师 — 旗舰级 Windows 磁盘维护与引导部署工具箱",
   "EasyMode": "简易模式",
   "WimDeploy": "系统部署",
@@ -181,5 +181,11 @@
   "TpmNotFound": "未检测到兼容的 TPM 芯片",
   "TestDnsPing": "⚡ 测试 DNS 延迟 (Ping)",
   "TpmManufacturer": "制造厂商",
-  "MoveLeft": "◀️ 向左移动 [Alt+Left]"
+  "MoveLeft": "◀️ 向左移动 [Alt+Left]",
+  "SystemPerformance": "性能分析",
+  "TabWinRe": "Windows 修复环境 (WinRE)",
+  "TabNetShare": "局域网共享向导",
+  "TabRdp": "远程桌面 RDP 服务端",
+  "TabCliTools": "命令提示符 (CMD) 工具箱",
+  "TabNtfsExplorer": "NTFS 深度特性探索"
 }

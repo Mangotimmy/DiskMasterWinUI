@@ -24,6 +24,7 @@ public sealed partial class MainWindow : Window
     private AdvancedModePage? _advancedModePage;
     private SystemOptimizerPage? _systemOptimizerPage;
     private NetworkToolsPage? _networkToolsPage;
+    private SystemPerformancePage? _systemPerformancePage;
     private SettingsPage? _settingsPage;
 
     public TrayIconService TrayService { get; } = new();
@@ -38,14 +39,14 @@ public sealed partial class MainWindow : Window
 
     private static readonly Dictionary<string, string[]> WorkspaceTabTags = new()
     {
-        ["Master"] = ["Starter", "EasyMode", "WimDeploy", "BootManager", "DiskTools", "SystemHealth", "NtfsPermissions", "AdvancedMode", "SystemOptimizer", "NetworkTools", "Settings"],
+        ["Master"] = ["Starter", "EasyMode", "WimDeploy", "BootManager", "DiskTools", "SystemHealth", "NtfsPermissions", "AdvancedMode", "SystemOptimizer", "NetworkTools", "SystemPerformance", "Settings"],
         ["Deploy"] = ["Starter", "WimDeploy", "BootManager", "EasyMode", "DiskTools", "Settings"],
-        ["Repair"] = ["Starter", "SystemHealth", "BootManager", "DiskTools", "NtfsPermissions", "EasyMode", "Settings"],
-        ["Gaming"] = ["Starter", "SystemOptimizer", "NetworkTools", "DiskTools", "SystemHealth", "Settings"],
-        ["Lite"] = ["Starter", "EasyMode", "NetworkTools", "SystemHealth", "Settings"]
+        ["Repair"] = ["Starter", "SystemHealth", "BootManager", "DiskTools", "NtfsPermissions", "SystemPerformance", "EasyMode", "Settings"],
+        ["Gaming"] = ["Starter", "SystemOptimizer", "NetworkTools", "SystemPerformance", "DiskTools", "SystemHealth", "Settings"],
+        ["Lite"] = ["Starter", "EasyMode", "NetworkTools", "SystemPerformance", "Settings"]
     };
 
-    private static readonly string[] EasyModeAllowedTags = ["Starter", "EasyMode", "NetworkTools", "Settings"];
+    private static readonly string[] EasyModeAllowedTags = ["Starter", "EasyMode", "NetworkTools", "SystemPerformance", "Settings"];
 
     public MainWindow()
     {
@@ -68,7 +69,7 @@ public sealed partial class MainWindow : Window
             catch { }
         }
 
-        // Cache all 11 original tabs for workspace filtering & floating dock-back
+        // Cache all 12 original tabs for workspace filtering & floating dock-back
         _allTabItems.AddRange([
             TabStarter,
             TabEasyMode,
@@ -80,6 +81,7 @@ public sealed partial class MainWindow : Window
             TabAdvancedMode,
             TabOptimizer,
             TabNetworkTools,
+            TabSystemPerformance,
             TabSettings
         ]);
 
@@ -495,6 +497,7 @@ public sealed partial class MainWindow : Window
             "AdvancedMode" => _advancedModePage ??= new AdvancedModePage(),
             "SystemOptimizer" => _systemOptimizerPage ??= new SystemOptimizerPage(),
             "NetworkTools" => _networkToolsPage ??= new NetworkToolsPage(),
+            "SystemPerformance" => _systemPerformancePage ??= new SystemPerformancePage(),
             "Settings" => _settingsPage ??= new SettingsPage(),
             _ => new Page()
         };
@@ -744,6 +747,12 @@ public sealed partial class MainWindow : Window
                 if (_networkToolsPage != null)
                 {
                     await _networkToolsPage.ViewModel.RefreshUpnpCommand.ExecuteAsync(null);
+                }
+                break;
+            case "SystemPerformance":
+                if (_systemPerformancePage != null)
+                {
+                    await _systemPerformancePage.ViewModel.RefreshAllCommand.ExecuteAsync(null);
                 }
                 break;
             case "Settings":
@@ -1026,6 +1035,13 @@ public sealed partial class MainWindow : Window
             "ja-JP" => "ネットワーク ツール",
             _ => "網路工具"
         };
+        TabSystemPerformance.Header = loc.CurrentLanguage switch
+        {
+            "zh-CN" => "性能分析",
+            "en-US" => "Performance",
+            "ja-JP" => "パフォーマンス",
+            _ => "效能分析"
+        };
         TabSettings.Header = loc["Settings"];
 
         LanguageToggleBtn.Content = loc.CurrentLanguage switch
@@ -1061,6 +1077,7 @@ public sealed partial class MainWindow : Window
         _advancedModePage?.ApplyLanguage();
         _systemOptimizerPage?.ApplyLanguage();
         _networkToolsPage?.ApplyLanguage();
+        _systemPerformancePage?.ApplyLanguage();
         _settingsPage?.ApplyLanguage();
     }
 
@@ -1111,6 +1128,10 @@ public sealed partial class MainWindow : Window
             case "NetworkTools":
                 _networkToolsPage ??= new NetworkToolsPage();
                 ContentFrame.Content = _networkToolsPage;
+                break;
+            case "SystemPerformance":
+                _systemPerformancePage ??= new SystemPerformancePage();
+                ContentFrame.Content = _systemPerformancePage;
                 break;
             case "Settings":
                 _settingsPage ??= new SettingsPage();

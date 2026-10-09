@@ -1,4 +1,4 @@
-﻿{
+{
   "AppTitle": "DiskMaster Pro — Windows ディスク管理・ブート修復スイート",
   "EasyMode": "かんたんモード",
   "WimDeploy": "システム展開",
@@ -181,5 +181,11 @@
   "TpmNotFound": "互換性のある TPM チップが検出されません",
   "TestDnsPing": "⚡ DNS 遅延テスト (Ping)",
   "TpmManufacturer": "製造元",
-  "MoveLeft": "◀️ 左へ移動 [Alt+Left]"
+  "MoveLeft": "◀️ 左へ移動 [Alt+Left]",
+  "SystemPerformance": "パフォーマンス",
+  "TabWinRe": "Windows 回復環境 (WinRE)",
+  "TabNetShare": "LAN 共有ウィザード",
+  "TabRdp": "リモートデスクトップ (RDP)",
+  "TabCliTools": "コマンドプロンプト ツールボックス",
+  "TabNtfsExplorer": "NTFS 詳細エクスプローラー"
 }
