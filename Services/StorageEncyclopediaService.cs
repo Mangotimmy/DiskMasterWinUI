@@ -236,6 +236,21 @@ public class StorageEncyclopediaService
 
                 item.SizeBytes = totalBytes;
                 item.FileCount = totalFiles;
+
+                try
+                {
+                    var root = Path.GetPathRoot(item.Path);
+                    if (!string.IsNullOrEmpty(root))
+                    {
+                        var dInfo = new DriveInfo(root);
+                        if (dInfo.IsReady && dInfo.TotalSize > 0)
+                        {
+                            item.UsedPercentage = Math.Clamp(Math.Round((double)item.SizeBytes / dInfo.TotalSize * 100.0, 1), 0.0, 100.0);
+                            item.PercentageDisplay = $"{item.UsedPercentage:F1}%";
+                        }
+                    }
+                }
+                catch { }
             }, ct);
         }
         catch (OperationCanceledException) { }
@@ -355,5 +370,102 @@ public class StorageEncyclopediaService
     public async Task<string> ExecuteSafeCleanupAsync(StorageDirectoryItem item)
     {
         return await ExecuteActionAsync(item);
+    }
+
+    public async Task<List<TopLargeFileItem>> GetTopLargeFilesAsync(string rootPath, int maxCount = 100, CancellationToken ct = default)
+    {
+        return await Task.Run(() =>
+        {
+            var list = new List<TopLargeFileItem>();
+            try
+            {
+                if (!Directory.Exists(rootPath)) return list;
+                var di = new DirectoryInfo(rootPath);
+                var files = new List<FileInfo>();
+                EnumerateFilesSafe(di, files, maxDepth: 4, currentDepth: 0, ct);
+
+                return files
+                    .OrderByDescending(f => f.Length)
+                    .Take(maxCount)
+                    .Select(f => new TopLargeFileItem
+                    {
+                        FilePath = f.FullName,
+                        FileName = f.Name,
+                        DirectoryPath = f.DirectoryName ?? "",
+                        SizeBytes = f.Length,
+                        DisplaySize = TopLargeFileItem.FormatBytes(f.Length),
+                        Extension = string.IsNullOrEmpty(f.Extension) ? "(none)" : f.Extension.ToLowerInvariant(),
+                        LastModified = f.LastWriteTime
+                    })
+                    .ToList();
+            }
+            catch { return list; }
+        }, ct);
+    }
+
+    public async Task<List<FileExtensionBreakdownItem>> GetExtensionBreakdownAsync(string rootPath, CancellationToken ct = default)
+    {
+        return await Task.Run(() =>
+        {
+            var list = new List<FileExtensionBreakdownItem>();
+            try
+            {
+                if (!Directory.Exists(rootPath)) return list;
+                var di = new DirectoryInfo(rootPath);
+                var files = new List<FileInfo>();
+                EnumerateFilesSafe(di, files, maxDepth: 4, currentDepth: 0, ct);
+
+                long totalBytes = files.Sum(f => f.Length);
+                if (totalBytes <= 0) return list;
+
+                return files
+                    .GroupBy(f => string.IsNullOrEmpty(f.Extension) ? "(no ext)" : f.Extension.ToLowerInvariant())
+                    .Select(g =>
+                    {
+                        long groupSize = g.Sum(f => f.Length);
+                        double pct = Math.Round((double)groupSize / totalBytes * 100.0, 1);
+                        return new FileExtensionBreakdownItem
+                        {
+                            Extension = g.Key,
+                            TotalSizeBytes = groupSize,
+                            DisplaySize = TopLargeFileItem.FormatBytes(groupSize),
+                            FileCount = g.Count(),
+                            Percentage = pct,
+                            PercentageDisplay = $"{pct:F1}%"
+                        };
+                    })
+                    .OrderByDescending(x => x.TotalSizeBytes)
+                    .Take(25)
+                    .ToList();
+            }
+            catch { return list; }
+        }, ct);
+    }
+
+    private void EnumerateFilesSafe(DirectoryInfo dir, List<FileInfo> accumulator, int maxDepth, int currentDepth, CancellationToken ct)
+    {
+        if (ct.IsCancellationRequested || currentDepth > maxDepth) return;
+        try
+        {
+            foreach (var f in dir.EnumerateFiles())
+            {
+                if (ct.IsCancellationRequested) return;
+                try { accumulator.Add(f); } catch { }
+            }
+
+            foreach (var sub in dir.EnumerateDirectories())
+            {
+                if (ct.IsCancellationRequested) return;
+                try
+                {
+                    // Skip system junctions or recycle bin
+                    if (sub.Attributes.HasFlag(FileAttributes.ReparsePoint)) continue;
+                    if (sub.Name.Equals("$Recycle.Bin", StringComparison.OrdinalIgnoreCase)) continue;
+                    EnumerateFilesSafe(sub, accumulator, maxDepth, currentDepth + 1, ct);
+                }
+                catch { }
+            }
+        }
+        catch { }
     }
 }

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DiskMasterWinUI.Helpers;
@@ -110,6 +111,12 @@ public partial class DiskToolsViewModel : ObservableObject
     public ObservableCollection<StorageDirectoryItem> StorageDirectories { get; } = new();
     [ObservableProperty] private bool _isScanningDirectories;
     [ObservableProperty] private string _directoryScanStatus = "";
+
+    public ObservableCollection<TopLargeFileItem> TopLargeFiles { get; } = new();
+    public ObservableCollection<FileExtensionBreakdownItem> ExtensionBreakdowns { get; } = new();
+    [ObservableProperty] private string _customScanPath = @"C:\";
+    [ObservableProperty] private bool _isDeepScanning;
+    [ObservableProperty] private string _deepScanStatus = "";
 
     private readonly ThrottledLogBuffer _logBuffer;
 
@@ -1688,6 +1695,65 @@ public partial class DiskToolsViewModel : ObservableObject
         {
             AppendLog($"[ERROR] Action failed: {ex.Message}");
         }
+    }
+
+    [RelayCommand]
+    public async Task ScanDeepStorageAsync()
+    {
+        if (IsDeepScanning) return;
+        IsDeepScanning = true;
+        try
+        {
+            TopLargeFiles.Clear();
+            ExtensionBreakdowns.Clear();
+            DeepScanStatus = LocalizationService.Instance.CurrentLanguage switch
+            {
+                "zh-CN" => $"正在扫描 {CustomScanPath} 的巨型文件与扩展名分布...",
+                "en-US" => $"Scanning large files & extensions in {CustomScanPath}...",
+                "ja-JP" => $"{CustomScanPath} の大容量ファイルと拡張子を分析中...",
+                _ => $"正在掃描 {CustomScanPath} 的巨型檔案與副檔名分佈..."
+            };
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🔍 深度掃描儲存空間: {CustomScanPath}...");
+
+            var topFiles = await _encyclopediaService.GetTopLargeFilesAsync(CustomScanPath, 100);
+            foreach (var f in topFiles) TopLargeFiles.Add(f);
+
+            var exts = await _encyclopediaService.GetExtensionBreakdownAsync(CustomScanPath);
+            foreach (var e in exts) ExtensionBreakdowns.Add(e);
+
+            DeepScanStatus = LocalizationService.Instance.CurrentLanguage switch
+            {
+                "zh-CN" => $"扫描完成：发现 {TopLargeFiles.Count} 个巨型文件，{ExtensionBreakdowns.Count} 类扩展名",
+                "en-US" => $"Complete: {TopLargeFiles.Count} large files, {ExtensionBreakdowns.Count} extension types",
+                "ja-JP" => $"完了: {TopLargeFiles.Count} 個の大容量ファイル、{ExtensionBreakdowns.Count} 種の拡張子",
+                _ => $"掃描完成：發現 {TopLargeFiles.Count} 個巨型檔案，{ExtensionBreakdowns.Count} 類副檔名"
+            };
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] ✅ 深度空間分析完成！");
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[ERROR] Deep storage scan failed: {ex.Message}");
+        }
+        finally
+        {
+            IsDeepScanning = false;
+        }
+    }
+
+    [RelayCommand]
+    public void OpenFolderForFile(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"/select,\"{path}\"",
+                UseShellExecute = true
+            });
+        }
+        catch { }
     }
 
     [RelayCommand]

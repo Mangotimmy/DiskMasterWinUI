@@ -17,6 +17,7 @@ public sealed partial class NtfsPermissionsPage : Page
     {
         InitializeComponent();
         NavigationCacheMode = NavigationCacheMode.Required;
+        DiskMasterWinUI.Helpers.TabReorderHelper.Attach(NtfsTabView);
         ApplyLanguage();
         LocalizationService.Instance.LanguageChanged += ApplyLanguage;
     }
@@ -24,6 +25,11 @@ public sealed partial class NtfsPermissionsPage : Page
     public void ApplyLanguage()
     {
         var lang = LocalizationService.Instance.CurrentLanguage;
+
+        TabQuickActions.Header = lang switch { "zh-CN" => "⚡ 常用快捷操作 (Quick Actions)", "en-US" => "⚡ Quick Actions", "ja-JP" => "⚡ クイックアクション", _ => "⚡ 常用快捷操作 (Quick Actions)" };
+        TabNtfsExplorer.Header = lang switch { "zh-CN" => "🔍 NTFS 深度特性探索", "en-US" => "🔍 NTFS Deep Explorer", "ja-JP" => "🔍 NTFS 詳細エクスプローラー", _ => "🔍 NTFS 深度特性探索" };
+        TabRuleBuilder.Header = lang switch { "zh-CN" => "🛠️ 自定义 icacls 规则生成器", "en-US" => "🛠️ Custom icacls Builder", "ja-JP" => "🛠️ カスタム icacls ビルダー", _ => "🛠️ 自訂 icacls 規則建置器" };
+        TabTerminal.Header = lang switch { "zh-CN" => "💻 执行记录终端", "en-US" => "💻 Execution Terminal", "ja-JP" => "💻 実行ログターミナル", _ => "💻 執行記錄終端機" };
 
         TargetPathBox.Header = lang switch { "zh-CN" => "目标磁盘或目录路径", "en-US" => "Target Drive or Directory", "ja-JP" => "対象ドライブまたはディレクトリ", _ => "目標磁碟區或目錄路徑" };
         TargetPathBox.PlaceholderText = lang switch { "zh-CN" => "例如 D:\\ 或 C:\\Users\\Public", "en-US" => "e.g. D:\\ or C:\\Users\\Public", "ja-JP" => "例: D:\\ または C:\\Users\\Public", _ => "例如 D:\\ 或 C:\\Users\\Public" };

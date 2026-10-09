@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Name="ProcessHunterRoot"
+    x:Class="DiskMasterWinUI.Pages.SystemPerformancePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="using:DiskMasterWinUI.Models"
+    xmlns:vm="using:DiskMasterWinUI.ViewModels"
+    mc:Ignorable="d"
+    Loaded="Page_Loaded">
+
+    <Grid Padding="16" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Top Bar -->
+        <Grid Grid.Row="0" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                <Button Command="{x:Bind ViewModel.RefreshMetricsCommand}" Style="{StaticResource AccentButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                        <TextBlock Text="重新整理效能" />
+                    </StackPanel>
+                </Button>
+                <Button Command="{x:Bind ViewModel.KillAllNotRespondingCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE711;" FontSize="14" Foreground="OrangeRed" />
+                        <TextBlock Text="一鍵終結所有無響應程式" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                       VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+
+            <ProgressRing Grid.Column="2" IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" Width="24" Height="24" />
+        </Grid>
+
+        <!-- Main TabView -->
+        <TabView x:Name="PerfTabView" Grid.Row="1" CanReorderTabs="True" CanDragTabs="True" IsAddTabButtonVisible="False">
+            <TabView.TabItems>
+
+                <!-- ════ Tab 1: Real-Time Hardware Performance ════ -->
+                <TabViewItem x:Name="TabPerfMetrics" Header="📊 即時硬體資源 (typeperf 效能儀表)" IsClosable="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                        <StackPanel Spacing="16" Margin="0,0,16,20">
+
+                            <!-- Live Resource Cards (CPU & RAM) -->
+                            <Grid ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- CPU Card -->
+                                <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                        CornerRadius="8" Padding="16">
+                                    <StackPanel Spacing="12">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Spacing="2">
+                                                <TextBlock Text="處理器使用率 (CPU Total)" FontWeight="SemiBold" FontSize="14" />
+                                                <TextBlock Text="即時多核心處理器總負載" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.CurrentMetrics.DisplayCpuPercent, Mode=OneWay}"
+                                                       FontSize="24" FontWeight="Bold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                        </Grid>
+                                        <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.CpuUsagePercent, Mode=OneWay}" Maximum="100" Height="8" />
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- RAM Card -->
+                                <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                        CornerRadius="8" Padding="16">
+                                    <StackPanel Spacing="12">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Spacing="2">
+                                                <TextBlock Text="實體記憶體使用率 (RAM)" FontWeight="SemiBold" FontSize="14" />
+                                                <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.AvailableRamMb, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='可用記憶體: {0} MB'}"
+                                                           FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.CurrentMetrics.DisplayRamPercent, Mode=OneWay}"
+                                                       FontSize="24" FontWeight="Bold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                        </Grid>
+                                        <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.RamUsagePercent, Mode=OneWay}" Maximum="100" Height="8" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabViewItem>
+
+                <!-- ════ Tab 2: Deep Process Hunter ════ -->
+                <TabViewItem x:Name="TabProcessHunter" Header="🎯 進程獵手與強制終結 (Process Hunter &amp; Tree Killer)" IsClosable="False">
+                    <Grid RowSpacing="12" Margin="0,10,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <!-- Search & Filter Bar -->
+                        <Grid Grid.Row="0" ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0" PlaceholderText="🔍 依進程名稱、PID、完整啟動指令或執行檔路徑即時搜尋..."
+                                     Text="{x:Bind ViewModel.ProcessSearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button Grid.Column="1" Command="{x:Bind ViewModel.RefreshProcessesCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE72C;" FontSize="13" />
+                                    <TextBlock Text="重新整理清單" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                        <!-- Process List View -->
+                        <Border Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="8">
+                            <ListView ItemsSource="{x:Bind ViewModel.FilteredProcesses, Mode=OneWay}"
+                                      SelectedItem="{x:Bind ViewModel.SelectedProcess, Mode=TwoWay}"
+                                      SelectionMode="Single">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="models:ProcessHunterItem">
+                                        <Grid Padding="8,6" ColumnSpacing="12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="2*" />
+                                                <ColumnDefinition Width="1*" />
+                                                <ColumnDefinition Width="1*" />
+                                                <ColumnDefinition Width="3*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Name & PID -->
+                                            <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="{x:Bind ProcessName}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{x:Bind HierarchyDisplay}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontFamily="Consolas" />
+                                            </StackPanel>
+
+                                            <!-- Status Badge -->
+                                            <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                <TextBlock Text="{x:Bind StatusBadge}" FontSize="11" FontWeight="SemiBold" />
+                                            </Border>
+
+                                            <!-- Memory -->
+                                            <TextBlock Grid.Column="2" Text="{x:Bind DisplayMemory}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+
+                                            <!-- Command Line / Path -->
+                                            <StackPanel Grid.Column="3" Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="{x:Bind ExecutablePath}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{x:Bind CommandLine}" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" FontFamily="Consolas" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+
+                                            <!-- Force Kill Tree Button -->
+                                            <Button Grid.Column="4" Content="⚡ 強制終結進程樹"
+                                                    Command="{Binding ElementName=ProcessHunterRoot, Path=DataContext.KillProcessTreeCommand}"
+                                                    CommandParameter="{x:Bind}"
+                                                    IsEnabled="{x:Bind IsSystemProtected, Converter={StaticResource InvertBoolConverter}}"
+                                                    Padding="10,4" FontSize="11" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </Border>
+                    </Grid>
+                </TabViewItem>
+
+                <!-- ════ Tab 3: SystemInfo Hardware Profile ════ -->
+                <TabViewItem x:Name="TabSystemInfo" Header="📋 系統配置與修補程式報告 (systeminfo)" IsClosable="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                        <StackPanel Spacing="16" Margin="0,0,16,20">
+
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="電腦硬體與作業系統基本規格" FontWeight="Bold" FontSize="15" />
+                                    <Grid ColumnSpacing="16" RowSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <StackPanel Grid.Row="0" Grid.Column="0" Spacing="2">
+                                            <TextBlock Text="主機名稱" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Text="{x:Bind ViewModel.SystemInfo.HostName, Mode=OneWay}" FontWeight="SemiBold" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="0" Grid.Column="1" Spacing="2">
+                                            <TextBlock Text="作業系統" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Text="{x:Bind ViewModel.SystemInfo.OsName, Mode=OneWay}" FontWeight="SemiBold" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="1" Grid.Column="0" Spacing="2">
+                                            <TextBlock Text="主機板 / 製造商" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Text="{x:Bind ViewModel.SystemInfo.SystemManufacturer, Mode=OneWay}" FontWeight="SemiBold" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="1" Grid.Column="1" Spacing="2">
+                                            <TextBlock Text="BIOS 版本" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Text="{x:Bind ViewModel.SystemInfo.BiosVersion, Mode=OneWay}" FontWeight="SemiBold" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="2" Grid.Column="0" Spacing="2">
+                                            <TextBlock Text="系統開機時間" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Text="{x:Bind ViewModel.SystemInfo.SystemBootTime, Mode=OneWay}" FontWeight="SemiBold" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="2" Grid.Column="1" Spacing="2">
+                                            <TextBlock Text="實體記憶體總量" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Text="{x:Bind ViewModel.SystemInfo.TotalPhysicalMemory, Mode=OneWay}" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Installed Hotfixes List -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="{x:Bind ViewModel.SystemInfo.HotfixCount, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='已安裝 Windows 更新修補程式 ({0} 項)'}"
+                                               FontWeight="Bold" FontSize="15" />
+                                    <ListView ItemsSource="{x:Bind ViewModel.SystemInfo.Hotfixes, Mode=OneWay}" MaxHeight="240" SelectionMode="None">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="x:String">
+                                                <TextBlock Text="{x:Bind}" FontSize="12" FontFamily="Consolas" Padding="4,2" />
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </Border>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabViewItem>
+
+            </TabView.TabItems>
+        </TabView>
+    </Grid>
+</Page>

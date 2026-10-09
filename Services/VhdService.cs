@@ -18,7 +18,7 @@ public class VhdService
         var tempFile = Path.Combine(Path.GetTempPath(), $"dm_vhd_{Guid.NewGuid():N}.txt");
         try
         {
-            await File.WriteAllTextAsync(tempFile, script + "\r\nexit\r\n", Encoding.ASCII);
+            await File.WriteAllTextAsync(tempFile, script + "\r\nexit\r\n", ProcessHelper.GetConsoleEncoding());
             var (output, err, code) = await ProcessHelper.RunProcessAsync("diskpart.exe", $"/s \"{tempFile}\"");
             return string.IsNullOrWhiteSpace(output) ? err : output;
         }

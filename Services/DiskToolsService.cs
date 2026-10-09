@@ -51,10 +51,24 @@ public class DiskToolsService
         var ext = Path.GetExtension(path).ToLowerInvariant();
         if (ext == ".iso" || ext == ".vhd" || ext == ".vhdx")
         {
-            var psScript = $"$disk = Mount-DiskImage -ImagePath '{path}' -PassThru; $vol = $disk | Get-Volume; if ($vol) {{ $vol.DriveLetter + ':' }} else {{ 'Mounted (No letter assigned)' }}";
+            var escapedPath = path.Replace("'", "''");
+            var psScript = $"$img = Mount-DiskImage -ImagePath '{escapedPath}' -PassThru; $disk = $img | Get-Disk; $part = $disk | Get-Partition | Where-Object {{ $_.DriveLetter }}; if ($part) {{ ($part | ForEach-Object {{ $_.DriveLetter + ':' }}) -join ', ' }} else {{ 'Mounted (No letter assigned)' }}";
             var (outStr, errStr, code) = await ProcessHelper.RunProcessAsync("powershell.exe", $"-NoProfile -Command \"{psScript}\"");
+            if (code == 0 && !string.IsNullOrWhiteSpace(outStr))
+            {
+                return $"Successfully mounted {Path.GetFileName(path)} -> {outStr.Trim()}";
+            }
+
+            // Fallback for VHD/VHDX: Try DiskPart attach
+            if (ext == ".vhd" || ext == ".vhdx")
+            {
+                var vhdService = new VhdService();
+                var attachRes = await vhdService.AttachVhdAsync(path);
+                if (attachRes.Success) return $"Successfully mounted {Path.GetFileName(path)} (via DiskPart)";
+            }
+
             if (!string.IsNullOrWhiteSpace(errStr)) return $"[STDERR] {errStr}";
-            return $"Successfully mounted {Path.GetFileName(path)} -> {outStr.Trim()}";
+            return string.IsNullOrWhiteSpace(outStr) ? "Mount command completed." : outStr.Trim();
         }
         else
         {
@@ -65,8 +79,18 @@ public class DiskToolsService
     public async Task<string> DismountVirtualDiskAsync(string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return "No image path specified.";
-        var psScript = $"Dismount-DiskImage -ImagePath '{path}'";
+        var escapedPath = path.Replace("'", "''");
+        var psScript = $"Dismount-DiskImage -ImagePath '{escapedPath}'";
         var (outStr, errStr, code) = await ProcessHelper.RunProcessAsync("powershell.exe", $"-NoProfile -Command \"{psScript}\"");
+        
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        if (code != 0 && (ext == ".vhd" || ext == ".vhdx"))
+        {
+            var vhdService = new VhdService();
+            var detachRes = await vhdService.DetachVhdAsync(path);
+            if (detachRes.Success) return $"Successfully dismounted {Path.GetFileName(path)} (via DiskPart)";
+        }
+
         if (!string.IsNullOrWhiteSpace(errStr)) return $"[STDERR] {errStr}";
         return $"Successfully dismounted {Path.GetFileName(path)}";
     }

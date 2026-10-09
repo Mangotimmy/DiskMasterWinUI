@@ -25,13 +25,21 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <Button Grid.Column="0" Command="{x:Bind ViewModel.LoadInitialDataCommand}"
-                    Style="{StaticResource AccentButtonStyle}">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE72C;" FontSize="16" />
-                    <TextBlock x:Name="RefreshNetBtnText" Text="重新整理網路狀態" />
-                </StackPanel>
-            </Button>
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                <Button Command="{x:Bind ViewModel.LoadInitialDataCommand}"
+                        Style="{StaticResource AccentButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE72C;" FontSize="16" />
+                        <TextBlock x:Name="RefreshNetBtnText" Text="重新整理網路狀態" />
+                    </StackPanel>
+                </Button>
+                <Button Click="OpenSmartDiagDialog_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xEC06;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                        <TextBlock Text="🧠 智慧網路診斷精靈" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
 
             <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
                        VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}"
@@ -260,6 +268,61 @@
                                     </Grid>
                                 </StackPanel>
                             </Border>
+
+                            <!-- DNS Pollution & Tampering Detection Card -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE72E;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        <TextBlock Text="🛡️ DNS 污染 / 投毒檢測與 DoH 加密防護" FontWeight="Bold" FontSize="15" />
+                                    </StackPanel>
+                                    <TextBlock Text="發送雙軌比對（本機 UDP 53 vs Cloudflare/Google DoH 安全解析），檢測 ISP / 偽造 Bogon 假 IP 投毒，並提供 Windows 原生 DoH 一鍵加密配置。"
+                                               Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0" Header="測試網域 (可自訂)" Text="{x:Bind ViewModel.TestPollutionDomain, Mode=TwoWay}" PlaceholderText="例如 github.com 或 wikipedia.org" />
+                                        <Button Grid.Column="1" Command="{x:Bind ViewModel.TestPollutionCommand}" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Bottom">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE721;" FontSize="13" />
+                                                <TextBlock Text="檢測污染" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Column="2" Command="{x:Bind ViewModel.ConfigureWindowsDoHCommand}" VerticalAlignment="Bottom">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE8D7;" FontSize="13" />
+                                                <TextBlock Text="⚡ 配置原生 DoH (1.1.1.1)" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+
+                                    <!-- Pollution Test Results List -->
+                                    <ListView ItemsSource="{x:Bind ViewModel.PollutionResults, Mode=OneWay}" MaxHeight="220" SelectionMode="None">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="models:DnsPollutionItem">
+                                                <Grid Padding="6,8" ColumnSpacing="10" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="150" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{x:Bind Domain}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
+                                                    <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                                                        <TextBlock Text="{x:Bind StatusBadge}" FontSize="11" FontWeight="SemiBold" />
+                                                    </Border>
+                                                    <TextBlock Grid.Column="2" Text="{x:Bind Details}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </ScrollViewer>
                 </TabViewItem>
@@ -369,8 +432,365 @@
                                     CornerRadius="8" Padding="16">
                                 <TextBox Text="{x:Bind ViewModel.RawHostsText, Mode=TwoWay}"
                                          AcceptsReturn="True" TextWrapping="NoWrap"
-                                         FontFamily="Consolas" FontSize="12" Height="320" />
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                         ScrollViewer.VerticalScrollMode="Enabled"
+                                         ScrollViewer.HorizontalScrollMode="Enabled"
+                                         FontFamily="Consolas" FontSize="12" Height="340" />
                             </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabViewItem>
+
+                <!-- ════ Tab 5: 網路共用精靈 (One-Click NetShare Wizard) ════ -->
+                <TabViewItem x:Name="TabNetShare" Header="🖧 網路共用精靈 (NetShare)" IsClosable="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                        <StackPanel Spacing="16" Margin="0,0,16,20">
+
+                            <!-- Hero MS Account & Profile Fix Card -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE774;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        <TextBlock Text="🛠️ 微軟帳號區域網路共用驗證問題一鍵修復 (MS Account LAN Sharing Fix)" FontWeight="Bold" FontSize="15" />
+                                    </StackPanel>
+                                    <TextBlock Text="當本機登入微軟帳號時，區域網路其他電腦連線常遭遇 NTLM 身分驗證失敗或存取拒絕。此精靈自動修正 LocalAccountTokenFilterPolicy 政策、開啟防火牆規則與私人網路設定檔。"
+                                               Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+
+                                    <Grid ColumnSpacing="10" RowSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button Grid.Column="0" Command="{x:Bind ViewModel.FixMsAccountPolicyCommand}" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE8D7;" FontSize="13" />
+                                                <TextBlock Text="⚡ 修復微軟帳號權限政策" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Column="1" Command="{x:Bind ViewModel.SetPrivateNetworkCommand}" HorizontalAlignment="Stretch">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE8B0;" FontSize="13" />
+                                                <TextBlock Text="🔒 設為私人網路設定檔" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Column="2" Command="{x:Bind ViewModel.EnableSharingFirewallCommand}" HorizontalAlignment="Stretch">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE72E;" FontSize="13" />
+                                                <TextBlock Text="🔥 開啟檔案共用防火牆" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Create New Share Form -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="➕ 建立新的網路共用資料夾" FontWeight="Bold" FontSize="14" />
+                                    <Grid ColumnSpacing="10" RowSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="2*" />
+                                            <ColumnDefinition Width="3*" />
+                                            <ColumnDefinition Width="2*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0" Header="共用名稱 (Share Name)" Text="{x:Bind ViewModel.NewShareName, Mode=TwoWay}" />
+                                        <TextBox Grid.Column="1" Header="資料夾實體路徑 (Folder Path)" Text="{x:Bind ViewModel.NewSharePath, Mode=TwoWay}" />
+                                        <TextBox Grid.Column="2" Header="備註說明 (Remark)" Text="{x:Bind ViewModel.NewShareRemark, Mode=TwoWay}" />
+                                        <Button Grid.Column="3" Content="🚀 一鍵建立共用" Command="{x:Bind ViewModel.CreateShareCommand}"
+                                                Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Bottom" Padding="14,8" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Dedicated Local Sharing User Card -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="👤 建立區域網路專用連線帳號 (供手機/Mac/電視盒免微軟帳號直接連線)" FontWeight="Bold" FontSize="14" />
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0" Header="本機帳號名稱" Text="{x:Bind ViewModel.DedicatedUserName, Mode=TwoWay}" />
+                                        <TextBox Grid.Column="1" Header="帳號密碼" Text="{x:Bind ViewModel.DedicatedUserPassword, Mode=TwoWay}" />
+                                        <Button Grid.Column="2" Content="👤 建立共用專用帳號" Command="{x:Bind ViewModel.CreateDedicatedUserCommand}" VerticalAlignment="Bottom" Padding="14,8" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Existing Active Shares List -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="📋 現有區域網路共用資源清單" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Content="🔄 重新整理" Command="{x:Bind ViewModel.RefreshSharesCommand}" />
+                                    </Grid>
+
+                                    <ListView ItemsSource="{x:Bind ViewModel.NetShares, Mode=OneWay}" SelectionMode="None">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="models:NetShareItem">
+                                                <Grid Padding="8,8" ColumnSpacing="12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="150" />
+                                                        <ColumnDefinition Width="2*" />
+                                                        <ColumnDefinition Width="2*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                                        <TextBlock Text="{x:Bind ShareName}" FontWeight="SemiBold" FontSize="13" />
+                                                        <TextBlock Text="{x:Bind ResourcePath}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontFamily="Consolas" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                        <TextBlock Text="{x:Bind UncIpPath}" FontSize="12" FontWeight="SemiBold" FontFamily="Consolas" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                        <TextBlock Text="{x:Bind UncHostPath}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontFamily="Consolas" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="2" Text="{x:Bind Remark}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                                    <Button Grid.Column="3" Content="🗑️ 刪除共用" Command="{Binding ElementName=TabNetShare, Path=DataContext.DeleteShareCommand}" CommandParameter="{x:Bind}" Padding="8,4" FontSize="11" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </Border>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabViewItem>
+
+                <!-- ════ Tab 6: 遠端桌面服務 (Remote RDP Server) ════ -->
+                <TabViewItem x:Name="TabRdp" Header="🖥️ 遠端桌面 (RDP Server)" IsClosable="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                        <StackPanel Spacing="16" Margin="0,0,16,20">
+
+                            <!-- Status & Unlock Card -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="3">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <FontIcon Glyph="&#xE7F4;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                <TextBlock Text="Windows 遠端桌面伺服器 (RDP Server)" FontWeight="Bold" FontSize="16" />
+                                            </StackPanel>
+                                            <TextBlock Text="{x:Bind ViewModel.RdpStatus.EditionName, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='目前系統版本: {0}'}"
+                                                       Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="🔄 檢查狀態" Command="{x:Bind ViewModel.RefreshRdpStatusCommand}" VerticalAlignment="Center" />
+                                    </Grid>
+
+                                    <!-- Action Buttons -->
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button Grid.Column="0" Command="{x:Bind ViewModel.EnableRdpCommand}" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE768;" FontSize="13" />
+                                                <TextBlock Text="⚡ 一鍵啟用遠端桌面 (3389)" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Column="1" Command="{x:Bind ViewModel.DisableRdpCommand}" HorizontalAlignment="Stretch">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE71A;" FontSize="13" />
+                                                <TextBlock Text="🛑 停用遠端桌面" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Column="2" Command="{x:Bind ViewModel.LaunchRdpLoopbackCommand}" HorizontalAlignment="Stretch">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE7F4;" FontSize="13" />
+                                                <TextBlock Text="🖥️ 本機連線測試 (mstsc)" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+
+                                    <!-- Connection Info -->
+                                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                        <StackPanel Spacing="6">
+                                            <TextBlock Text="連線位址指引：" FontWeight="SemiBold" FontSize="12" />
+                                            <TextBlock Text="{x:Bind ViewModel.RdpStatus.ConnectAddressIp, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='區域網路 IP 連線位址: {0}'}" FontFamily="Consolas" FontSize="13" Foreground="{ThemeResource AccentFillColorDefaultBrush}" FontWeight="Bold" />
+                                            <TextBlock Text="{x:Bind ViewModel.RdpStatus.ConnectAddressHost, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='電腦主機名稱連線位址: {0}'}" FontFamily="Consolas" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Active Sessions List -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="👥 當前遠端工作階段 (qwinsta)" FontWeight="Bold" FontSize="14" />
+                                    <ListView ItemsSource="{x:Bind ViewModel.RdpSessions, Mode=OneWay}" MaxHeight="200" SelectionMode="None">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="services:RdpSessionItem">
+                                                <Grid Padding="6,6" ColumnSpacing="12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="150" />
+                                                        <ColumnDefinition Width="150" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{x:Bind SessionName}" FontWeight="SemiBold" FontSize="12" />
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind UserName}" FontSize="12" />
+                                                    <TextBlock Grid.Column="2" Text="{x:Bind State}" FontSize="12" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </Border>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabViewItem>
+
+                <!-- ════ Tab 7: CMD 網路工具箱 (Ping, Netstat, OpenFiles, Nbtstat) ════ -->
+                <TabViewItem x:Name="TabCliTools" Header="⚡ CMD 網路工具箱" IsClosable="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                        <StackPanel Spacing="16" Margin="0,0,16,20">
+
+                            <!-- Ping & MTU Card -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="🌐 Ping 延遲探測與最佳路徑 MTU 自動發現 (Path MTU Discovery)" FontWeight="Bold" FontSize="14" />
+                                    <Grid ColumnSpacing="10" RowSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="2*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0" Header="目標主機或 IP" Text="{x:Bind ViewModel.PingOptions.TargetHost, Mode=TwoWay}" />
+                                        <TextBox Grid.Column="1" Header="封包數 (-n)" Text="{x:Bind ViewModel.PingOptions.Count, Mode=TwoWay}" />
+                                        <TextBox Grid.Column="2" Header="緩衝區大小 (-l)" Text="{x:Bind ViewModel.PingOptions.BufferSize, Mode=TwoWay}" />
+                                        <Button Grid.Column="3" Content="🚀 開始 Ping" Command="{x:Bind ViewModel.RunPingCommand}" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Bottom" Padding="14,8" />
+                                        <Button Grid.Column="4" Content="🔍 探測 MTU" Command="{x:Bind ViewModel.DetectMtuCommand}" VerticalAlignment="Bottom" Padding="14,8" />
+                                    </Grid>
+
+                                    <!-- Log Output -->
+                                    <TextBox Text="{x:Bind ViewModel.PingOutputLog, Mode=OneWay}" Height="140"
+                                             AcceptsReturn="True" IsReadOnly="True" FontFamily="Consolas" FontSize="11"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Netstat Port Hunter Card -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="🎯 通訊埠佔用獵手 (Netstat Port Hunter &amp; 1-Click Process Terminator)" FontWeight="Bold" FontSize="14" />
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="200" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0" Header="篩選端口 (例如 80, 443, 8080)" Text="{x:Bind ViewModel.FilterPort, Mode=TwoWay}" />
+                                        <Button Grid.Column="1" Content="🔍 查詢通訊埠佔用" Command="{x:Bind ViewModel.RefreshNetstatCommand}" VerticalAlignment="Bottom" Padding="14,8" />
+                                        <Button Grid.Column="2" Content="⚡ 一鍵終結佔用此端口程式" Command="{x:Bind ViewModel.KillPortOccupantCommand}" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Bottom" Padding="14,8" />
+                                    </Grid>
+
+                                    <ListView ItemsSource="{x:Bind ViewModel.NetstatConnections, Mode=OneWay}" MaxHeight="220" SelectionMode="None">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="models:NetstatConnectionItem">
+                                                <Grid Padding="4,6" ColumnSpacing="10" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="60" />
+                                                        <ColumnDefinition Width="150" />
+                                                        <ColumnDefinition Width="150" />
+                                                        <ColumnDefinition Width="100" />
+                                                        <ColumnDefinition Width="80" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{x:Bind Protocol}" FontWeight="SemiBold" FontSize="11" />
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind LocalAddress}" FontSize="11" FontFamily="Consolas" />
+                                                    <TextBlock Grid.Column="2" Text="{x:Bind ForeignAddress}" FontSize="11" FontFamily="Consolas" />
+                                                    <TextBlock Grid.Column="3" Text="{x:Bind State}" FontSize="11" />
+                                                    <TextBlock Grid.Column="4" Text="{x:Bind Pid}" FontSize="11" FontFamily="Consolas" />
+                                                    <TextBlock Grid.Column="5" Text="{x:Bind ProcessName}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- OpenFiles and Nbtstat Card -->
+                            <Grid ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- OpenFiles -->
+                                <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                        CornerRadius="8" Padding="14">
+                                    <StackPanel Spacing="10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="📂 共享檔案遠端鎖定 (OpenFiles)" FontWeight="Bold" FontSize="13" VerticalAlignment="Center" />
+                                            <Button Grid.Column="1" Content="🔄 查詢" Command="{x:Bind ViewModel.RefreshOpenFilesCommand}" Padding="8,4" FontSize="11" />
+                                        </Grid>
+                                        <ListView ItemsSource="{x:Bind ViewModel.OpenFiles, Mode=OneWay}" MaxHeight="160" SelectionMode="None">
+                                            <ListView.ItemTemplate>
+                                                <DataTemplate x:DataType="models:OpenSharedFileItem">
+                                                    <Grid Padding="2,4" ColumnSpacing="6">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0" Text="{x:Bind OpenPath}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                                                        <Button Grid.Column="1" Content="🔓 解鎖" Command="{Binding ElementName=TabCliTools, Path=DataContext.DisconnectOpenFileCommand}" CommandParameter="{x:Bind}" Padding="6,2" FontSize="10" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ListView.ItemTemplate>
+                                        </ListView>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Nbtstat -->
+                                <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                        CornerRadius="8" Padding="14">
+                                    <StackPanel Spacing="10">
+                                        <TextBlock Text="🔄 NetBIOS 快取與名稱釋放 (Nbtstat)" FontWeight="Bold" FontSize="13" />
+                                        <TextBlock Text="當區網電腦更改 IP 或在網路芳鄰中失聯時，強制清除並重整 NetBIOS 快取 (-R &amp; -RR)。" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                        <Button Content="⚡ 一鍵清除並重載 NetBIOS 快取" Command="{x:Bind ViewModel.FlushNetBiosCommand}" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" Padding="12,6" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
                         </StackPanel>
                     </ScrollViewer>
                 </TabViewItem>

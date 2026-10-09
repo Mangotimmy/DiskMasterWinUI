@@ -1,4 +1,4 @@
-﻿{
+{
   "AppTitle": "DiskMaster Pro 磁碟大師 — 旗艦級 Windows 磁碟維護與引導部署工具箱",
   "EasyMode": "簡易模式",
   "WimDeploy": "系統部署",
@@ -181,5 +181,11 @@
   "TpmNotFound": "未檢測到相容的 TPM 晶片",
   "TestDnsPing": "⚡ 測試 DNS 延遲 (Ping)",
   "TpmManufacturer": "製造廠商",
-  "MoveLeft": "◀️ 向左移動 [Alt+Left]"
+  "MoveLeft": "◀️ 向左移動 [Alt+Left]",
+  "SystemPerformance": "效能分析",
+  "TabWinRe": "Windows 修復環境 (WinRE)",
+  "TabNetShare": "區域網路共享精靈",
+  "TabRdp": "遠端桌面 RDP 伺服器",
+  "TabCliTools": "命令提示字元 (CMD) 工具箱",
+  "TabNtfsExplorer": "NTFS 深度特性探索"
 }

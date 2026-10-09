@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentDialog
+    x:Class="DiskMasterWinUI.Controls.SmartNetworkDiagnosticDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="🧠 智慧網路連線診斷與一鍵修復精靈"
+    PrimaryButtonText="⚡ 一鍵智慧修復"
+    SecondaryButtonText="重新檢測"
+    CloseButtonText="關閉"
+    DefaultButton="Primary"
+    PrimaryButtonClick="SmartRepair_Click"
+    SecondaryButtonClick="RerunDiagnostic_Click"
+    mc:Ignorable="d">
+
+    <Grid MinWidth="520" RowSpacing="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="全方位檢測區域網路實體介面卡、預設閘道、DNS 解析延遲、網際網路 ICMP、TLS 握手、系統代理設定與 DNS 投毒污染。"
+                   Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+
+        <!-- Diagnostic Steps List -->
+        <Border Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                CornerRadius="8" Padding="12">
+            <StackPanel x:Name="StepsContainer" Spacing="10">
+                <!-- Dynamically populated or item rows -->
+            </StackPanel>
+        </Border>
+
+        <!-- Summary Status Box -->
+        <Border Grid.Row="2" x:Name="SummaryBorder" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                CornerRadius="6" Padding="10">
+            <TextBlock x:Name="SummaryText" Text="診斷進行中..." FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap" />
+        </Border>
+    </Grid>
+</ContentDialog>

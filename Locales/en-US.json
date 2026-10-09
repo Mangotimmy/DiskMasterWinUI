@@ -1,4 +1,4 @@
-﻿{
+{
   "AppTitle": "DiskMaster Pro — Flagship Windows Disk Maintenance & Boot Deployment Suite",
   "EasyMode": "Easy Mode",
   "WimDeploy": "WIM Deploy",
@@ -181,5 +181,11 @@
   "TpmNotFound": "No compatible TPM chip detected",
   "TestDnsPing": "⚡ Test DNS Ping Latency",
   "TpmManufacturer": "Manufacturer",
-  "MoveLeft": "◀️ Move Left [Alt+Left]"
+  "MoveLeft": "◀️ Move Left [Alt+Left]",
+  "SystemPerformance": "Performance",
+  "TabWinRe": "Windows Recovery (WinRE)",
+  "TabNetShare": "LAN Share Wizard",
+  "TabRdp": "Remote Desktop (RDP)",
+  "TabCliTools": "CMD CLI Toolbox",
+  "TabNtfsExplorer": "NTFS Deep Explorer"
 }

@@ -252,6 +252,23 @@
                             </TabViewItem.ContextFlyout>
                         </TabViewItem>
 
+                        <TabViewItem x:Name="TabSystemPerformance" Header="效能分析" Tag="SystemPerformance" IsClosable="False"
+                                      ToolTipService.ToolTip="系統即時效能監控、進程獵殺與硬體報告 — 右鍵浮動視窗">
+                            <TabViewItem.IconSource>
+                                <FontIconSource Glyph="&#xE9D9;" />
+                            </TabViewItem.IconSource>
+                            <TabViewItem.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="🪟 獨立浮動視窗 [Ctrl+Shift+F]" Click="TabContext_Float_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最左側" Click="TabContext_MoveFirst_Click" />
+                                    <MenuFlyoutItem Text="📌 移至最右側" Click="TabContext_MoveLast_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
+                                    <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                </MenuFlyout>
+                            </TabViewItem.ContextFlyout>
+                        </TabViewItem>
+
                         <TabViewItem x:Name="TabSettings" Header="設定" Tag="Settings" IsClosable="False"
                                       ToolTipService.ToolTip="偏好設定 — 快捷鍵: Ctrl+, / 右鍵浮動視窗">
                             <TabViewItem.IconSource>
