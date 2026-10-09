@@ -230,7 +230,7 @@
                                                             </Grid.ColumnDefinitions>
                                                             <TextBlock Grid.Column="0" Text="{x:Bind PrimaryDns, Converter={StaticResource StringFormatConverter}, ConverterParameter='主要: {0}'}" Style="{StaticResource CaptionTextBlockStyle}" />
                                                             <TextBlock Grid.Column="1" Text="🏆 最速推薦" FontSize="11" FontWeight="Bold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
-                                                                       Visibility="{x:Bind IsFastest, Mode=OneWay}" />
+                                                                       Visibility="{x:Bind IsFastest, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
                                                         </Grid>
                                                         <TextBlock Text="{x:Bind Description}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
                                                     </StackPanel>
@@ -389,57 +389,60 @@
 
                 <!-- ════ Tab 4: Windows Hosts 檔案視覺化編輯器 ════ -->
                 <TabViewItem x:Name="TabHosts" Header="📝 Hosts 檔案編輯器" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                        <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
+                    <Grid RowSpacing="12" Margin="0,10,0,10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
 
-                            <!-- Control Card -->
-                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                                    CornerRadius="8" Padding="16">
-                                <StackPanel Spacing="12">
-                                    <Grid ColumnSpacing="12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="Windows 本機網域名稱解析 (C:\Windows\System32\drivers\etc\hosts)" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                        <Button Grid.Column="1" Content="🔄 重新整理" Command="{x:Bind ViewModel.RefreshHostsCommand}" />
-                                        <Button Grid.Column="2" Content="🛡️ 還原官方預設" Command="{x:Bind ViewModel.RestoreDefaultHostsCommand}" />
-                                        <Button Grid.Column="3" Content="💾 儲存 Hosts" Command="{x:Bind ViewModel.SaveRawHostsCommand}" Style="{StaticResource AccentButtonStyle}" />
-                                    </Grid>
+                        <!-- Control Card -->
+                        <Border Grid.Row="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Windows 本機網域名稱解析 (C:\Windows\System32\drivers\etc\hosts)" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" Content="🔄 重新整理" Command="{x:Bind ViewModel.RefreshHostsCommand}" />
+                                    <Button Grid.Column="2" Content="🛡️ 還原官方預設" Command="{x:Bind ViewModel.RestoreDefaultHostsCommand}" />
+                                    <Button Grid.Column="3" Content="💾 儲存 Hosts" Command="{x:Bind ViewModel.SaveRawHostsCommand}" Style="{StaticResource AccentButtonStyle}" />
+                                </Grid>
 
-                                    <!-- Quick Add Form -->
-                                    <Grid ColumnSpacing="8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="160" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox Grid.Column="0" Header="IP 位址" Text="{x:Bind ViewModel.NewHostIp, Mode=TwoWay}" />
-                                        <TextBox Grid.Column="1" Header="網域名稱 (Domain Name)" Text="{x:Bind ViewModel.NewHostDomain, Mode=TwoWay}" PlaceholderText="例如: telemetry.microsoft.com" />
-                                        <TextBox Grid.Column="2" Header="備註說明" Text="{x:Bind ViewModel.NewHostComment, Mode=TwoWay}" PlaceholderText="可留空" />
-                                        <Button Grid.Column="3" Content="➕ 加入條目" Command="{x:Bind ViewModel.AddHostEntryCommand}" VerticalAlignment="Bottom" />
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
+                                <!-- Quick Add Form -->
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="160" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0" Header="IP 位址" Text="{x:Bind ViewModel.NewHostIp, Mode=TwoWay}" />
+                                    <TextBox Grid.Column="1" Header="網域名稱 (Domain Name)" Text="{x:Bind ViewModel.NewHostDomain, Mode=TwoWay}" PlaceholderText="例如: telemetry.microsoft.com" />
+                                    <TextBox Grid.Column="2" Header="備註說明" Text="{x:Bind ViewModel.NewHostComment, Mode=TwoWay}" PlaceholderText="可留空" />
+                                    <Button Grid.Column="3" Content="➕ 加入條目" Command="{x:Bind ViewModel.AddHostEntryCommand}" VerticalAlignment="Bottom" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
 
-                            <!-- Raw Editor Box -->
-                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                                    CornerRadius="8" Padding="16">
-                                <TextBox Text="{x:Bind ViewModel.RawHostsText, Mode=TwoWay}"
-                                         AcceptsReturn="True" TextWrapping="NoWrap"
-                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                                         ScrollViewer.VerticalScrollMode="Enabled"
-                                         ScrollViewer.HorizontalScrollMode="Enabled"
-                                         FontFamily="Consolas" FontSize="12" Height="340" />
-                            </Border>
-                        </StackPanel>
-                    </ScrollViewer>
+                        <!-- Raw Editor Box with Always-Visible Vertical ScrollBar and Flexible Height -->
+                        <Border Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="12">
+                            <TextBox Text="{x:Bind ViewModel.RawHostsText, Mode=TwoWay}"
+                                     AcceptsReturn="True" TextWrapping="NoWrap"
+                                     ScrollViewer.VerticalScrollBarVisibility="Visible"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                     ScrollViewer.VerticalScrollMode="Enabled"
+                                     ScrollViewer.HorizontalScrollMode="Enabled"
+                                     FontFamily="Consolas" FontSize="13"
+                                     VerticalAlignment="Stretch" HorizontalAlignment="Stretch" MinHeight="320" />
+                        </Border>
+                    </Grid>
                 </TabViewItem>
 
                 <!-- ════ Tab 5: 網路共用精靈 (One-Click NetShare Wizard) ════ -->
@@ -561,7 +564,7 @@
                                                         <TextBlock Text="{x:Bind UncHostPath}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontFamily="Consolas" />
                                                     </StackPanel>
                                                     <TextBlock Grid.Column="2" Text="{x:Bind Remark}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
-                                                    <Button Grid.Column="3" Content="🗑️ 刪除共用" Command="{Binding ElementName=TabNetShare, Path=DataContext.DeleteShareCommand}" CommandParameter="{x:Bind}" Padding="8,4" FontSize="11" VerticalAlignment="Center" />
+                                                    <Button Grid.Column="3" Content="🗑️ 刪除共用" Click="DeleteShare_Click" Padding="8,4" FontSize="11" VerticalAlignment="Center" />
                                                 </Grid>
                                             </DataTemplate>
                                         </ListView.ItemTemplate>
@@ -771,7 +774,7 @@
                                                             <ColumnDefinition Width="Auto" />
                                                         </Grid.ColumnDefinitions>
                                                         <TextBlock Grid.Column="0" Text="{x:Bind OpenPath}" FontSize="11" TextTrimming="CharacterEllipsis" />
-                                                        <Button Grid.Column="1" Content="🔓 解鎖" Command="{Binding ElementName=TabCliTools, Path=DataContext.DisconnectOpenFileCommand}" CommandParameter="{x:Bind}" Padding="6,2" FontSize="10" />
+                                                        <Button Grid.Column="1" Content="🔓 解鎖" Click="DisconnectOpenFile_Click" Padding="6,2" FontSize="10" />
                                                     </Grid>
                                                 </DataTemplate>
                                             </ListView.ItemTemplate>

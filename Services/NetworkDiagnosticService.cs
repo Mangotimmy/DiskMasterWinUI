@@ -86,7 +86,7 @@ public class NetworkDiagnosticService
     }
 
     /// <summary>
-    /// Checks whether the network interface is a virtual adapter (VPN, Tailscale, WSL, VM, etc.).
+    /// Checks whether the network interface is a virtual adapter (WAN Miniport, QoS Scheduler, VPN, Tailscale, WSL, VM, etc.).
     /// </summary>
     public static bool IsVirtualAdapter(NetworkInterface ni)
     {
@@ -104,10 +104,13 @@ public class NetworkDiagnosticService
 
         string[] virtualKeywords =
         [
-            "tailscale", "tap", "tun", "vpn", "wsl", "hyper-v", "vethernet",
+            "miniport", "wan ", "wan-", "wan (", "qos", "packet scheduler", "pacer",
+            "wfp", "lightweight filter", "filter driver", "filter", "ndis",
+            "tailscale", "tap", "tun", "wintun", "vpn", "wsl", "hyper-v", "vethernet", "vswitch",
             "vmware", "vmnet", "virtual", "pseudo", "bluetooth", "npcap", "pcap",
-            "filter", "ndis", "multiplexor", "docker", "container", "wireguard",
-            "zerotier", "hamachi", "radmin", "vbox", "virtualbox", "teredo", "isatap"
+            "multiplexor", "docker", "container", "wireguard", "surfshark",
+            "zerotier", "hamachi", "radmin", "vbox", "virtualbox", "teredo", "isatap",
+            "kernel debug", "wi-fi direct virtual", "direct virtual"
         ];
 
         return virtualKeywords.Any(k => nameLower.Contains(k) || descLower.Contains(k));
@@ -206,17 +209,21 @@ public class NetworkDiagnosticService
                     IsPrimary = isPrimary
                 };
 
-                if (!isVirtual && !string.IsNullOrEmpty(gw))
-                {
-                    physicalWithGw.Add(item);
-                }
-                else if (!isVirtual)
-                {
-                    physicalWithoutGw.Add(item);
-                }
-                else
+                if (isVirtual)
                 {
                     virtualAdapters.Add(item);
+                }
+                else if (ni.NetworkInterfaceType == NetworkInterfaceType.Ethernet ||
+                         ni.NetworkInterfaceType == NetworkInterfaceType.Wireless80211)
+                {
+                    if (!string.IsNullOrEmpty(gw))
+                    {
+                        physicalWithGw.Add(item);
+                    }
+                    else if (!string.IsNullOrEmpty(ipv4) || isPrimary)
+                    {
+                        physicalWithoutGw.Add(item);
+                    }
                 }
             }
 

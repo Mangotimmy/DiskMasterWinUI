@@ -14,6 +14,7 @@ public sealed partial class NetworkToolsPage : Page
     public NetworkToolsPage()
     {
         InitializeComponent();
+        DataContext = ViewModel;
         NavigationCacheMode = NavigationCacheMode.Required;
         DiskMasterWinUI.Helpers.TabReorderHelper.Attach(NetTabView);
         ApplyLanguage();
@@ -62,6 +63,30 @@ public sealed partial class NetworkToolsPage : Page
             "en-US" => "📝 Hosts File Editor",
             "ja-JP" => "📝 Hosts エディタ",
             _ => "📝 Hosts 檔案編輯器"
+        };
+
+        TabNetShare.Header = lang switch
+        {
+            "zh-CN" => "🖧 局域网共享 (NetShare)",
+            "en-US" => "🖧 LAN File Share (NetShare)",
+            "ja-JP" => "🖧 共有フォルダ (NetShare)",
+            _ => "🖧 網路共用精靈 (NetShare)"
+        };
+
+        TabRdp.Header = lang switch
+        {
+            "zh-CN" => "🖥️ 远程桌面 (RDP)",
+            "en-US" => "🖥️ Remote Desktop (RDP)",
+            "ja-JP" => "🖥️ リモートデスクトップ (RDP)",
+            _ => "🖥️ 遠端桌面 (RDP Server)"
+        };
+
+        TabCliTools.Header = lang switch
+        {
+            "zh-CN" => "⚡ CMD 网络工具箱",
+            "en-US" => "⚡ CMD Network Toolkit",
+            "ja-JP" => "⚡ CMD ネットワークツール",
+            _ => "⚡ CMD 網路工具箱"
         };
     }
 
@@ -124,6 +149,22 @@ public sealed partial class NetworkToolsPage : Page
         if (sender is Button btn && btn.DataContext is UpnpPortMappingItem item)
         {
             await ViewModel.DeletePortMappingCommand.ExecuteAsync(item);
+        }
+    }
+
+    private async void DeleteShare_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is NetShareItem item)
+        {
+            await ViewModel.DeleteShareCommand.ExecuteAsync(item);
+        }
+    }
+
+    private async void DisconnectOpenFile_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is OpenSharedFileItem item)
+        {
+            await ViewModel.DisconnectOpenFileCommand.ExecuteAsync(item);
         }
     }
 

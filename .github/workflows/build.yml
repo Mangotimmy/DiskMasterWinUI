@@ -152,8 +152,10 @@ jobs:
         if [[ "${{ github.ref }}" == refs/tags/* ]]; then
           echo "TAG_NAME=${{ github.ref_name }}" >> $GITHUB_OUTPUT
         else
-          # Fallback for manual workflow_dispatch runs
-          echo "TAG_NAME=v1.4.2-build-$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+          # Extract version dynamically from Directory.Build.props
+          VERSION=$(sed -n 's/.*<Version>\(.*\)<\/Version>.*/\1/p' Directory.Build.props | tr -d ' \r\n')
+          if [ -z "$VERSION" ]; then VERSION="1.4.2"; fi
+          echo "TAG_NAME=v${VERSION}-build-$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
         fi
 
     - name: Publish GitHub Release

@@ -11,13 +11,21 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$projectDir = $PSScriptRoot
+Set-Location $projectDir
+
+$versionFile = Join-Path $projectDir "Directory.Build.props"
+$appVersion = "1.4.2"
+if (Test-Path $versionFile) {
+    [xml]$xmlProps = Get-Content $versionFile
+    $appVersion = $xmlProps.Project.PropertyGroup.Version
+}
+
 Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host "     DiskMaster Pro Windows Setup Installer (.EXE) Builder       " -ForegroundColor Cyan
 Write-Host "     Target Architecture: $Architecture                          " -ForegroundColor Cyan
+Write-Host "     Suite Version:       v$appVersion                           " -ForegroundColor Cyan
 Write-Host "=================================================================" -ForegroundColor Cyan
-
-$projectDir = $PSScriptRoot
-Set-Location $projectDir
 
 # Close any running instances
 Stop-Process -Name "DiskMasterWinUI" -Force -ErrorAction SilentlyContinue

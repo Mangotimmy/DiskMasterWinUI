@@ -20,6 +20,23 @@ public class UpnpService
     {
         try
         {
+            var primaryNic = NetworkDiagnosticService.GetPrimaryPhysicalInternetAdapter();
+            if (primaryNic != null)
+            {
+                var props = primaryNic.GetIPProperties();
+                var ipv4 = props.UnicastAddresses
+                    .FirstOrDefault(ip => ip.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip.Address))
+                    ?.Address.ToString();
+                if (!string.IsNullOrEmpty(ipv4))
+                {
+                    return ipv4;
+                }
+            }
+        }
+        catch { }
+
+        try
+        {
             using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, 0);
             socket.Connect("8.8.8.8", 65530);
             if (socket.LocalEndPoint is IPEndPoint endPoint)
@@ -29,13 +46,14 @@ public class UpnpService
         }
         catch
         {
-            // Fallback: search operational network interfaces
+            // Fallback: search operational physical network interfaces
             try
             {
                 foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
                 {
                     if (ni.OperationalStatus != OperationalStatus.Up ||
-                        ni.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+                        ni.NetworkInterfaceType == NetworkInterfaceType.Loopback ||
+                        NetworkDiagnosticService.IsVirtualAdapter(ni))
                     {
                         continue;
                     }

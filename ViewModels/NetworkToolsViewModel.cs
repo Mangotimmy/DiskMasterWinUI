@@ -127,6 +127,8 @@ public partial class NetworkToolsViewModel : ObservableObject
     {
         await RefreshUpnpAsync();
         await RefreshHostsAsync();
+        await RefreshSharesAsync();
+        await RefreshRdpStatusAsync();
     }
 
     // ══════════════════════════════════════════════════════════
