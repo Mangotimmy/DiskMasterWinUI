@@ -1,11 +1,11 @@
 <Project>
   <!-- Single Source of Truth for DiskMaster Pro suite versioning and metadata -->
   <PropertyGroup>
-    <VersionPrefix>1.4.5</VersionPrefix>
-    <Version>1.4.5</Version>
-    <AssemblyVersion>1.4.5.0</AssemblyVersion>
-    <FileVersion>1.4.5.0</FileVersion>
-    <InformationalVersion>1.4.5</InformationalVersion>
+    <VersionPrefix>1.4.6</VersionPrefix>
+    <Version>1.4.6</Version>
+    <AssemblyVersion>1.4.6.0</AssemblyVersion>
+    <FileVersion>1.4.6.0</FileVersion>
+    <InformationalVersion>1.4.6</InformationalVersion>
     <Company>DiskMaster Team</Company>
     <Product>DiskMaster Pro</Product>
     <Authors>DiskMaster Team</Authors>
