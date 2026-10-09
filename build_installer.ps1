@@ -44,11 +44,33 @@ if (-not (Test-Path "$publishDir\DiskMasterWinUI.exe")) {
     Write-Host "`n[1/5] Using existing published binaries in $publishDir..." -ForegroundColor Yellow
 }
 
+# 1.1 Ensure native uninstaller binary is compiled into publish directory
+$uninstallerProj = "$projectDir\tools\DiskMasterUninstaller\DiskMasterUninstaller.csproj"
+if (Test-Path $uninstallerProj) {
+    Write-Host "`n[1.1/5] Compiling Native Uninstaller executable ($Architecture)..." -ForegroundColor Yellow
+    $uninstTempOut = "$projectDir\tools\DiskMasterUninstaller\bin\temp_uninst_out"
+    if (Test-Path $uninstTempOut) { Remove-Item $uninstTempOut -Recurse -Force }
+    dotnet publish $uninstallerProj `
+        -c Release `
+        -r $Architecture `
+        --self-contained true `
+        -p:PublishSingleFile=true `
+        -p:IncludeNativeLibrariesForSelfExtract=true `
+        -p:EnableCompressionInSingleFile=true `
+        -o $uninstTempOut
+    Copy-Item "$uninstTempOut\DiskMasterUninstaller.exe" "$publishDir\Uninstall.exe" -Force
+    Remove-Item $uninstTempOut -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # 2. Sign inner binaries if not already signed
 if (Test-Path $signScript) {
     Write-Host "`n[2/5] Verifying & signing payload binaries..." -ForegroundColor Yellow
+    $targetsToSign = @("$publishDir\DiskMasterWinUI.exe")
+    if (Test-Path "$publishDir\Uninstall.exe") {
+        $targetsToSign += "$publishDir\Uninstall.exe"
+    }
     $signArgs = @{
-        TargetPath = @("$publishDir\DiskMasterWinUI.exe")
+        TargetPath = $targetsToSign
     }
     if ($CertThumbprint) { $signArgs["CertThumbprint"] = $CertThumbprint }
     if ($PfxPath) { $signArgs["PfxPath"] = $PfxPath }

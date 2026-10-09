@@ -76,12 +76,33 @@ public static class AppEnvironmentHelper
                 return true;
             }
 
-            // 2. Check Windows Add/Remove Programs registry key
+            // 2. Check if running from %LocalAppData%\Programs
+            string localPrograms = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs");
+            if (!string.IsNullOrEmpty(localPrograms) && exePath.StartsWith(localPrograms, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            // 3. Check Windows Add/Remove Programs registry key InstallLocation
             using var hklmKey = Registry.LocalMachine.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\DiskMasterPro");
-            if (hklmKey != null) return true;
+            if (hklmKey != null)
+            {
+                string? installLoc = hklmKey.GetValue("InstallLocation") as string;
+                if (!string.IsNullOrEmpty(installLoc) && exePath.StartsWith(installLoc, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
 
             using var hkcuKey = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\DiskMasterPro");
-            if (hkcuKey != null) return true;
+            if (hkcuKey != null)
+            {
+                string? installLoc = hkcuKey.GetValue("InstallLocation") as string;
+                if (!string.IsNullOrEmpty(installLoc) && exePath.StartsWith(installLoc, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
         }
         catch
         {
