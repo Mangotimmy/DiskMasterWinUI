@@ -18,9 +18,9 @@
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);MVVMTK0045</NoWarn>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>1.3.0</Version>
-    <AssemblyVersion>1.3.0.0</AssemblyVersion>
-    <FileVersion>1.3.0.0</FileVersion>
+    <Version>1.4.2</Version>
+    <AssemblyVersion>1.4.2.0</AssemblyVersion>
+    <FileVersion>1.4.2.0</FileVersion>
     <Company>DiskMaster Team</Company>
     <Product>DiskMaster Pro</Product>
     <Authors>DiskMaster Team</Authors>
