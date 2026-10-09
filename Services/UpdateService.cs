@@ -49,7 +49,7 @@ public class UpdateService
         get
         {
             var ver = typeof(UpdateService).Assembly.GetName().Version;
-            return ver != null ? $"v{ver.Major}.{ver.Minor}.{ver.Build}" : "v1.3.0";
+            return ver != null ? $"v{ver.Major}.{ver.Minor}.{ver.Build}" : "v1.4.2";
         }
     }
 
