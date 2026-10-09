@@ -386,8 +386,11 @@ internal static class Program
             using var key = baseKey.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\DiskMasterPro");
             if (key != null)
             {
+                var ver = typeof(Program).Assembly.GetName().Version;
+                string displayVer = ver != null ? $"{ver.Major}.{ver.Minor}.{ver.Build}" : "1.4.2";
+
                 key.SetValue("DisplayName", "DiskMaster Pro 旗艦版");
-                key.SetValue("DisplayVersion", "1.4.2");
+                key.SetValue("DisplayVersion", displayVer);
                 key.SetValue("Publisher", "DiskMaster Team");
                 key.SetValue("InstallLocation", targetDir);
                 key.SetValue("DisplayIcon", $"{exePath},0");

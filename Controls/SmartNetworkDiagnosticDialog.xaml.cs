@@ -145,18 +145,27 @@ public sealed partial class SmartNetworkDiagnosticDialog : ContentDialog
 
         // Step 6: System Proxy
         var s6 = new DiagStep { Title = "6. 系統代理伺服器 (Proxy) 設定" };
-        var proxy = WebRequest.GetSystemWebProxy();
-        var testUri = new Uri("https://www.google.com");
-        var actualProxy = proxy.GetProxy(testUri);
-        if (actualProxy == null || actualProxy == testUri)
+        try
+        {
+            using var regKey = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Internet Settings");
+            int proxyEnable = regKey?.GetValue("ProxyEnable") as int? ?? 0;
+            string proxyServer = regKey?.GetValue("ProxyServer") as string ?? "";
+
+            if (proxyEnable == 0 || string.IsNullOrWhiteSpace(proxyServer))
+            {
+                s6.IsPass = true;
+                s6.Status = "🟢 直連模式 (無代理阻礙)";
+            }
+            else
+            {
+                s6.IsWarning = true;
+                s6.Status = $"🟡 啟用代理中: {proxyServer}";
+            }
+        }
+        catch
         {
             s6.IsPass = true;
-            s6.Status = "🟢 直連模式 (無代理阻礙)";
-        }
-        else
-        {
-            s6.IsWarning = true;
-            s6.Status = $"🟡 啟用代理中: {actualProxy}";
+            s6.Status = "🟢 直連模式 (預設)";
         }
         AddStepToUi(s6);
 
