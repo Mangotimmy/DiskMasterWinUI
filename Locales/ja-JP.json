@@ -187,5 +187,7 @@
   "TabNetShare": "LAN 共有ウィザード",
   "TabRdp": "リモートデスクトップ (RDP)",
   "TabCliTools": "コマンドプロンプト ツールボックス",
-  "TabNtfsExplorer": "NTFS 詳細エクスプローラー"
+  "TabNtfsExplorer": "NTFS 詳細エクスプローラー",
+  "FollowWindowsLanguage": "Windows システム言語に従う",
+  "FollowWindowsLanguageDesc": "現在の Windows OS 表示言語を自動検出して即時適用します"
 }

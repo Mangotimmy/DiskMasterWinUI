@@ -6,7 +6,7 @@ public class AppSettings
 {
     public string Theme { get; set; } = "System";
     public int ScalePercent { get; set; } = 100;
-    public string Language { get; set; } = "zh-TW";
+    public string Language { get; set; } = "Auto";
     public bool EnableSafetyConfirmations { get; set; } = true;
     public string DefaultPartitionStyle { get; set; } = "GPT";
     public string DefaultFileSystem { get; set; } = "NTFS";
@@ -75,9 +75,14 @@ public class AppSettings
     public bool CloseToTray { get; set; } = false;
     public bool EnableTaskbarFlash { get; set; } = true;
     public bool EnableAudioFeedback { get; set; } = true;
+    public string NotificationSoundScheme { get; set; } = "Default"; // "Default", "Chimes", "Ding", "Tada", "Crystal", "Custom"
+    public string CustomNotificationSoundPath { get; set; } = "";
+    public bool EnableWindowsNotificationCenter { get; set; } = true;
 
     // ── Chrome Modular Tab & Layout Settings ──
+    public bool EnableCustomTabReorder { get; set; } = true;
     public List<string> CustomTabOrder { get; set; } = new();
+    public List<string> DisabledTabTags { get; set; } = new();
     public Dictionary<string, bool> ComponentVisibility { get; set; } = new();
     public Dictionary<string, double> LayoutSplitterSizes { get; set; } = new();
     public List<string> DiskHealthCardOrder { get; set; } = new();

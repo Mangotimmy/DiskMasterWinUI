@@ -219,6 +219,9 @@ public sealed partial class SettingsPage : Page
         AudioFeedbackToggle.Header = LocalizationService.T("操作成功與完成播放提示音效", "操作成功与完成播放提示音效", "Play System Sounds on Completion", "完了時にシステム効果音を再生");
         AudioFeedbackToggle.OffContent = LocalizationService.T("靜音", "静音", "Mute", "ミュート");
         AudioFeedbackToggle.OnContent = LocalizationService.T("音效啟用", "音效启用", "Enabled", "有効");
+        WindowsNotificationCenterToggle.Header = LocalizationService.T("同步發送至 Windows 通知中心清單", "同步发送至 Windows 通知中心列表", "Sync to Windows Notification Center List", "Windows 通知センターリストに同期");
+        WindowsNotificationCenterToggle.OffContent = LocalizationService.T("僅系統匣氣球", "仅系统托盘气泡", "Tray Balloon Only", "トレイ通知のみ");
+        WindowsNotificationCenterToggle.OnContent = LocalizationService.T("長駐通知中心 (Win+N)", "长驻通知中心 (Win+N)", "Action Center (Win+N)", "通知センターに常駐 (Win+N)");
 
         // Section 7.2: Auto Updater
         UpdaterCardTitle.Text = LocalizationService.T("🚀 自動更新與版本管理", "🚀 自动更新与版本管理", "🚀 Auto Updater & Version Control", "🚀 自動更新とバージョン管理");
@@ -275,5 +278,37 @@ public sealed partial class SettingsPage : Page
             DefaultButton = ContentDialogButton.Close
         };
         await dialog.ShowAsync();
+    }
+
+    private void MoveTabToTop_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is Models.TabOrderItem item)
+        {
+            ViewModel.MoveTabToTop(item);
+        }
+    }
+
+    private void MoveTabUp_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is Models.TabOrderItem item)
+        {
+            ViewModel.MoveTabUp(item);
+        }
+    }
+
+    private void MoveTabDown_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is Models.TabOrderItem item)
+        {
+            ViewModel.MoveTabDown(item);
+        }
+    }
+
+    private void MoveTabToBottom_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is Models.TabOrderItem item)
+        {
+            ViewModel.MoveTabToBottom(item);
+        }
     }
 }

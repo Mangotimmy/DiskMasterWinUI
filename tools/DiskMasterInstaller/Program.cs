@@ -94,7 +94,7 @@ internal static class Program
 
         // Check for Existing Installation to avoid duplicate / accidental reinstallation
         var assemblyVer = typeof(Program).Assembly.GetName().Version;
-        string currentVersionStr = assemblyVer != null ? $"{assemblyVer.Major}.{assemblyVer.Minor}.{assemblyVer.Build}" : "1.4.6";
+        string currentVersionStr = assemblyVer != null ? $"{assemblyVer.Major}.{assemblyVer.Minor}.{assemblyVer.Build}" : "1.4.9";
 
         bool hasExisting = FindExistingInstallation(out string existingVersion, out string existingLocation, out bool isExistingMachine);
 
@@ -491,6 +491,14 @@ internal static class Program
                 key.SetValue("URLInfoAbout", "https://github.com/Mangotimmy/DiskMasterWinUI");
                 key.SetValue("NoModify", 1, RegistryValueKind.DWord);
                 key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
+            }
+
+            using var appKey = Registry.CurrentUser.CreateSubKey(@"Software\Classes\AppUserModelId\DiskMaster.Pro.Flagship", writable: true);
+            if (appKey != null)
+            {
+                appKey.SetValue("DisplayName", "DiskMaster Pro 旗艦版");
+                appKey.SetValue("IconUri", Path.Combine(targetDir, "Assets", "AppIcon.ico"));
+                appKey.SetValue("ShowInSettings", 1, RegistryValueKind.DWord);
             }
         }
         catch { }

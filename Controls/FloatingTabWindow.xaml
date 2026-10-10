@@ -36,12 +36,26 @@
                     <FontIcon Glyph="&#xE8A7;" FontSize="16" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
                     <TextBlock x:Name="WindowNoticeText" Text="獨立分頁視窗" VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
-                <Button Grid.Column="1" x:Name="DockBackButton" Click="DockBack_Click" Style="{StaticResource AccentButtonStyle}" Padding="12,5" FontSize="12">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <FontIcon Glyph="&#xE8B0;" FontSize="13" />
-                        <TextBlock x:Name="DockBackText" Text="嵌回主視窗" />
-                    </StackPanel>
-                </Button>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="DockRightButton" Click="DockRight_Click" Padding="10,5" FontSize="12" ToolTipService.ToolTip="停靠至主視窗右側雙欄分屏">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE765;" FontSize="12" />
+                            <TextBlock x:Name="DockRightText" Text="◨ 停靠至右側" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="DockBottomButton" Click="DockBottom_Click" Padding="10,5" FontSize="12" ToolTipService.ToolTip="停靠至主視窗底部水平分屏">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE765;" FontSize="12" />
+                            <TextBlock x:Name="DockBottomText" Text="⬓ 停靠至底部" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="DockBackButton" Click="DockBack_Click" Style="{StaticResource AccentButtonStyle}" Padding="12,5" FontSize="12" ToolTipService.ToolTip="嵌回主視窗頂部分頁列">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE8B0;" FontSize="13" />
+                            <TextBlock x:Name="DockBackText" Text="嵌回主視窗" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
             </Grid>
         </Border>
 

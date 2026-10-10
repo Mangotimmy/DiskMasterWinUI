@@ -13,6 +13,8 @@ public sealed partial class FloatingTabWindow : Window
     public string TabHeader { get; }
     public Page HostedPage { get; }
     public event Action<FloatingTabWindow>? DockRequested;
+    public event Action<FloatingTabWindow>? DockToRightRequested;
+    public event Action<FloatingTabWindow>? DockToBottomRequested;
 
     private bool _isDocking = false;
 
@@ -82,6 +84,20 @@ public sealed partial class FloatingTabWindow : Window
             "ja-JP" => "独立タブウィンドウ",
             _ => "獨立分頁視窗"
         };
+        DockRightText.Text = loc.CurrentLanguage switch
+        {
+            "zh-CN" => "◨ 停靠至右侧",
+            "en-US" => "◨ Dock Right",
+            "ja-JP" => "◨ 右にドック",
+            _ => "◨ 停靠至右側"
+        };
+        DockBottomText.Text = loc.CurrentLanguage switch
+        {
+            "zh-CN" => "⬓ 停靠至底部",
+            "en-US" => "⬓ Dock Bottom",
+            "ja-JP" => "⬓ 下にドック",
+            _ => "⬓ 停靠至底部"
+        };
         DockBackText.Text = loc.CurrentLanguage switch
         {
             "zh-CN" => "嵌回主窗口",
@@ -100,11 +116,33 @@ public sealed partial class FloatingTabWindow : Window
             {
                 var ff = new FontFamily(font);
                 FloatingContentFrame.FontFamily = ff;
+                DockRightButton.FontFamily = ff;
+                DockBottomButton.FontFamily = ff;
                 DockBackButton.FontFamily = ff;
                 WindowNoticeText.FontFamily = ff;
             }
             catch { }
         }
+    }
+
+    private void DockRight_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isDocking) return;
+        _isDocking = true;
+        UnsubscribeEvents();
+        FloatingContentFrame.Content = null;
+        DockToRightRequested?.Invoke(this);
+        try { this.Close(); } catch { }
+    }
+
+    private void DockBottom_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isDocking) return;
+        _isDocking = true;
+        UnsubscribeEvents();
+        FloatingContentFrame.Content = null;
+        DockToBottomRequested?.Invoke(this);
+        try { this.Close(); } catch { }
     }
 
     private void DockBack_Click(object sender, RoutedEventArgs e)
@@ -120,13 +158,17 @@ public sealed partial class FloatingTabWindow : Window
         }
     }
 
+    private void UnsubscribeEvents()
+    {
+        LocalizationService.Instance.LanguageChanged -= ApplyLanguage;
+        SettingsService.Instance.SettingsChanged -= ApplyFont;
+    }
+
     public void PerformDock(bool closeWindow = true)
     {
         if (_isDocking) return;
         _isDocking = true;
-
-        LocalizationService.Instance.LanguageChanged -= ApplyLanguage;
-        SettingsService.Instance.SettingsChanged -= ApplyFont;
+        UnsubscribeEvents();
 
         // Remove page from frame before docking
         FloatingContentFrame.Content = null;

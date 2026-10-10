@@ -33,6 +33,7 @@ public partial class SystemMetricsSnapshot : ObservableObject
     [ObservableProperty] private string _diskReadRateDisplay = "0 KB/s";
     [ObservableProperty] private string _diskWriteRateDisplay = "0 KB/s";
     [ObservableProperty] private string _netThroughputDisplay = "0 KB/s";
+    [ObservableProperty] private List<DiskPerformanceItem> _disks = new();
 
     public string DisplayCpuPercent => $"{CpuUsagePercent:F1}%";
     public string DisplayRamPercent => $"{RamUsagePercent:F1}%";
@@ -66,6 +67,55 @@ public partial class SystemMetricsSnapshot : ObservableObject
     }
     partial void OnAvailableRamMbChanged(long value) => OnPropertyChanged(nameof(DisplayRamDetail));
     partial void OnTotalRamMbChanged(long value) => OnPropertyChanged(nameof(DisplayRamDetail));
+}
+
+public partial class DiskPerformanceItem : ObservableObject
+{
+    [ObservableProperty] private int _diskIndex; // 0, 1, 2... or -1 for _Total
+    [ObservableProperty] private string _instanceName = ""; // e.g. "0 C:", "1 F:", "_Total"
+    [ObservableProperty] private string _displayName = ""; // e.g. "磁碟 0 (C:)"
+    [ObservableProperty] private string _modelName = ""; // e.g. "WD_BLACK SN850X 2000GB"
+    [ObservableProperty] private string _mediaType = "SSD"; // "NVMe SSD", "SSD", "HDD", "外接磁碟 (USB)"
+    [ObservableProperty] private string _capacityDisplay = ""; // "2,000 GB", "500 GB"
+    [ObservableProperty] private double _activeTimePercent;
+    [ObservableProperty] private double _readLatencyMs;
+    [ObservableProperty] private double _writeLatencyMs;
+    [ObservableProperty] private string _readRateDisplay = "0 KB/s";
+    [ObservableProperty] private string _writeRateDisplay = "0 KB/s";
+    [ObservableProperty] private bool _isSelected;
+
+    public string DisplayActivePercent => $"{ActiveTimePercent:F1}%";
+    public string DisplayReadLatency => ReadLatencyMs > 0 ? $"{ReadLatencyMs:F2} ms" : "0.00 ms";
+    public string DisplayWriteLatency => WriteLatencyMs > 0 ? $"{WriteLatencyMs:F2} ms" : "0.00 ms";
+
+    public string ResponseTimeBadge => (ReadLatencyMs + WriteLatencyMs) switch
+    {
+        <= 1.0 => "⚡ 極速回應 (< 1ms)",
+        <= 10.0 => "🟢 存取正常 (< 10ms)",
+        <= 25.0 => "🟡 負載較高 (< 25ms)",
+        _ => "🔴 延遲過高 (> 25ms)"
+    };
+
+    public string TypeIconGlyph => MediaType.Contains("外接") || MediaType.Contains("USB")
+        ? "\uE88E"
+        : MediaType.Contains("NVMe") || MediaType.Contains("SSD")
+            ? "\uEDA2"
+            : "\uEDA3";
+
+    // Rolling 60-second usage history queue for this specific disk
+    public Queue<double> UsageHistory { get; } = new(Enumerable.Repeat(0.0, 60));
+
+    partial void OnActiveTimePercentChanged(double value) => OnPropertyChanged(nameof(DisplayActivePercent));
+    partial void OnReadLatencyMsChanged(double value)
+    {
+        OnPropertyChanged(nameof(DisplayReadLatency));
+        OnPropertyChanged(nameof(ResponseTimeBadge));
+    }
+    partial void OnWriteLatencyMsChanged(double value)
+    {
+        OnPropertyChanged(nameof(DisplayWriteLatency));
+        OnPropertyChanged(nameof(ResponseTimeBadge));
+    }
 }
 
 public partial class SystemInfoSummary : ObservableObject

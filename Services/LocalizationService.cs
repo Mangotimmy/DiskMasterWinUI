@@ -36,6 +36,14 @@ public partial class LocalizationService : ObservableObject
     public LocalizationService()
     {
         LoadTranslations();
+        try
+        {
+            ApplyLanguagePreference(SettingsService.Instance.Current.Language);
+        }
+        catch
+        {
+            CurrentLanguage = DetectWindowsLanguage();
+        }
     }
 
     /// <summary>
@@ -133,6 +141,63 @@ public partial class LocalizationService : ObservableObject
         return key;
     }
 
+    /// <summary>
+    /// Detects Windows system UI language and maps to one of the 4 supported culture codes:
+    /// zh-TW, zh-CN, ja-JP, or en-US.
+    /// </summary>
+    public static string DetectWindowsLanguage()
+    {
+        try
+        {
+            var uiCulture = System.Globalization.CultureInfo.CurrentUICulture;
+            var name = uiCulture.Name;
+            var twoLetter = uiCulture.TwoLetterISOLanguageName;
+
+            if (twoLetter.Equals("zh", StringComparison.OrdinalIgnoreCase))
+            {
+                if (name.Contains("TW", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("HK", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("MO", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("Hant", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "zh-TW";
+                }
+                return "zh-CN";
+            }
+
+            if (twoLetter.Equals("ja", StringComparison.OrdinalIgnoreCase))
+            {
+                return "ja-JP";
+            }
+
+            return "en-US";
+        }
+        catch
+        {
+            return "zh-TW";
+        }
+    }
+
+    /// <summary>
+    /// Applies user language preference. If "Auto" or null/empty, detects and applies Windows system UI language.
+    /// Otherwise applies specific culture code (zh-TW, zh-CN, en-US, ja-JP).
+    /// </summary>
+    public void ApplyLanguagePreference(string? preference)
+    {
+        if (string.IsNullOrWhiteSpace(preference) || preference.Equals("Auto", StringComparison.OrdinalIgnoreCase))
+        {
+            CurrentLanguage = DetectWindowsLanguage();
+        }
+        else if (preference is "zh-TW" or "zh-CN" or "en-US" or "ja-JP")
+        {
+            CurrentLanguage = preference;
+        }
+        else
+        {
+            CurrentLanguage = DetectWindowsLanguage();
+        }
+    }
+
     public void SetLanguage(string language)
     {
         CurrentLanguage = language;
@@ -147,6 +212,12 @@ public partial class LocalizationService : ObservableObject
             "en-US" => "ja-JP",
             _ => "zh-TW"
         };
+        try
+        {
+            SettingsService.Instance.Current.Language = CurrentLanguage;
+            SettingsService.Instance.Save();
+        }
+        catch { }
     }
 
     partial void OnCurrentLanguageChanged(string value)

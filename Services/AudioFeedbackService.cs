@@ -31,11 +31,21 @@ public static class AudioFeedbackService
     public static bool IsSoundEnabled { get; set; } = true;
 
     /// <summary>
-    /// Plays standard completion / success audio cue through multi-tiered fallback.
+    /// Plays standard completion / success audio cue through multi-tiered fallback,
+    /// adhering to the user's selected notification sound scheme in Settings.
     /// </summary>
     public static void PlaySuccess()
     {
         if (!IsSoundEnabled) return;
+
+        var scheme = SettingsService.Instance.Current.NotificationSoundScheme ?? "Default";
+        var customPath = SettingsService.Instance.Current.CustomNotificationSoundPath;
+
+        if (scheme != "Default")
+        {
+            PlaySoundScheme(scheme, customPath);
+            return;
+        }
 
         Task.Run(() =>
         {
@@ -89,6 +99,45 @@ public static class AudioFeedbackService
     }
 
     public static void PlayAsterisk() => PlaySuccess();
+
+    /// <summary>
+    /// Plays an explicit notification sound scheme for preview or execution.
+    /// </summary>
+    public static void PlaySoundScheme(string scheme, string? customPath = null)
+    {
+        Task.Run(() =>
+        {
+            try
+            {
+                if (scheme == "Custom" && !string.IsNullOrWhiteSpace(customPath) && File.Exists(customPath))
+                {
+                    PlaySound(customPath, IntPtr.Zero, SND_FILENAME | SND_ASYNC);
+                    return;
+                }
+
+                string? wavFile = scheme switch
+                {
+                    "Chimes" => @"C:\Windows\Media\chimes.wav",
+                    "Ding" => @"C:\Windows\Media\Windows Notify Messaging.wav",
+                    "Tada" => @"C:\Windows\Media\tada.wav",
+                    "Crystal" => @"C:\Windows\Media\Windows Background.wav",
+                    _ => null
+                };
+
+                if (wavFile != null && File.Exists(wavFile))
+                {
+                    PlaySound(wavFile, IntPtr.Zero, SND_FILENAME | SND_ASYNC);
+                    return;
+                }
+
+                PlaySound("SystemNotification", IntPtr.Zero, SND_ALIAS | SND_ASYNC | SND_NODEFAULT);
+            }
+            catch
+            {
+                try { MessageBeep(MB_ICONASTERISK); } catch { }
+            }
+        });
+    }
 
     /// <summary>
     /// Plays warning sound cue.

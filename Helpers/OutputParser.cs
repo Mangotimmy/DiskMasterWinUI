@@ -379,11 +379,11 @@ public static partial class OutputParser
         var list = new List<OemDriverItem>();
         if (string.IsNullOrWhiteSpace(output)) return list;
 
-        var blocks = Regex.Split(output, @"(?=(?:Published Name|發佈名稱|发布名称|公開名)\s*:)", RegexOptions.IgnoreCase);
+        var blocks = Regex.Split(output, @"(?=(?:Published Name|發佈名稱|發行名稱|发布名称|公開名)\s*:)", RegexOptions.IgnoreCase);
         foreach (var block in blocks)
         {
             if (string.IsNullOrWhiteSpace(block)) continue;
-            var pubMatch = Regex.Match(block, @"(?:Published Name|發佈名稱|发布名称|公開名)\s*:\s*([^\r\n]+)", RegexOptions.IgnoreCase);
+            var pubMatch = Regex.Match(block, @"(?:Published Name|發佈名稱|發行名稱|发布名称|公開名)\s*:\s*([^\r\n]+)", RegexOptions.IgnoreCase);
             if (!pubMatch.Success) continue;
 
             var item = new OemDriverItem

@@ -1,8 +1,10 @@
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DiskMasterWinUI.Helpers;
+using DiskMasterWinUI.Models;
 using DiskMasterWinUI.Services;
 
 namespace DiskMasterWinUI.ViewModels;
@@ -11,9 +13,27 @@ public partial class SettingsViewModel : ObservableObject
 {
     private readonly TcpOptimizerService _tcpOptimizer = new();
 
+    // ── Tab Reordering & Visibility Management ──
+    public ObservableCollection<TabOrderItem> TabOrderItems { get; } = new();
+    [ObservableProperty] private bool _enableCustomTabReorder = true;
+
+    // ── Notification Sound Scheme ──
+    public string[] NotificationSoundSchemeOptions { get; } =
+    [
+        "預設系統音效 (System Default)",
+        "清脆風鈴 (Chimes)",
+        "晶瑩提示 (Ding)",
+        "經典號角 (Tada)",
+        "柔和水晶 (Crystal)",
+        "自訂音效檔案 (.wav)"
+    ];
+    [ObservableProperty] private string _selectedNotificationSoundScheme = "預設系統音效 (System Default)";
+    [ObservableProperty] private string _customNotificationSoundPath = "";
+    [ObservableProperty] private bool _isCustomNotificationSoundVisible;
+
     [ObservableProperty] private string _selectedTheme = "System";
     [ObservableProperty] private int _selectedScale = 100;
-    [ObservableProperty] private string _selectedLanguage = "繁體中文 (zh-TW)";
+    [ObservableProperty] private string _selectedLanguage = "🌐 跟隨 Windows 系統語言 (Auto)";
     [ObservableProperty] private bool _enableSafetyConfirmations = true;
     [ObservableProperty] private string _defaultPartitionStyle = "GPT";
     [ObservableProperty] private string _defaultFileSystem = "NTFS";
@@ -95,6 +115,7 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _closeToTray = false;
     [ObservableProperty] private bool _enableTaskbarFlash = true;
     [ObservableProperty] private bool _enableAudioFeedback = true;
+    [ObservableProperty] private bool _enableWindowsNotificationCenter = true;
 
     // ── Debug & Diagnostic Logging ──
     [ObservableProperty] private bool _enableDebugLogging = false;
@@ -115,10 +136,11 @@ public partial class SettingsViewModel : ObservableObject
 
     public string[] LanguageOptions { get; } =
     [
-        "繁體中文 (zh-TW)",
-        "简体中文 (zh-CN)",
-        "English (en-US)",
-        "日本語 (ja-JP)"
+        "🌐 跟隨 Windows 系統語言 (Auto)",
+        "繁體中文 (Traditional Chinese - zh-TW)",
+        "简体中文 (Simplified Chinese - zh-CN)",
+        "English (United States - en-US)",
+        "日本語 (Japanese - ja-JP)"
     ];
 
     [ObservableProperty] private string[] _fontOptionList = [];
@@ -161,10 +183,11 @@ public partial class SettingsViewModel : ObservableObject
 
         SelectedLanguage = s.Language switch
         {
-            "zh-CN" => "简体中文 (zh-CN)",
-            "en-US" => "English (en-US)",
-            "ja-JP" => "日本語 (ja-JP)",
-            _ => "繁體中文 (zh-TW)"
+            "zh-CN" => "简体中文 (Simplified Chinese - zh-CN)",
+            "en-US" => "English (United States - en-US)",
+            "ja-JP" => "日本語 (Japanese - ja-JP)",
+            "zh-TW" => "繁體中文 (Traditional Chinese - zh-TW)",
+            _ => "🌐 跟隨 Windows 系統語言 (Auto)"
         };
 
         EnableSafetyConfirmations = s.EnableSafetyConfirmations;
@@ -212,10 +235,25 @@ public partial class SettingsViewModel : ObservableObject
         CloseToTray = s.CloseToTray;
         EnableTaskbarFlash = s.EnableTaskbarFlash;
         EnableAudioFeedback = s.EnableAudioFeedback;
+        EnableWindowsNotificationCenter = s.EnableWindowsNotificationCenter;
 
         EnableDebugLogging = s.EnableDebugLogging;
         DebugLogService.Instance.IsEnabled = s.EnableDebugLogging;
         UpdateDebugLogStats();
+
+        EnableCustomTabReorder = s.EnableCustomTabReorder;
+        SelectedNotificationSoundScheme = (s.NotificationSoundScheme ?? "Default") switch
+        {
+            "Chimes" => "清脆風鈴 (Chimes)",
+            "Ding" => "晶瑩提示 (Ding)",
+            "Tada" => "經典號角 (Tada)",
+            "Crystal" => "柔和水晶 (Crystal)",
+            "Custom" => "自訂音效檔案 (.wav)",
+            _ => "預設系統音效 (System Default)"
+        };
+        CustomNotificationSoundPath = s.CustomNotificationSoundPath ?? "";
+        IsCustomNotificationSoundVisible = SelectedNotificationSoundScheme.Contains("自訂");
+        LoadTabOrderItems();
 
         RefreshLocalizedOptions();
     }
@@ -253,6 +291,27 @@ public partial class SettingsViewModel : ObservableObject
             "Lite" => LocalizationService.Instance["WorkspaceLite"],
             _ => LocalizationService.Instance["WorkspaceMaster"]
         };
+
+        var expectedLanguageOption = s.Language switch
+        {
+            "zh-CN" => "简体中文 (Simplified Chinese - zh-CN)",
+            "en-US" => "English (United States - en-US)",
+            "ja-JP" => "日本語 (Japanese - ja-JP)",
+            "zh-TW" => "繁體中文 (Traditional Chinese - zh-TW)",
+            _ => "🌐 跟隨 Windows 系統語言 (Auto)"
+        };
+        if (SelectedLanguage != expectedLanguageOption)
+        {
+            _isUpdatingLanguage = true;
+            try
+            {
+                SelectedLanguage = expectedLanguageOption;
+            }
+            finally
+            {
+                _isUpdatingLanguage = false;
+            }
+        }
     }
 
     [RelayCommand]
@@ -267,7 +326,8 @@ public partial class SettingsViewModel : ObservableObject
             var l when l.Contains("zh-CN") => "zh-CN",
             var l when l.Contains("en-US") => "en-US",
             var l when l.Contains("ja-JP") => "ja-JP",
-            _ => "zh-TW"
+            var l when l.Contains("zh-TW") => "zh-TW",
+            _ => "Auto"
         };
 
         s.EnableSafetyConfirmations = EnableSafetyConfirmations;
@@ -315,6 +375,7 @@ public partial class SettingsViewModel : ObservableObject
         s.CloseToTray = CloseToTray;
         s.EnableTaskbarFlash = EnableTaskbarFlash;
         s.EnableAudioFeedback = EnableAudioFeedback;
+        s.EnableWindowsNotificationCenter = EnableWindowsNotificationCenter;
         s.EnableDebugLogging = EnableDebugLogging;
         DebugLogService.Instance.IsEnabled = EnableDebugLogging;
 
@@ -327,8 +388,186 @@ public partial class SettingsViewModel : ObservableObject
             _ => "Master"
         };
 
+        s.EnableCustomTabReorder = EnableCustomTabReorder;
+        s.NotificationSoundScheme = SelectedNotificationSoundScheme switch
+        {
+            var sch when sch.Contains("Chimes") => "Chimes",
+            var sch when sch.Contains("Ding") => "Ding",
+            var sch when sch.Contains("Tada") => "Tada",
+            var sch when sch.Contains("Crystal") => "Crystal",
+            var sch when sch.Contains("自訂") => "Custom",
+            _ => "Default"
+        };
+        s.CustomNotificationSoundPath = CustomNotificationSoundPath;
+
         SettingsService.Instance.Save();
         StatusMessage = LocalizationService.T("設定已成功儲存！", "设置已成功保存！", "Settings saved successfully!", "設定が正常に保存されました！");
+    }
+
+    partial void OnSelectedNotificationSoundSchemeChanged(string value)
+    {
+        IsCustomNotificationSoundVisible = value.Contains("自訂");
+        SaveSettings();
+    }
+
+    [RelayCommand]
+    public void PlayPreviewNotificationSound()
+    {
+        string scheme = SelectedNotificationSoundScheme switch
+        {
+            var s when s.Contains("Chimes") => "Chimes",
+            var s when s.Contains("Ding") => "Ding",
+            var s when s.Contains("Tada") => "Tada",
+            var s when s.Contains("Crystal") => "Crystal",
+            var s when s.Contains("自訂") => "Custom",
+            _ => "Default"
+        };
+        AudioFeedbackService.PlaySoundScheme(scheme, CustomNotificationSoundPath);
+    }
+
+    [RelayCommand]
+    public async Task BrowseCustomNotificationSoundAsync()
+    {
+        var file = await FilePickerHelper.PickSingleFileAsync([".wav", ".mp3", ".wma"]);
+        if (!string.IsNullOrWhiteSpace(file))
+        {
+            CustomNotificationSoundPath = file;
+            SaveSettings();
+            AudioFeedbackService.PlaySoundScheme("Custom", file);
+        }
+    }
+
+    public void LoadTabOrderItems()
+    {
+        TabOrderItems.Clear();
+        var s = SettingsService.Instance.Current;
+        var disabled = new HashSet<string>(s.DisabledTabTags ?? new(), StringComparer.OrdinalIgnoreCase);
+
+        var allDefinitions = new (string Tag, string Header, string Icon, string Desc)[]
+        {
+            ("Starter", "入門精靈", "\uE735", "新手引導、磁碟體檢與一鍵快速維護"),
+            ("EasyMode", "簡易模式", "\uEDA2", "直覺易用的磁碟狀態檢視與日常操作"),
+            ("WimDeploy", "系統部署", "\uE896", "WIM/ESD 映像套用、備份與引導建立"),
+            ("BootManager", "引導管理", "\uE7C3", "UEFI/BIOS 開機項目管理與 BCD 修復"),
+            ("DiskTools", "磁碟工具", "\uE90F", "S.M.A.R.T. 監控、分區管理與救援工具"),
+            ("SystemHealth", "系統修復", "\uEC06", "DISM 映像修復、SFC 系統檔完整性掃描"),
+            ("NtfsPermissions", "權限管理", "\uE72E", "NTFS 權限重設與擁有權奪取"),
+            ("AdvancedMode", "進階腳本", "\uEC7A", "DiskPart 腳本批次執行與命令列終端"),
+            ("SystemOptimizer", "最佳化", "\uE945", "CPU排程、遊戲模式與電源方案優化"),
+            ("NetworkTools", "網路工具", "\uE968", "連接埠檢測、UPnP 轉發與網路診斷"),
+            ("SystemPerformance", "效能分析", "\uE9D9", "即時 CPU/RAM/磁碟監控與進程獵手"),
+            ("Settings", "偏好設定", "\uE713", "介面主題、字型排版與自訂配置")
+        };
+
+        var order = s.CustomTabOrder != null && s.CustomTabOrder.Count > 0 ? s.CustomTabOrder : allDefinitions.Select(d => d.Tag).ToList();
+
+        var orderedDefs = allDefinitions.OrderBy(d =>
+        {
+            int idx = order.IndexOf(d.Tag);
+            return idx >= 0 ? idx : int.MaxValue;
+        }).ToList();
+
+        int pos = 1;
+        foreach (var def in orderedDefs)
+        {
+            var item = new TabOrderItem
+            {
+                Tag = def.Tag,
+                Header = def.Header,
+                IconGlyph = def.Icon,
+                Description = def.Desc,
+                DisplayOrder = pos++,
+                IsEnabled = !disabled.Contains(def.Tag)
+            };
+            item.IsEnabledChanged += () => SaveAndApplyTabOrder();
+            TabOrderItems.Add(item);
+        }
+    }
+
+    public void SaveAndApplyTabOrder()
+    {
+        var s = SettingsService.Instance.Current;
+        s.CustomTabOrder = TabOrderItems.Select(t => t.Tag).ToList();
+        s.DisabledTabTags = TabOrderItems.Where(t => !t.IsEnabled).Select(t => t.Tag).ToList();
+        SettingsService.Instance.Save();
+
+        for (int i = 0; i < TabOrderItems.Count; i++)
+        {
+            TabOrderItems[i].DisplayOrder = i + 1;
+        }
+
+        MainWindow.CurrentInstance?.ApplyCustomTabOrder(s.CustomTabOrder, s.DisabledTabTags);
+    }
+
+    [RelayCommand]
+    public void MoveTabUp(TabOrderItem? item)
+    {
+        if (item == null) return;
+        int idx = TabOrderItems.IndexOf(item);
+        if (idx > 0)
+        {
+            TabOrderItems.Move(idx, idx - 1);
+            SaveAndApplyTabOrder();
+            AudioFeedbackService.PlaySuccess();
+        }
+    }
+
+    [RelayCommand]
+    public void MoveTabDown(TabOrderItem? item)
+    {
+        if (item == null) return;
+        int idx = TabOrderItems.IndexOf(item);
+        if (idx >= 0 && idx < TabOrderItems.Count - 1)
+        {
+            TabOrderItems.Move(idx, idx + 1);
+            SaveAndApplyTabOrder();
+            AudioFeedbackService.PlaySuccess();
+        }
+    }
+
+    [RelayCommand]
+    public void MoveTabToTop(TabOrderItem? item)
+    {
+        if (item == null) return;
+        int idx = TabOrderItems.IndexOf(item);
+        if (idx > 0)
+        {
+            TabOrderItems.Move(idx, 0);
+            SaveAndApplyTabOrder();
+            AudioFeedbackService.PlaySuccess();
+        }
+    }
+
+    [RelayCommand]
+    public void MoveTabToBottom(TabOrderItem? item)
+    {
+        if (item == null) return;
+        int idx = TabOrderItems.IndexOf(item);
+        if (idx >= 0 && idx < TabOrderItems.Count - 1)
+        {
+            TabOrderItems.Move(idx, TabOrderItems.Count - 1);
+            SaveAndApplyTabOrder();
+            AudioFeedbackService.PlaySuccess();
+        }
+    }
+
+    [RelayCommand]
+    public void ResetTabOrder()
+    {
+        var s = SettingsService.Instance.Current;
+        s.CustomTabOrder.Clear();
+        s.DisabledTabTags.Clear();
+        SettingsService.Instance.Save();
+        LoadTabOrderItems();
+        MainWindow.CurrentInstance?.ResetTabOrderToDefault();
+        AudioFeedbackService.PlaySuccess();
+    }
+
+    [RelayCommand]
+    public void ToggleTabEnabled(TabOrderItem? item)
+    {
+        if (item == null) return;
+        SaveAndApplyTabOrder();
     }
 
     [RelayCommand]
@@ -455,14 +694,20 @@ public partial class SettingsViewModel : ObservableObject
         SaveSettings();
     }
 
+    private bool _isUpdatingLanguage;
+
     partial void OnSelectedLanguageChanged(string value)
     {
-        string langCode = "zh-TW";
-        if (value.Contains("zh-CN")) langCode = "zh-CN";
-        else if (value.Contains("en-US")) langCode = "en-US";
-        else if (value.Contains("ja-JP")) langCode = "ja-JP";
+        if (_isUpdatingLanguage) return;
+        string targetPref = "Auto";
+        if (value.Contains("zh-CN")) targetPref = "zh-CN";
+        else if (value.Contains("en-US")) targetPref = "en-US";
+        else if (value.Contains("ja-JP")) targetPref = "ja-JP";
+        else if (value.Contains("zh-TW")) targetPref = "zh-TW";
+        else targetPref = "Auto";
 
-        LocalizationService.Instance.CurrentLanguage = langCode;
+        LocalizationService.Instance.ApplyLanguagePreference(targetPref);
+        SettingsService.Instance.Current.Language = targetPref;
         RefreshLocalizedOptions();
         SaveSettings();
     }
@@ -620,7 +865,7 @@ public partial class SettingsViewModel : ObservableObject
         var s = new AppSettings();
         SelectedTheme = s.Theme;
         SelectedScale = s.ScalePercent;
-        SelectedLanguage = "繁體中文 (Traditional Chinese - zh-TW)";
+        SelectedLanguage = "🌐 跟隨 Windows 系統語言 (Auto)";
         EnableSafetyConfirmations = s.EnableSafetyConfirmations;
         DefaultPartitionStyle = s.DefaultPartitionStyle;
         DefaultFileSystem = s.DefaultFileSystem;
@@ -749,5 +994,28 @@ public partial class SettingsViewModel : ObservableObject
         SelectedScale = recommended;
         SaveSettings();
         StatusMessage = $"已自動套用螢幕最佳縮放比例: {recommended}%";
+    }
+
+    [RelayCommand]
+    public void SendTestNotification()
+    {
+        try
+        {
+            string title = LocalizationService.T("DiskMaster Pro 旗艦版", "DiskMaster Pro 旗舰版", "DiskMaster Pro Flagship", "DiskMaster Pro Flagship");
+            string message = LocalizationService.T("🔔 已成功連線至 Windows 通知中心！點擊此處可開啟偏好設定。",
+                                                   "🔔 已成功连线至 Windows 通知中心！点击此处可开启偏好设置。",
+                                                   "🔔 Successfully connected to Windows Notification Center! Click to open Settings.",
+                                                   "🔔 Windows 通知センターに接続しました！クリックして設定を開きます。");
+
+            WindowsNotificationService.Instance.ShowNotification(title, message, "Settings");
+            StatusMessage = LocalizationService.T("已發送測試通知至 Windows 通知清單！",
+                                                  "已发送测试通知至 Windows 通知列表！",
+                                                  "Test notification sent to Windows Notification Center!",
+                                                  "Windows 通知リストへテスト通知を送信しました！");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"發送測試通知失敗: {ex.Message}";
+        }
     }
 }

@@ -6,6 +6,8 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
+    Background="Transparent"
+    ManipulationMode="None"
     PointerEntered="OnPointerEntered"
     PointerExited="OnPointerExited"
     PointerPressed="OnPointerPressed"
@@ -14,7 +16,7 @@
     PointerCaptureLost="OnPointerCaptureLost"
     DoubleTapped="OnDoubleTapped">
 
-    <Grid x:Name="RootGrid" Background="Transparent">
+    <Grid x:Name="RootGrid" Background="Transparent" ManipulationMode="None">
         <!-- Visual Line in center -->
         <Border x:Name="VisualLine"
                 HorizontalAlignment="Stretch"

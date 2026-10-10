@@ -57,18 +57,15 @@
                         <StackPanel Spacing="16" Margin="0,0,16,20">
 
                             <!-- Live Resource Cards (CPU, RAM, Disk Active & Throughput, Disk Response Latency) -->
-                            <Grid ColumnSpacing="16" RowSpacing="16">
+                            <!-- 1. CPU & RAM Resource Cards -->
+                            <Grid ColumnSpacing="16">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
 
                                 <!-- 1. CPU Card -->
-                                <Border Grid.Row="0" Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                                         CornerRadius="8" Padding="16">
                                     <StackPanel Spacing="12">
@@ -89,7 +86,7 @@
                                 </Border>
 
                                 <!-- 2. RAM Card -->
-                                <Border Grid.Row="0" Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                                         CornerRadius="8" Padding="16">
                                     <StackPanel Spacing="12">
@@ -109,9 +106,79 @@
                                         <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.RamUsagePercent, Mode=OneWay}" Maximum="100" Height="8" />
                                     </StackPanel>
                                 </Border>
+                            </Grid>
+
+                            <!-- 2. Physical Disk Auto-Detection & Task Manager Selector -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="14">
+                                <StackPanel Spacing="10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <FontIcon Glyph="&#xEDA2;" FontSize="16" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                            <TextBlock x:Name="DiskSelectorTitle" Text="實體硬碟自動偵測與效能監控 (Task Manager Mode)" FontWeight="Bold" FontSize="14" />
+                                        </StackPanel>
+                                        <TextBlock x:Name="DiskSelectorHint" Grid.Column="1" Text="點選硬碟以即時切換專屬使用率與歷程圖表" FontSize="11"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                    </Grid>
+
+                                    <!-- Horizontal Scrollable Detected Disks List -->
+                                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                                                  HorizontalScrollMode="Enabled" VerticalScrollMode="Disabled">
+                                        <ItemsControl ItemsSource="{x:Bind ViewModel.DetectedDisks, Mode=OneWay}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" Spacing="10" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="models:DiskPerformanceItem">
+                                                    <Button Command="{Binding ElementName=ProcessHunterRoot, Path=ViewModel.SelectDiskCommand}"
+                                                            CommandParameter="{x:Bind}"
+                                                            Padding="12,8" CornerRadius="6" HorizontalAlignment="Stretch">
+                                                        <Grid ColumnSpacing="10" MinWidth="180">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <FontIcon Grid.Column="0" Glyph="{x:Bind TypeIconGlyph, Mode=OneWay}" FontSize="20"
+                                                                      Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                                            <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                                                                <TextBlock Text="{x:Bind DisplayName, Mode=OneWay}" FontWeight="Bold" FontSize="12" />
+                                                                <TextBlock Text="{x:Bind ModelName, Mode=OneWay}" FontSize="10"
+                                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                                           TextTrimming="CharacterEllipsis" MaxWidth="140" />
+                                                                <TextBlock Text="{x:Bind CapacityDisplay, Mode=OneWay}" FontSize="9"
+                                                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                            </StackPanel>
+                                                            <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                                                <TextBlock Text="{x:Bind DisplayActivePercent, Mode=OneWay}" FontWeight="Bold" FontSize="14"
+                                                                           Foreground="{ThemeResource AccentFillColorDefaultBrush}" HorizontalAlignment="Right" />
+                                                                <ProgressBar Value="{x:Bind ActiveTimePercent, Mode=OneWay}" Maximum="100" Width="40" Height="4" />
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- 3. Selected Disk Active Time, Throughput & Latency Cards -->
+                            <Grid ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
 
                                 <!-- 3. Disk Active Time & Throughput Card -->
-                                <Border Grid.Row="1" Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                                         CornerRadius="8" Padding="16">
                                     <StackPanel Spacing="12">
@@ -121,26 +188,26 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Grid.Column="0" Spacing="2">
-                                                <TextBlock Text="磁碟活動時間與傳輸量 (Disk %)" FontWeight="SemiBold" FontSize="14" />
+                                                <TextBlock Text="{x:Bind ViewModel.SelectedDisk.DisplayName, Mode=OneWay, FallbackValue='磁碟活動時間與傳輸量 (Disk %)'}" FontWeight="SemiBold" FontSize="14" />
                                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                                     <TextBlock FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
-                                                        <Run Text="讀取: " /><Run Text="{x:Bind ViewModel.CurrentMetrics.DiskReadRateDisplay, Mode=OneWay}" FontWeight="SemiBold" />
+                                                        <Run Text="讀取: " /><Run Text="{x:Bind ViewModel.SelectedDisk.ReadRateDisplay, Mode=OneWay, FallbackValue='0 KB/s'}" FontWeight="SemiBold" />
                                                     </TextBlock>
                                                     <TextBlock Text="|" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                                                     <TextBlock FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
-                                                        <Run Text="寫入: " /><Run Text="{x:Bind ViewModel.CurrentMetrics.DiskWriteRateDisplay, Mode=OneWay}" FontWeight="SemiBold" />
+                                                        <Run Text="寫入: " /><Run Text="{x:Bind ViewModel.SelectedDisk.WriteRateDisplay, Mode=OneWay, FallbackValue='0 KB/s'}" FontWeight="SemiBold" />
                                                     </TextBlock>
                                                 </StackPanel>
                                             </StackPanel>
-                                            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.CurrentMetrics.DisplayDiskUsagePercent, Mode=OneWay}"
+                                            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.SelectedDisk.DisplayActivePercent, Mode=OneWay, FallbackValue='0.0%'}"
                                                        FontSize="24" FontWeight="Bold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
                                         </Grid>
-                                        <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.DiskUsagePercent, Mode=OneWay}" Maximum="100" Height="8" />
+                                        <ProgressBar Value="{x:Bind ViewModel.SelectedDisk.ActiveTimePercent, Mode=OneWay, FallbackValue=0}" Maximum="100" Height="8" />
                                     </StackPanel>
                                 </Border>
 
                                 <!-- 4. Disk Response Time / Latency (ms Delay) Card -->
-                                <Border Grid.Row="1" Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                                         CornerRadius="8" Padding="16">
                                     <StackPanel Spacing="12">
@@ -153,17 +220,17 @@
                                                 <TextBlock Text="磁碟讀寫存取延遲 (Response Time)" FontWeight="SemiBold" FontSize="14" />
                                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                                     <TextBlock FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
-                                                        <Run Text="讀取延遲: " /><Run Text="{x:Bind ViewModel.CurrentMetrics.DisplayDiskReadLatency, Mode=OneWay}" FontWeight="SemiBold" />
+                                                        <Run Text="讀取延遲: " /><Run Text="{x:Bind ViewModel.SelectedDisk.DisplayReadLatency, Mode=OneWay, FallbackValue='0.00 ms'}" FontWeight="SemiBold" />
                                                     </TextBlock>
                                                     <TextBlock Text="|" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                                                     <TextBlock FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
-                                                        <Run Text="寫入延遲: " /><Run Text="{x:Bind ViewModel.CurrentMetrics.DisplayDiskWriteLatency, Mode=OneWay}" FontWeight="SemiBold" />
+                                                        <Run Text="寫入延遲: " /><Run Text="{x:Bind ViewModel.SelectedDisk.DisplayWriteLatency, Mode=OneWay, FallbackValue='0.00 ms'}" FontWeight="SemiBold" />
                                                     </TextBlock>
                                                 </StackPanel>
                                             </StackPanel>
                                             <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
                                                     CornerRadius="4" Padding="8,4" VerticalAlignment="Center">
-                                                <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.DiskLatencyBadge, Mode=OneWay}"
+                                                <TextBlock Text="{x:Bind ViewModel.SelectedDisk.ResponseTimeBadge, Mode=OneWay, FallbackValue='⚡ 極速回應 (&lt; 1ms)'}"
                                                            FontSize="12" FontWeight="SemiBold" />
                                             </Border>
                                         </Grid>
@@ -174,16 +241,114 @@
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Grid.Column="0" Spacing="3">
                                                 <TextBlock Text="讀取延遲 (Read)" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                                                <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.DiskReadLatencyMs, Mode=OneWay}" Maximum="50" Height="4" />
+                                                <ProgressBar Value="{x:Bind ViewModel.SelectedDisk.ReadLatencyMs, Mode=OneWay, FallbackValue=0}" Maximum="50" Height="4" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="1" Spacing="3">
                                                 <TextBlock Text="寫入延遲 (Write)" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                                                <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.DiskWriteLatencyMs, Mode=OneWay}" Maximum="50" Height="4" />
+                                                <ProgressBar Value="{x:Bind ViewModel.SelectedDisk.WriteLatencyMs, Mode=OneWay, FallbackValue=0}" Maximum="50" Height="4" />
                                             </StackPanel>
                                         </Grid>
                                     </StackPanel>
                                 </Border>
                             </Grid>
+
+                            <!-- 5. Task Manager-Style Real-Time Disk Performance Waveform Card (60 Seconds) -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="14">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="3">
+                                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <FontIcon Glyph="&#xE9D9;" FontSize="16" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                <TextBlock Text="{x:Bind ViewModel.SelectedDisk.DisplayName, Mode=OneWay, FallbackValue='實體磁碟'}" FontWeight="Bold" FontSize="15" />
+                                                <TextBlock Text="即時動態效能圖表 (Task Manager - 60 秒歷程)" FontWeight="Bold" FontSize="15" />
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <TextBlock Text="{x:Bind ViewModel.SelectedDisk.ModelName, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Text="·" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                <TextBlock Text="{x:Bind ViewModel.SelectedDisk.MediaType, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Text="·" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                <TextBlock Text="{x:Bind ViewModel.SelectedDisk.CapacityDisplay, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <!-- Real-Time Metrics Badges -->
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                                            <StackPanel Spacing="1" HorizontalAlignment="Right">
+                                                <TextBlock Text="活動時間" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Right" />
+                                                <TextBlock Text="{x:Bind ViewModel.SelectedDisk.DisplayActivePercent, Mode=OneWay, FallbackValue='0.0%'}"
+                                                           FontSize="22" FontWeight="Bold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                            </StackPanel>
+                                            <StackPanel Spacing="1">
+                                                <TextBlock Text="讀取速度" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                <TextBlock Text="{x:Bind ViewModel.SelectedDisk.ReadRateDisplay, Mode=OneWay, FallbackValue='0 KB/s'}" FontSize="12" FontWeight="SemiBold" />
+                                            </StackPanel>
+                                            <StackPanel Spacing="1">
+                                                <TextBlock Text="寫入速度" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                <TextBlock Text="{x:Bind ViewModel.SelectedDisk.WriteRateDisplay, Mode=OneWay, FallbackValue='0 KB/s'}" FontSize="12" FontWeight="SemiBold" />
+                                            </StackPanel>
+                                            <StackPanel Spacing="1">
+                                                <TextBlock Text="回應延遲" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                <TextBlock Text="{x:Bind ViewModel.SelectedDisk.DisplayReadLatency, Mode=OneWay, FallbackValue='0.00 ms'}" FontSize="12" FontWeight="SemiBold" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Chart Area Container with Gridlines -->
+                                    <Grid Height="190">
+                                        <Border Background="{ThemeResource LayerFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="6" />
+
+                                        <!-- Background Grid Lines -->
+                                        <Grid Margin="36,8,8,24">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="*" />
+                                                <RowDefinition Height="*" />
+                                                <RowDefinition Height="*" />
+                                                <RowDefinition Height="*" />
+                                            </Grid.RowDefinitions>
+                                            <Border Grid.Row="0" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" />
+                                            <Border Grid.Row="1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" />
+                                            <Border Grid.Row="2" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" />
+                                            <Border Grid.Row="3" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" />
+                                        </Grid>
+
+                                        <!-- Y-Axis Value Labels (Left) -->
+                                        <StackPanel VerticalAlignment="Stretch" Margin="8,4,0,24" HorizontalAlignment="Left" Spacing="22">
+                                            <TextBlock Text="100%" FontSize="9" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                            <TextBlock Text="75%" FontSize="9" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                            <TextBlock Text="50%" FontSize="9" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                            <TextBlock Text="25%" FontSize="9" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                            <TextBlock Text="0%" FontSize="9" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                        </StackPanel>
+
+                                        <!-- The Waveform Canvas -->
+                                        <Canvas x:Name="DiskChartCanvas" Margin="36,8,8,24" SizeChanged="DiskChartCanvas_SizeChanged">
+                                            <!-- Gradient Area Fill -->
+                                            <Polygon x:Name="DiskChartPolygon" Opacity="0.28">
+                                                <Polygon.Fill>
+                                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                        <GradientStop Color="#00B4D8" Offset="0.0" />
+                                                        <GradientStop Color="#0000B4D8" Offset="1.0" />
+                                                    </LinearGradientBrush>
+                                                </Polygon.Fill>
+                                            </Polygon>
+                                            <!-- Glowing Polyline -->
+                                            <Polyline x:Name="DiskChartPolyline" Stroke="#00B4D8" StrokeThickness="2.0" StrokeLineJoin="Round" />
+                                        </Canvas>
+
+                                        <!-- X-Axis Time Labels (Bottom) -->
+                                        <Grid VerticalAlignment="Bottom" Margin="36,0,8,4">
+                                            <TextBlock Text="60 秒前" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Left" />
+                                            <TextBlock Text="30 秒" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
+                                            <TextBlock Text="0 秒 (即時)" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Right" />
+                                        </Grid>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
 
                         </StackPanel>
                     </ScrollViewer>

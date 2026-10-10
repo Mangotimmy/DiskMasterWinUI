@@ -94,7 +94,7 @@ public sealed partial class AdobeSplitter : UserControl
     {
         if (Orientation == AdobeSplitterOrientation.Vertical)
         {
-            Width = 8;
+            Width = 14;
             HorizontalAlignment = HorizontalAlignment.Center;
             VerticalAlignment = VerticalAlignment.Stretch;
             if (VisualLine != null)
@@ -115,7 +115,7 @@ public sealed partial class AdobeSplitter : UserControl
         }
         else
         {
-            Height = 8;
+            Height = 14;
             HorizontalAlignment = HorizontalAlignment.Stretch;
             VerticalAlignment = VerticalAlignment.Center;
             if (VisualLine != null)
@@ -133,6 +133,37 @@ public sealed partial class AdobeSplitter : UserControl
                 ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeNorthSouth);
             }
             catch { }
+        }
+    }
+
+    private void ResolveTargets()
+    {
+        if (Parent is Grid grid)
+        {
+            if (Orientation == AdobeSplitterOrientation.Vertical && TargetColumn == null)
+            {
+                int col = Grid.GetColumn(this);
+                if (ResizeMode == AdobeSplitterResizeMode.TargetFirst && col > 0 && grid.ColumnDefinitions.Count >= col)
+                {
+                    TargetColumn = grid.ColumnDefinitions[col - 1];
+                }
+                else if (ResizeMode == AdobeSplitterResizeMode.TargetSecond && col + 1 < grid.ColumnDefinitions.Count)
+                {
+                    TargetColumn = grid.ColumnDefinitions[col + 1];
+                }
+            }
+            else if (Orientation == AdobeSplitterOrientation.Horizontal && TargetRow == null)
+            {
+                int row = Grid.GetRow(this);
+                if (ResizeMode == AdobeSplitterResizeMode.TargetFirst && row > 0 && grid.RowDefinitions.Count >= row)
+                {
+                    TargetRow = grid.RowDefinitions[row - 1];
+                }
+                else if (ResizeMode == AdobeSplitterResizeMode.TargetSecond && row + 1 < grid.RowDefinitions.Count)
+                {
+                    TargetRow = grid.RowDefinitions[row + 1];
+                }
+            }
         }
     }
 
@@ -179,11 +210,12 @@ public sealed partial class AdobeSplitter : UserControl
 
     private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        var parentGrid = Parent as UIElement;
-        if (parentGrid == null) return;
+        ResolveTargets();
+        var root = (this.XamlRoot?.Content as UIElement) ?? (Parent as UIElement);
+        if (root == null) return;
 
         _isDragging = true;
-        _startPoint = e.GetCurrentPoint(parentGrid).Position;
+        _startPoint = e.GetCurrentPoint(root).Position;
 
         if (Orientation == AdobeSplitterOrientation.Vertical && TargetColumn != null)
         {
@@ -203,10 +235,10 @@ public sealed partial class AdobeSplitter : UserControl
     {
         if (!_isDragging) return;
 
-        var parentGrid = Parent as UIElement;
-        if (parentGrid == null) return;
+        var root = (this.XamlRoot?.Content as UIElement) ?? (Parent as UIElement);
+        if (root == null) return;
 
-        var currentPoint = e.GetCurrentPoint(parentGrid).Position;
+        var currentPoint = e.GetCurrentPoint(root).Position;
 
         if (Orientation == AdobeSplitterOrientation.Vertical && TargetColumn != null)
         {

@@ -187,5 +187,7 @@
   "TabNetShare": "LAN Share Wizard",
   "TabRdp": "Remote Desktop (RDP)",
   "TabCliTools": "CMD CLI Toolbox",
-  "TabNtfsExplorer": "NTFS Deep Explorer"
+  "TabNtfsExplorer": "NTFS Deep Explorer",
+  "FollowWindowsLanguage": "Follow Windows System Language",
+  "FollowWindowsLanguageDesc": "Automatically detects current Windows OS display language and applies in real time"
 }

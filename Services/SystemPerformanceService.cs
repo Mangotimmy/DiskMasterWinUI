@@ -91,53 +91,217 @@ public partial class SystemPerformanceService
             catch { }
         }
 
-        // 2. CPU & Real-Time PhysicalDisk Metrics via typeperf sample
+        // 2. Query Physical Disk hardware metadata (cached)
+        await EnsurePhysicalDiskCacheAsync();
+
+        // 3. CPU & Real-Time PhysicalDisk Metrics via typeperf sample (Auto-Detect All Disks)
         try
         {
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeoutCts.CancelAfter(TimeSpan.FromSeconds(4));
-            const string typeperfCounters = "\"\\Processor(_Total)\\% Processor Time\" \"\\PhysicalDisk(_Total)\\% Disk Time\" \"\\PhysicalDisk(_Total)\\Avg. Disk sec/Read\" \"\\PhysicalDisk(_Total)\\Avg. Disk sec/Write\" \"\\PhysicalDisk(_Total)\\Disk Read Bytes/sec\" \"\\PhysicalDisk(_Total)\\Disk Write Bytes/sec\" -sc 1";
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+            const string typeperfCounters = @"""\Processor(_Total)\% Processor Time"" ""\PhysicalDisk(*)\% Disk Time"" ""\PhysicalDisk(*)\Avg. Disk sec/Read"" ""\PhysicalDisk(*)\Avg. Disk sec/Write"" ""\PhysicalDisk(*)\Disk Read Bytes/sec"" ""\PhysicalDisk(*)\Disk Write Bytes/sec"" -sc 1";
             var (outStr, _, code) = await ProcessHelper.RunProcessAsync("typeperf.exe", typeperfCounters, cancellationToken: timeoutCts.Token);
             if (code == 0 && !string.IsNullOrWhiteSpace(outStr))
             {
                 var lines = outStr.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+                var headerLine = lines.FirstOrDefault(l => l.Contains("PhysicalDisk"));
                 var dataLine = lines.LastOrDefault(l => l.Contains(','));
-                if (dataLine != null)
+
+                if (headerLine != null && dataLine != null)
                 {
-                    var parts = dataLine.Split('"').Where(p => p != "," && !string.IsNullOrWhiteSpace(p)).ToArray();
-                    if (parts.Length >= 7)
+                    var headers = ParseCsvLine(headerLine);
+                    var values = ParseCsvLine(dataLine);
+
+                    int count = Math.Min(headers.Length, values.Length);
+                    var diskData = new Dictionary<string, Dictionary<string, double>>(StringComparer.OrdinalIgnoreCase);
+
+                    for (int i = 0; i < count; i++)
                     {
-                        if (double.TryParse(parts[1], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double cpu))
+                        string header = headers[i];
+                        string valStr = values[i];
+
+                        if (!double.TryParse(valStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double val))
                         {
-                            snap.CpuUsagePercent = Math.Clamp(Math.Round(cpu, 1), 0.0, 100.0);
+                            continue;
                         }
-                        if (double.TryParse(parts[2], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double diskPct))
+
+                        if (header.Contains("Processor(_Total)\\% Processor Time", StringComparison.OrdinalIgnoreCase))
                         {
-                            snap.DiskUsagePercent = Math.Clamp(Math.Round(diskPct, 1), 0.0, 100.0);
+                            snap.CpuUsagePercent = Math.Clamp(Math.Round(val, 1), 0.0, 100.0);
+                            continue;
                         }
-                        if (double.TryParse(parts[3], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double readSec))
+
+                        var match = Regex.Match(header, @"PhysicalDisk\((?<inst>[^)]+)\)\\(?<counter>[^""]+)", RegexOptions.IgnoreCase);
+                        if (match.Success)
                         {
-                            snap.DiskReadLatencyMs = Math.Max(0, Math.Round(readSec * 1000.0, 2));
-                        }
-                        if (double.TryParse(parts[4], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double writeSec))
-                        {
-                            snap.DiskWriteLatencyMs = Math.Max(0, Math.Round(writeSec * 1000.0, 2));
-                        }
-                        if (double.TryParse(parts[5], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double readBytes))
-                        {
-                            snap.DiskReadRateDisplay = FormatBytesPerSec(readBytes);
-                        }
-                        if (double.TryParse(parts[6], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double writeBytes))
-                        {
-                            snap.DiskWriteRateDisplay = FormatBytesPerSec(writeBytes);
+                            string inst = match.Groups["inst"].Value.Trim();
+                            string counter = match.Groups["counter"].Value.Trim();
+
+                            if (!diskData.TryGetValue(inst, out var counters))
+                            {
+                                counters = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+                                diskData[inst] = counters;
+                            }
+                            counters[counter] = val;
                         }
                     }
+
+                    // Process each disk instance
+                    var diskItems = new List<DiskPerformanceItem>();
+                    foreach (var (inst, counters) in diskData)
+                    {
+                        counters.TryGetValue("% Disk Time", out double diskPct);
+                        counters.TryGetValue("Avg. Disk sec/Read", out double readSec);
+                        counters.TryGetValue("Avg. Disk sec/Write", out double writeSec);
+                        counters.TryGetValue("Disk Read Bytes/sec", out double readBytes);
+                        counters.TryGetValue("Disk Write Bytes/sec", out double writeBytes);
+
+                        if (inst.Equals("_Total", StringComparison.OrdinalIgnoreCase))
+                        {
+                            snap.DiskUsagePercent = Math.Clamp(Math.Round(diskPct, 1), 0.0, 100.0);
+                            snap.DiskReadLatencyMs = Math.Max(0, Math.Round(readSec * 1000.0, 2));
+                            snap.DiskWriteLatencyMs = Math.Max(0, Math.Round(writeSec * 1000.0, 2));
+                            snap.DiskReadRateDisplay = FormatBytesPerSec(readBytes);
+                            snap.DiskWriteRateDisplay = FormatBytesPerSec(writeBytes);
+
+                            var totalItem = new DiskPerformanceItem
+                            {
+                                DiskIndex = -1,
+                                InstanceName = "_Total",
+                                DisplayName = "全部磁碟總計 (_Total)",
+                                ModelName = "All Physical Disks Combined",
+                                MediaType = "彙總",
+                                CapacityDisplay = "",
+                                ActiveTimePercent = Math.Clamp(Math.Round(diskPct, 1), 0.0, 100.0),
+                                ReadLatencyMs = Math.Max(0, Math.Round(readSec * 1000.0, 2)),
+                                WriteLatencyMs = Math.Max(0, Math.Round(writeSec * 1000.0, 2)),
+                                ReadRateDisplay = FormatBytesPerSec(readBytes),
+                                WriteRateDisplay = FormatBytesPerSec(writeBytes)
+                            };
+                            diskItems.Add(totalItem);
+                        }
+                        else
+                        {
+                            // Parse index and letters from instance like "0 C:" or "1 D: E:" or "0"
+                            int diskIdx = -1;
+                            string letters = "";
+                            var idxMatch = Regex.Match(inst, @"^(?<idx>\d+)(\s+(?<letters>.+))?$");
+                            if (idxMatch.Success)
+                            {
+                                int.TryParse(idxMatch.Groups["idx"].Value, out diskIdx);
+                                letters = idxMatch.Groups["letters"].Value.Trim();
+                            }
+
+                            string model = $"Disk {diskIdx}";
+                            string mediaType = "SSD";
+                            string capacity = "";
+
+                            if (diskIdx >= 0 && _physicalDiskCache.TryGetValue(diskIdx, out var cachedInfo))
+                            {
+                                model = cachedInfo.Model;
+                                mediaType = cachedInfo.MediaType;
+                                capacity = cachedInfo.Capacity;
+                            }
+
+                            string display = !string.IsNullOrEmpty(letters)
+                                ? $"磁碟 {diskIdx} ({letters})"
+                                : $"磁碟 {diskIdx}";
+
+                            var item = new DiskPerformanceItem
+                            {
+                                DiskIndex = diskIdx,
+                                InstanceName = inst,
+                                DisplayName = display,
+                                ModelName = model,
+                                MediaType = mediaType,
+                                CapacityDisplay = capacity,
+                                ActiveTimePercent = Math.Clamp(Math.Round(diskPct, 1), 0.0, 100.0),
+                                ReadLatencyMs = Math.Max(0, Math.Round(readSec * 1000.0, 2)),
+                                WriteLatencyMs = Math.Max(0, Math.Round(writeSec * 1000.0, 2)),
+                                ReadRateDisplay = FormatBytesPerSec(readBytes),
+                                WriteRateDisplay = FormatBytesPerSec(writeBytes)
+                            };
+                            diskItems.Add(item);
+                        }
+                    }
+
+                    // Order by DiskIndex (0, 1, 2... and _Total at the end)
+                    snap.Disks = diskItems.OrderBy(d => d.DiskIndex < 0 ? int.MaxValue : d.DiskIndex).ToList();
                 }
             }
         }
         catch { }
 
         return snap;
+    }
+
+    private readonly Dictionary<int, (string Model, string MediaType, string Capacity)> _physicalDiskCache = new();
+    private DateTime _lastDiskCacheTime = DateTime.MinValue;
+
+    private async Task EnsurePhysicalDiskCacheAsync()
+    {
+        if (DateTime.Now - _lastDiskCacheTime < TimeSpan.FromSeconds(60) && _physicalDiskCache.Count > 0) return;
+
+        await Task.Run(() =>
+        {
+            try
+            {
+                using var searcher = new System.Management.ManagementObjectSearcher("SELECT Index, Model, Size, MediaType, InterfaceType FROM Win32_DiskDrive");
+                foreach (var obj in searcher.Get())
+                {
+                    int index = Convert.ToInt32(obj["Index"]);
+                    string model = obj["Model"]?.ToString()?.Trim() ?? $"Disk {index}";
+                    ulong size = Convert.ToUInt64(obj["Size"] ?? 0);
+                    string mediaType = obj["MediaType"]?.ToString() ?? "";
+                    string iface = obj["InterfaceType"]?.ToString() ?? "";
+
+                    string typeStr = iface.Contains("NVMe", StringComparison.OrdinalIgnoreCase) || model.Contains("NVMe", StringComparison.OrdinalIgnoreCase)
+                        ? "NVMe SSD"
+                        : mediaType.Contains("External", StringComparison.OrdinalIgnoreCase) || iface.Contains("USB", StringComparison.OrdinalIgnoreCase)
+                            ? "外接磁碟 (USB)"
+                            : mediaType.Contains("Fixed", StringComparison.OrdinalIgnoreCase)
+                                ? "SSD / 內建"
+                                : "硬碟";
+
+                    string capStr = size > 0
+                        ? size >= 1_000_000_000_000UL
+                            ? $"{size / 1_000_000_000_000.0:F1} TB ({size / (1024 * 1024 * 1024):N0} GB)"
+                            : $"{size / (1000 * 1000 * 1000):N0} GB"
+                        : "";
+
+                    _physicalDiskCache[index] = (model, typeStr, capStr);
+                }
+                _lastDiskCacheTime = DateTime.Now;
+            }
+            catch { }
+        });
+    }
+
+    private static string[] ParseCsvLine(string line)
+    {
+        var list = new List<string>();
+        bool inQuotes = false;
+        var current = new System.Text.StringBuilder();
+
+        for (int i = 0; i < line.Length; i++)
+        {
+            char c = line[i];
+            if (c == '"')
+            {
+                inQuotes = !inQuotes;
+            }
+            else if (c == ',' && !inQuotes)
+            {
+                list.Add(current.ToString().Trim());
+                current.Clear();
+            }
+            else
+            {
+                current.Append(c);
+            }
+        }
+        list.Add(current.ToString().Trim());
+        return list.ToArray();
     }
 
     private static string FormatBytesPerSec(double bytesPerSec)
@@ -301,46 +465,86 @@ public partial class SystemPerformanceService
 
     public async Task<SystemInfoSummary> GetSystemInfoSummaryAsync(CancellationToken ct = default)
     {
-        return await Task.Run(async () =>
+        return await Task.Run(() =>
         {
             var summary = new SystemInfoSummary();
             try
             {
-                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                timeoutCts.CancelAfter(TimeSpan.FromSeconds(6));
-                var (outStr, _, code) = await ProcessHelper.RunProcessAsync("systeminfo.exe", "", cancellationToken: timeoutCts.Token);
-                if (string.IsNullOrWhiteSpace(outStr)) return summary;
+                // 1. Host Name via Environment
+                summary.HostName = Environment.MachineName;
 
-                var lines = outStr.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-                var hotfixes = new List<string>();
-
-                foreach (var line in lines)
+                // 2. OS Name & Build via Registry
+                try
                 {
-                    var trimmed = line.Trim();
-                    if (trimmed.StartsWith("Host Name:", StringComparison.OrdinalIgnoreCase))
-                        summary.HostName = ExtractValue(trimmed);
-                    else if (trimmed.StartsWith("OS Name:", StringComparison.OrdinalIgnoreCase))
-                        summary.OsName = ExtractValue(trimmed);
-                    else if (trimmed.StartsWith("OS Version:", StringComparison.OrdinalIgnoreCase))
-                        summary.OsVersion = ExtractValue(trimmed);
-                    else if (trimmed.StartsWith("System Manufacturer:", StringComparison.OrdinalIgnoreCase))
-                        summary.SystemManufacturer = ExtractValue(trimmed);
-                    else if (trimmed.StartsWith("System Model:", StringComparison.OrdinalIgnoreCase))
-                        summary.SystemModel = ExtractValue(trimmed);
-                    else if (trimmed.StartsWith("BIOS Version:", StringComparison.OrdinalIgnoreCase))
-                        summary.BiosVersion = ExtractValue(trimmed);
-                    else if (trimmed.StartsWith("System Boot Time:", StringComparison.OrdinalIgnoreCase))
-                        summary.SystemBootTime = ExtractValue(trimmed);
-                    else if (trimmed.StartsWith("Total Physical Memory:", StringComparison.OrdinalIgnoreCase))
-                        summary.TotalPhysicalMemory = ExtractValue(trimmed);
-                    else if (trimmed.StartsWith("Available Physical Memory:", StringComparison.OrdinalIgnoreCase))
-                        summary.AvailablePhysicalMemory = ExtractValue(trimmed);
-                    else if (Regex.IsMatch(trimmed, @"\[\d+\]:\s*(KB\d+)"))
+                    using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion");
+                    if (key != null)
                     {
-                        var m = Regex.Match(trimmed, @"(KB\d+)");
-                        if (m.Success) hotfixes.Add(m.Value);
+                        var prod = key.GetValue("ProductName")?.ToString() ?? "";
+                        var displayVer = key.GetValue("DisplayVersion")?.ToString() ?? "";
+                        var build = key.GetValue("CurrentBuild")?.ToString() ?? "";
+                        if (int.TryParse(build, out int bNum) && bNum >= 22000 && prod.StartsWith("Windows 10"))
+                        {
+                            prod = "Windows 11" + prod.Substring("Windows 10".Length);
+                        }
+                        summary.OsName = string.IsNullOrEmpty(displayVer) ? $"{prod} (Build {build})" : $"{prod} {displayVer} (Build {build})";
+                        summary.OsVersion = string.IsNullOrEmpty(build) ? "10.0" : $"10.0.{build}";
                     }
                 }
+                catch
+                {
+                    summary.OsName = Environment.OSVersion.VersionString;
+                }
+
+                // 3. Motherboard Manufacturer, Model & BIOS Version via Registry
+                try
+                {
+                    using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"HARDWARE\DESCRIPTION\System\BIOS");
+                    if (key != null)
+                    {
+                        summary.SystemManufacturer = key.GetValue("SystemManufacturer")?.ToString() ?? "Standard PC";
+                        summary.SystemModel = key.GetValue("SystemProductName")?.ToString() ?? "";
+                        summary.BiosVersion = key.GetValue("BIOSVersion")?.ToString() ?? "";
+                    }
+                }
+                catch { }
+
+                // 4. Boot Time & Uptime
+                var bootDate = DateTime.Now.AddMilliseconds(-Environment.TickCount64);
+                summary.SystemBootTime = bootDate.ToString("yyyy/MM/dd HH:mm:ss");
+                var uptimeSpan = TimeSpan.FromMilliseconds(Environment.TickCount64);
+                summary.Uptime = $"{(int)uptimeSpan.TotalHours} 小時 {uptimeSpan.Minutes} 分鐘";
+
+                // 5. Physical RAM via Win32 GlobalMemoryStatusEx
+                try
+                {
+                    var memStatus = new MEMORYSTATUSEX();
+                    memStatus.Init();
+                    if (GlobalMemoryStatusEx(ref memStatus))
+                    {
+                        double totalGb = memStatus.ullTotalPhys / (1024.0 * 1024 * 1024);
+                        double availGb = memStatus.ullAvailPhys / (1024.0 * 1024 * 1024);
+                        summary.TotalPhysicalMemory = $"{totalGb:F1} GB ({memStatus.ullTotalPhys / (1024 * 1024):N0} MB)";
+                        summary.AvailablePhysicalMemory = $"{availGb:F1} GB ({memStatus.ullAvailPhys / (1024 * 1024):N0} MB)";
+                    }
+                }
+                catch { }
+
+                // 6. Windows Hotfixes via WMI Win32_QuickFixEngineering (language-independent)
+                var hotfixes = new List<string>();
+                try
+                {
+                    using var searcher = new System.Management.ManagementObjectSearcher("SELECT HotFixID FROM Win32_QuickFixEngineering");
+                    using var col = searcher.Get();
+                    foreach (var obj in col)
+                    {
+                        var id = obj["HotFixID"]?.ToString()?.Trim();
+                        if (!string.IsNullOrEmpty(id) && id.StartsWith("KB", StringComparison.OrdinalIgnoreCase))
+                        {
+                            hotfixes.Add(id);
+                        }
+                    }
+                }
+                catch { }
 
                 summary.Hotfixes = hotfixes;
                 summary.HotfixCount = hotfixes.Count;
@@ -348,11 +552,5 @@ public partial class SystemPerformanceService
             catch { }
             return summary;
         }, ct);
-    }
-
-    private static string ExtractValue(string line)
-    {
-        var idx = line.IndexOf(':');
-        return idx > 0 && idx < line.Length - 1 ? line.Substring(idx + 1).Trim() : "";
     }
 }

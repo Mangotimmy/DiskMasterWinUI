@@ -82,9 +82,27 @@ public partial class App : Application
     {
         try
         {
+            try
+            {
+                SetCurrentProcessExplicitAppUserModelID("DiskMaster.Pro.Flagship");
+            }
+            catch { }
+
             _window = new MainWindow();
             GlobalExceptionHandler.Initialize(_window.DispatcherQueue);
             _window.Activate();
+
+            _ = Services.JumpListService.InitializeAsync();
+
+            var cmd = Environment.GetCommandLineArgs();
+            for (int i = 0; i < cmd.Length; i++)
+            {
+                if (cmd[i] == "--tab" && i + 1 < cmd.Length)
+                {
+                    _window.NavigateToTag(cmd[i + 1]);
+                    break;
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -93,4 +111,7 @@ public partial class App : Application
             throw;
         }
     }
+
+    [System.Runtime.InteropServices.DllImport("shell32.dll", SetLastError = true)]
+    private static extern int SetCurrentProcessExplicitAppUserModelID([System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.LPWStr)] string AppID);
 }

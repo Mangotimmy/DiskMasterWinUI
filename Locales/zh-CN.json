@@ -187,5 +187,7 @@
   "TabNetShare": "局域网共享向导",
   "TabRdp": "远程桌面 RDP 服务端",
   "TabCliTools": "命令提示符 (CMD) 工具箱",
-  "TabNtfsExplorer": "NTFS 深度特性探索"
+  "TabNtfsExplorer": "NTFS 深度特性探索",
+  "FollowWindowsLanguage": "跟随 Windows 系统语言",
+  "FollowWindowsLanguageDesc": "自动检测当前 Windows 操作系统显示语言并即时套用"
 }

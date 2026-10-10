@@ -37,6 +37,23 @@ public sealed partial class MainWindow : Window
     private readonly List<TabViewItem> _allTabItems = new();
     private readonly Dictionary<string, FloatingTabWindow> _floatingWindows = new();
 
+    private string? _rightDockTag;
+    private Page? _rightDockPage;
+    private string? _bottomDockTag;
+    private Page? _bottomDockPage;
+
+    private const uint WM_SETICON = 0x0080;
+    private const int ICON_SMALL = 0;
+    private const int ICON_BIG = 1;
+    private const uint IMAGE_ICON = 1;
+    private const uint LR_LOADFROMFILE = 0x00000010;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true, CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+    private static extern IntPtr LoadImage(IntPtr hinst, string lpszName, uint uType, int cxDesired, int cyDesired, uint fuLoad);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
     private static readonly Dictionary<string, string[]> WorkspaceTabTags = new()
     {
         ["Master"] = ["Starter", "EasyMode", "WimDeploy", "BootManager", "DiskTools", "SystemHealth", "NtfsPermissions", "AdvancedMode", "SystemOptimizer", "NetworkTools", "SystemPerformance", "Settings"],
@@ -69,6 +86,9 @@ public sealed partial class MainWindow : Window
             catch { }
         }
 
+        // Apply Win32 WM_SETICON on HWND to fix Windows 11 Taskbar generic white document icon
+        SetWindowTaskbarIcons();
+
         // Cache all 12 original tabs for workspace filtering & floating dock-back
         _allTabItems.AddRange([
             TabStarter,
@@ -95,6 +115,28 @@ public sealed partial class MainWindow : Window
                     TrayService.RestoreFromTray();
                 });
             };
+            TrayService.QuickActionRequested += (action) =>
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    HandleQuickAction(action);
+                });
+            };
+
+            // Initialize Windows Notification Center & Toast integration
+            WindowsNotificationService.Instance.Initialize(
+                onNavigate: (tag) =>
+                {
+                    TrayService.RestoreFromTray();
+                    if (!string.IsNullOrEmpty(tag) && tag != "Default")
+                    {
+                        NavigateToTag(tag);
+                    }
+                },
+                trayFallback: (title, msg) =>
+                {
+                    TrayService.ShowNotification(title, msg);
+                });
         }
         catch { }
 
@@ -104,7 +146,7 @@ public sealed partial class MainWindow : Window
             {
                 args.Cancel = true;
                 TrayService.MinimizeToTray();
-                TrayService.ShowNotification("DiskMaster Pro", LocalizationService.Instance["CloseToTrayNotice"] ?? "已縮小至系統匣後台執行");
+                WindowsNotificationService.Instance.ShowNotification("DiskMaster Pro", LocalizationService.Instance["CloseToTrayNotice"] ?? "已縮小至系統匣後台執行", "EasyMode");
             }
         };
 
@@ -131,6 +173,7 @@ public sealed partial class MainWindow : Window
         PopulateWorkspaceCombo();
         ApplyWorkspacePreset(SettingsService.Instance.Current.WorkspacePreset);
         ApplyCustomFont();
+        LocalizationService.Instance.ApplyLanguagePreference(SettingsService.Instance.Current.Language);
         ApplyLanguage();
         LocalizationService.Instance.LanguageChanged += ApplyLanguage;
 
@@ -192,7 +235,81 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void SetWindowTaskbarIcons()
+    {
+        try
+        {
+            var iconPath = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico");
+            if (System.IO.File.Exists(iconPath))
+            {
+                var hBig = LoadImage(IntPtr.Zero, iconPath, IMAGE_ICON, 32, 32, LR_LOADFROMFILE);
+                var hSmall = LoadImage(IntPtr.Zero, iconPath, IMAGE_ICON, 16, 16, LR_LOADFROMFILE);
+                if (hBig != IntPtr.Zero)
+                {
+                    SendMessage(WindowHelper.CurrentHwnd, WM_SETICON, (IntPtr)ICON_BIG, hBig);
+                }
+                if (hSmall != IntPtr.Zero)
+                {
+                    SendMessage(WindowHelper.CurrentHwnd, WM_SETICON, (IntPtr)ICON_SMALL, hSmall);
+                }
+            }
+        }
+        catch { }
+    }
+
+    private void HandleQuickAction(string action)
+    {
+        TrayService.RestoreFromTray();
+        switch (action)
+        {
+            case "Open":
+                break;
+            case "EasyMode":
+                NavigateToTag("EasyMode");
+                break;
+            case "Performance":
+                NavigateToTag("SystemPerformance");
+                break;
+            case "Network":
+                NavigateToTag("NetworkTools");
+                break;
+            case "DiskTools":
+                NavigateToTag("DiskTools");
+                break;
+            case "SystemHealth":
+                NavigateToTag("SystemHealth");
+                break;
+            case "CleanCache":
+                NavigateToTag("SystemHealth");
+                if (_systemHealthPage != null)
+                {
+                    _ = _systemHealthPage.ViewModel.CleanSelectedTempCategoriesCommand.ExecuteAsync(null);
+                }
+                break;
+            case "Settings":
+                NavigateToTag("Settings");
+                break;
+            case "Exit":
+                TrayService.Dispose();
+                AppWindow.Destroy();
+                Application.Current.Exit();
+                break;
+        }
+    }
+
     public static MainWindow? CurrentInstance { get; private set; }
+
+    public void ApplyCustomTabOrder(IEnumerable<string> order, IEnumerable<string> disabledTags)
+    {
+        var preset = SettingsService.Instance.Current.WorkspacePreset ?? "Master";
+        ApplyWorkspacePreset(preset);
+    }
+
+    public void ResetTabOrderToDefault()
+    {
+        var preset = SettingsService.Instance.Current.WorkspacePreset ?? "Master";
+        ApplyWorkspacePreset(preset);
+    }
 
     public void CompanionSay(string text)
     {
@@ -392,7 +509,12 @@ public sealed partial class MainWindow : Window
                 allowedTags = allowedTags.Where(tag => EasyModeAllowedTags.Contains(tag)).ToArray();
             }
 
-            if (s.CustomTabOrder != null && s.CustomTabOrder.Count > 0)
+            if (s.DisabledTabTags != null && s.DisabledTabTags.Count > 0)
+            {
+                allowedTags = allowedTags.Where(tag => !s.DisabledTabTags.Contains(tag)).ToArray();
+            }
+
+            if (s.EnableCustomTabReorder && s.CustomTabOrder != null && s.CustomTabOrder.Count > 0)
             {
                 allowedTags = allowedTags
                     .OrderBy(tag =>
@@ -410,7 +532,7 @@ public sealed partial class MainWindow : Window
 
             foreach (var tag in allowedTags)
             {
-                if (_floatingWindows.ContainsKey(tag)) continue;
+                if (_floatingWindows.ContainsKey(tag) || tag == _rightDockTag || tag == _bottomDockTag) continue;
 
                 var tabItem = _allTabItems.FirstOrDefault(t => t.Tag?.ToString() == tag);
                 if (tabItem != null)
@@ -476,31 +598,263 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    // ── Chrome Logic: Tab Detach & Floating Windows ──
+    // ── Chrome Logic: Multi-Directional Docking & Floating Windows ──
+
+    public string GetTabHeader(string tag)
+    {
+        var tab = _allTabItems.FirstOrDefault(t => t.Tag?.ToString() == tag);
+        return tab?.Header?.ToString() ?? tag;
+    }
+
+    public Page GetOrCreatePageForTag(string tag) => tag switch
+    {
+        "Starter" => _starterPage ??= new StarterPage(),
+        "EasyMode" => _easyModePage ??= new EasyModePage(),
+        "WimDeploy" => _wimDeployPage ??= new WimDeployPage(),
+        "BootManager" => _bootManagerPage ??= new BootManagerPage(),
+        "DiskTools" => _diskToolsPage ??= new DiskToolsPage(),
+        "SystemHealth" => _systemHealthPage ??= new SystemHealthPage(),
+        "NtfsPermissions" => _ntfsPermissionsPage ??= new NtfsPermissionsPage(),
+        "AdvancedMode" => _advancedModePage ??= new AdvancedModePage(),
+        "SystemOptimizer" => _systemOptimizerPage ??= new SystemOptimizerPage(),
+        "NetworkTools" => _networkToolsPage ??= new NetworkToolsPage(),
+        "SystemPerformance" => _systemPerformancePage ??= new SystemPerformancePage(),
+        "Settings" => _settingsPage ??= new SettingsPage(),
+        _ => new Page()
+    };
+
+    public void DockToRight(string tag)
+    {
+        if (string.IsNullOrEmpty(tag)) return;
+        if (_rightDockTag == tag) return;
+
+        if (_bottomDockTag == tag)
+        {
+            CloseBottomDock(reinsertToTabs: false);
+        }
+
+        if (_floatingWindows.TryGetValue(tag, out var floatWin))
+        {
+            _floatingWindows.Remove(tag);
+            floatWin.PerformDock(closeWindow: true);
+        }
+
+        if (!string.IsNullOrEmpty(_rightDockTag))
+        {
+            CloseRightDock(reinsertToTabs: true);
+        }
+
+        var tabItem = MainTabs.TabItems.OfType<TabViewItem>().FirstOrDefault(t => t.Tag?.ToString() == tag);
+        if (tabItem != null)
+        {
+            if (ReferenceEquals(MainTabs.SelectedItem, tabItem))
+            {
+                ContentFrame.Content = null;
+            }
+            MainTabs.TabItems.Remove(tabItem);
+            if (MainTabs.TabItems.Count > 0 && MainTabs.SelectedItem == null)
+            {
+                MainTabs.SelectedIndex = 0;
+            }
+        }
+
+        var page = GetOrCreatePageForTag(tag);
+        _rightDockTag = tag;
+        _rightDockPage = page;
+
+        RightDockTitleText.Text = $"側邊分屏: {GetTabHeader(tag)}";
+        RightDockFrame.Content = page;
+        RightDockPanel.Visibility = Visibility.Visible;
+        RightDockSplitter.Visibility = Visibility.Visible;
+        RightDockColDef.Width = new GridLength(460);
+
+        UpdateFloatingManagerUI();
+    }
+
+    public void CloseRightDock(bool reinsertToTabs = true)
+    {
+        if (string.IsNullOrEmpty(_rightDockTag)) return;
+
+        var tag = _rightDockTag;
+        _rightDockTag = null;
+        _rightDockPage = null;
+
+        RightDockFrame.Content = null;
+        RightDockPanel.Visibility = Visibility.Collapsed;
+        RightDockSplitter.Visibility = Visibility.Collapsed;
+        RightDockColDef.Width = GridLength.Auto;
+
+        if (reinsertToTabs)
+        {
+            ReinsertTabToMainTabs(tag);
+        }
+        UpdateFloatingManagerUI();
+    }
+
+    public void DockToBottom(string tag)
+    {
+        if (string.IsNullOrEmpty(tag)) return;
+        if (_bottomDockTag == tag) return;
+
+        if (_rightDockTag == tag)
+        {
+            CloseRightDock(reinsertToTabs: false);
+        }
+
+        if (_floatingWindows.TryGetValue(tag, out var floatWin))
+        {
+            _floatingWindows.Remove(tag);
+            floatWin.PerformDock(closeWindow: true);
+        }
+
+        if (!string.IsNullOrEmpty(_bottomDockTag))
+        {
+            CloseBottomDock(reinsertToTabs: true);
+        }
+
+        var tabItem = MainTabs.TabItems.OfType<TabViewItem>().FirstOrDefault(t => t.Tag?.ToString() == tag);
+        if (tabItem != null)
+        {
+            if (ReferenceEquals(MainTabs.SelectedItem, tabItem))
+            {
+                ContentFrame.Content = null;
+            }
+            MainTabs.TabItems.Remove(tabItem);
+            if (MainTabs.TabItems.Count > 0 && MainTabs.SelectedItem == null)
+            {
+                MainTabs.SelectedIndex = 0;
+            }
+        }
+
+        var page = GetOrCreatePageForTag(tag);
+        _bottomDockTag = tag;
+        _bottomDockPage = page;
+
+        BottomDockTitleText.Text = $"底部水平分屏: {GetTabHeader(tag)}";
+        BottomDockFrame.Content = page;
+        BottomDockPanel.Visibility = Visibility.Visible;
+        BottomDockSplitter.Visibility = Visibility.Visible;
+        BottomDockRowDef.Height = new GridLength(280);
+
+        UpdateFloatingManagerUI();
+    }
+
+    public void CloseBottomDock(bool reinsertToTabs = true)
+    {
+        if (string.IsNullOrEmpty(_bottomDockTag)) return;
+
+        var tag = _bottomDockTag;
+        _bottomDockTag = null;
+        _bottomDockPage = null;
+
+        BottomDockFrame.Content = null;
+        BottomDockPanel.Visibility = Visibility.Collapsed;
+        BottomDockSplitter.Visibility = Visibility.Collapsed;
+        BottomDockRowDef.Height = GridLength.Auto;
+
+        if (reinsertToTabs)
+        {
+            ReinsertTabToMainTabs(tag);
+        }
+        UpdateFloatingManagerUI();
+    }
+
+    private void ReinsertTabToMainTabs(string tag)
+    {
+        var tabItem = _allTabItems.FirstOrDefault(t => t.Tag?.ToString() == tag);
+        if (tabItem != null && !MainTabs.TabItems.Contains(tabItem))
+        {
+            var currentPreset = SettingsService.Instance.Current.WorkspacePreset ?? "Master";
+            if (!WorkspaceTabTags.TryGetValue(currentPreset, out var allowedTags))
+            {
+                allowedTags = WorkspaceTabTags["Master"];
+            }
+
+            int insertIndex = MainTabs.TabItems.Count;
+            if (allowedTags.Contains(tag))
+            {
+                insertIndex = 0;
+                int tagIndexInAllowed = Array.IndexOf(allowedTags, tag);
+                for (int i = 0; i < MainTabs.TabItems.Count; i++)
+                {
+                    var otherTag = (MainTabs.TabItems[i] as TabViewItem)?.Tag?.ToString() ?? "";
+                    int otherIndexInAllowed = Array.IndexOf(allowedTags, otherTag);
+                    if (otherIndexInAllowed < tagIndexInAllowed)
+                    {
+                        insertIndex = i + 1;
+                    }
+                }
+                insertIndex = Math.Clamp(insertIndex, 0, MainTabs.TabItems.Count);
+            }
+            MainTabs.TabItems.Insert(insertIndex, tabItem);
+            MainTabs.SelectedItem = tabItem;
+            NavigateToTag(tag);
+            SaveCustomTabOrder();
+        }
+    }
+
+    private void RightToBottom_Click(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(_rightDockTag))
+        {
+            var tag = _rightDockTag;
+            CloseRightDock(reinsertToTabs: false);
+            DockToBottom(tag);
+        }
+    }
+
+    private void RightToFloat_Click(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(_rightDockTag))
+        {
+            var tag = _rightDockTag;
+            var header = GetTabHeader(tag);
+            var page = _rightDockPage ?? GetOrCreatePageForTag(tag);
+            CloseRightDock(reinsertToTabs: false);
+            CreateFloatingWindow(tag, header, page);
+        }
+    }
+
+    private void RightDockClose_Click(object sender, RoutedEventArgs e)
+    {
+        CloseRightDock(reinsertToTabs: true);
+    }
+
+    private void BottomToRight_Click(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(_bottomDockTag))
+        {
+            var tag = _bottomDockTag;
+            CloseBottomDock(reinsertToTabs: false);
+            DockToRight(tag);
+        }
+    }
+
+    private void BottomToFloat_Click(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(_bottomDockTag))
+        {
+            var tag = _bottomDockTag;
+            var header = GetTabHeader(tag);
+            var page = _bottomDockPage ?? GetOrCreatePageForTag(tag);
+            CloseBottomDock(reinsertToTabs: false);
+            CreateFloatingWindow(tag, header, page);
+        }
+    }
+
+    private void BottomDockClose_Click(object sender, RoutedEventArgs e)
+    {
+        CloseBottomDock(reinsertToTabs: true);
+    }
 
     public void FloatTab(TabViewItem tabItem, Windows.Graphics.PointInt32? mousePos = null)
     {
         var tag = tabItem.Tag?.ToString();
         if (string.IsNullOrEmpty(tag) || _floatingWindows.ContainsKey(tag)) return;
-        if (MainTabs.TabItems.Count <= 1) return; // Prevent detaching the last remaining tab
+        if (MainTabs.TabItems.Count <= 1) return;
 
         var header = tabItem.Header?.ToString() ?? tag;
-        Page page = tag switch
-        {
-            "Starter" => _starterPage ??= new StarterPage(),
-            "EasyMode" => _easyModePage ??= new EasyModePage(),
-            "WimDeploy" => _wimDeployPage ??= new WimDeployPage(),
-            "BootManager" => _bootManagerPage ??= new BootManagerPage(),
-            "DiskTools" => _diskToolsPage ??= new DiskToolsPage(),
-            "SystemHealth" => _systemHealthPage ??= new SystemHealthPage(),
-            "NtfsPermissions" => _ntfsPermissionsPage ??= new NtfsPermissionsPage(),
-            "AdvancedMode" => _advancedModePage ??= new AdvancedModePage(),
-            "SystemOptimizer" => _systemOptimizerPage ??= new SystemOptimizerPage(),
-            "NetworkTools" => _networkToolsPage ??= new NetworkToolsPage(),
-            "SystemPerformance" => _systemPerformancePage ??= new SystemPerformancePage(),
-            "Settings" => _settingsPage ??= new SettingsPage(),
-            _ => new Page()
-        };
+        Page page = GetOrCreatePageForTag(tag);
 
         if (ReferenceEquals(ContentFrame.Content, page))
         {
@@ -513,26 +867,188 @@ public sealed partial class MainWindow : Window
             MainTabs.SelectedIndex = Math.Clamp(MainTabs.SelectedIndex, 0, MainTabs.TabItems.Count - 1);
         }
 
+        CreateFloatingWindow(tag, header, page, mousePos);
+    }
+
+    public void CreateFloatingWindow(string tag, string header, Page page, Windows.Graphics.PointInt32? mousePos = null)
+    {
+        if (_floatingWindows.ContainsKey(tag)) return;
+
         var win = new FloatingTabWindow(tag, header, page, mousePos);
         win.DockRequested += OnFloatingTabDockRequested;
+        win.DockToRightRequested += (w) =>
+        {
+            _floatingWindows.Remove(w.TabTag);
+            DockToRight(w.TabTag);
+        };
+        win.DockToBottomRequested += (w) =>
+        {
+            _floatingWindows.Remove(w.TabTag);
+            DockToBottom(w.TabTag);
+        };
         _floatingWindows[tag] = win;
         win.Activate();
         UpdateFloatingManagerUI();
         SaveCustomTabOrder();
     }
 
+    private TabViewItem? _draggedTabItem;
+
+    private void MainTabs_TabDragStarting(TabView sender, TabViewTabDragStartingEventArgs args)
+    {
+        _draggedTabItem = args.Tab;
+        args.Data.RequestedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.Move;
+        args.Data.SetText(args.Tab.Tag?.ToString() ?? "tab");
+        ShowDockDropOverlay(true);
+    }
+
     private void MainTabs_TabDroppedOutside(TabView sender, TabViewTabDroppedOutsideEventArgs args)
     {
-        if (args.Tab != null)
+        ShowDockDropOverlay(false);
+        var tab = args.Tab ?? _draggedTabItem;
+        _draggedTabItem = null;
+        if (tab != null)
         {
             var cursor = DisplayHelper.GetCurrentCursorPosition();
-            FloatTab(args.Tab, cursor);
+            FloatTab(tab, cursor);
         }
     }
 
     private void MainTabs_TabDragCompleted(TabView sender, TabViewTabDragCompletedEventArgs args)
     {
+        _draggedTabItem = null;
+        ShowDockDropOverlay(false);
         SaveCustomTabOrder();
+    }
+
+    private void DockContainerGrid_DragOver(object sender, DragEventArgs e)
+    {
+        e.AcceptedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.Move;
+        e.DragUIOverride.IsCaptionVisible = false;
+        e.DragUIOverride.IsGlyphVisible = false;
+
+        ShowDockDropOverlay(true);
+
+        var pos = e.GetPosition(DockContainerGrid);
+        var w = DockContainerGrid.ActualWidth;
+        var h = DockContainerGrid.ActualHeight;
+
+        UpdateDockDropHighlight(pos, w, h);
+    }
+
+    private void DockContainerGrid_DragLeave(object sender, DragEventArgs e)
+    {
+        ResetDockDropHighlights();
+    }
+
+    private void DockContainerGrid_Drop(object sender, DragEventArgs e)
+    {
+        var tab = _draggedTabItem ?? (MainTabs.SelectedItem as TabViewItem);
+        _draggedTabItem = null;
+        ShowDockDropOverlay(false);
+
+        if (tab == null) return;
+        var tag = tab.Tag?.ToString();
+        if (string.IsNullOrEmpty(tag)) return;
+
+        var pos = e.GetPosition(DockContainerGrid);
+        var w = DockContainerGrid.ActualWidth;
+        var h = DockContainerGrid.ActualHeight;
+
+        if (pos.X > w - 280)
+        {
+            DockToRight(tag);
+        }
+        else if (pos.Y > h - 190)
+        {
+            DockToBottom(tag);
+        }
+        else
+        {
+            var cursor = DisplayHelper.GetCurrentCursorPosition();
+            FloatTab(tab, cursor);
+        }
+    }
+
+    private void ShowDockDropOverlay(bool visible)
+    {
+        if (DockDropOverlay == null) return;
+        DockDropOverlay.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        if (!visible)
+        {
+            ResetDockDropHighlights();
+        }
+    }
+
+    private void UpdateDockDropHighlight(Windows.Foundation.Point pos, double width, double height)
+    {
+        if (DropZoneCenter == null || DropZoneRight == null || DropZoneBottom == null) return;
+
+        if (Application.Current.Resources.TryGetValue("AccentFillColorDefaultBrush", out var accentObj) && accentObj is Brush accentBrush &&
+            Application.Current.Resources.TryGetValue("CardStrokeColorDefaultBrush", out var defaultObj) && defaultObj is Brush defaultStroke)
+        {
+            if (pos.X > width - 280)
+            {
+                DropZoneRight.BorderBrush = accentBrush;
+                DropZoneRight.BorderThickness = new Thickness(3);
+                DropZoneRight.Opacity = 1.0;
+
+                DropZoneBottom.BorderBrush = defaultStroke;
+                DropZoneBottom.BorderThickness = new Thickness(2);
+                DropZoneBottom.Opacity = 0.6;
+
+                DropZoneCenter.BorderBrush = defaultStroke;
+                DropZoneCenter.BorderThickness = new Thickness(2);
+                DropZoneCenter.Opacity = 0.6;
+            }
+            else if (pos.Y > height - 190)
+            {
+                DropZoneBottom.BorderBrush = accentBrush;
+                DropZoneBottom.BorderThickness = new Thickness(3);
+                DropZoneBottom.Opacity = 1.0;
+
+                DropZoneRight.BorderBrush = defaultStroke;
+                DropZoneRight.BorderThickness = new Thickness(2);
+                DropZoneRight.Opacity = 0.6;
+
+                DropZoneCenter.BorderBrush = defaultStroke;
+                DropZoneCenter.BorderThickness = new Thickness(2);
+                DropZoneCenter.Opacity = 0.6;
+            }
+            else
+            {
+                DropZoneCenter.BorderBrush = accentBrush;
+                DropZoneCenter.BorderThickness = new Thickness(3);
+                DropZoneCenter.Opacity = 1.0;
+
+                DropZoneRight.BorderBrush = defaultStroke;
+                DropZoneRight.BorderThickness = new Thickness(2);
+                DropZoneRight.Opacity = 0.6;
+
+                DropZoneBottom.BorderBrush = defaultStroke;
+                DropZoneBottom.BorderThickness = new Thickness(2);
+                DropZoneBottom.Opacity = 0.6;
+            }
+        }
+    }
+
+    private void ResetDockDropHighlights()
+    {
+        if (DropZoneCenter == null || DropZoneRight == null || DropZoneBottom == null) return;
+        if (Application.Current.Resources.TryGetValue("CardStrokeColorDefaultBrush", out var defaultObj) && defaultObj is Brush defaultStroke)
+        {
+            DropZoneCenter.BorderBrush = defaultStroke;
+            DropZoneCenter.BorderThickness = new Thickness(2);
+            DropZoneCenter.Opacity = 0.6;
+
+            DropZoneRight.BorderBrush = defaultStroke;
+            DropZoneRight.BorderThickness = new Thickness(2);
+            DropZoneRight.Opacity = 0.6;
+
+            DropZoneBottom.BorderBrush = defaultStroke;
+            DropZoneBottom.BorderThickness = new Thickness(2);
+            DropZoneBottom.Opacity = 0.6;
+        }
     }
 
     private void SaveCustomTabOrder()
@@ -564,43 +1080,20 @@ public sealed partial class MainWindow : Window
     {
         var tag = win.TabTag;
         _floatingWindows.Remove(tag);
-
-        var currentPreset = SettingsService.Instance.Current.WorkspacePreset ?? "Master";
-        if (!WorkspaceTabTags.TryGetValue(currentPreset, out var allowedTags))
-        {
-            allowedTags = WorkspaceTabTags["Master"];
-        }
-
-        var tabItem = _allTabItems.FirstOrDefault(t => t.Tag?.ToString() == tag);
-        if (tabItem != null && !MainTabs.TabItems.Contains(tabItem))
-        {
-            int insertIndex = MainTabs.TabItems.Count;
-            if (allowedTags.Contains(tag))
-            {
-                insertIndex = 0;
-                int tagIndexInAllowed = Array.IndexOf(allowedTags, tag);
-                for (int i = 0; i < MainTabs.TabItems.Count; i++)
-                {
-                    var otherTag = (MainTabs.TabItems[i] as TabViewItem)?.Tag?.ToString() ?? "";
-                    int otherIndexInAllowed = Array.IndexOf(allowedTags, otherTag);
-                    if (otherIndexInAllowed < tagIndexInAllowed)
-                    {
-                        insertIndex = i + 1;
-                    }
-                }
-                insertIndex = Math.Clamp(insertIndex, 0, MainTabs.TabItems.Count);
-            }
-            MainTabs.TabItems.Insert(insertIndex, tabItem);
-            MainTabs.SelectedItem = tabItem;
-            ContentFrame.Content = win.HostedPage;
-        }
-
+        ReinsertTabToMainTabs(tag);
         UpdateFloatingManagerUI();
-        SaveCustomTabOrder();
+    }
+
+    private void DockAllFloatingTabs_Click(object sender, RoutedEventArgs e)
+    {
+        DockAll_Click(sender, e);
     }
 
     private void DockAll_Click(object sender, RoutedEventArgs e)
     {
+        CloseRightDock(reinsertToTabs: true);
+        CloseBottomDock(reinsertToTabs: true);
+
         var windows = _floatingWindows.Values.ToList();
         foreach (var win in windows)
         {
@@ -610,19 +1103,22 @@ public sealed partial class MainWindow : Window
 
     private void UpdateFloatingManagerUI()
     {
-        int count = _floatingWindows.Count;
-        if (count > 0)
+        int floatingCount = _floatingWindows.Count;
+        int dockedCount = (!string.IsNullOrEmpty(_rightDockTag) ? 1 : 0) + (!string.IsNullOrEmpty(_bottomDockTag) ? 1 : 0);
+        int total = floatingCount + dockedCount;
+
+        if (total > 0)
         {
             FloatingManagerBtn.Visibility = Visibility.Visible;
             var loc = LocalizationService.Instance;
             var template = loc.CurrentLanguage switch
             {
-                "zh-CN" => "{0} 浮动窗口 (点击全部嵌回)",
-                "en-US" => "{0} Floating (Click to Dock All)",
-                "ja-JP" => "{0} 分離中 (クリックで全て戻す)",
-                _ => "{0} 浮動視窗 (點擊全部嵌回)"
+                "zh-CN" => "{0} 分屏/浮动 (点击全部嵌回)",
+                "en-US" => "{0} Docked/Float (Click to Reset)",
+                "ja-JP" => "{0} 分割/分離中 (クリックで全て戻す)",
+                _ => "{0} 分屏/浮動 (點擊全部嵌回)"
             };
-            FloatingCountText.Text = string.Format(template, count);
+            FloatingCountText.Text = string.Format(template, total);
         }
         else
         {
@@ -652,6 +1148,56 @@ public sealed partial class MainWindow : Window
         if (tab != null) FloatTab(tab);
     }
 
+    private void TabContext_DockRight_Click(object sender, RoutedEventArgs e)
+    {
+        var tab = GetTabFromSender(sender);
+        if (tab?.Tag is string tag)
+        {
+            DockToRight(tag);
+        }
+    }
+
+    private void TabContext_DockBottom_Click(object sender, RoutedEventArgs e)
+    {
+        var tab = GetTabFromSender(sender);
+        if (tab?.Tag is string tag)
+        {
+            DockToBottom(tag);
+        }
+    }
+
+    private void TabContext_MoveLeft_Click(object sender, RoutedEventArgs e)
+    {
+        var tab = GetTabFromSender(sender);
+        if (tab != null && MainTabs.TabItems.Contains(tab))
+        {
+            int oldIndex = MainTabs.TabItems.IndexOf(tab);
+            if (oldIndex > 0)
+            {
+                MainTabs.TabItems.RemoveAt(oldIndex);
+                MainTabs.TabItems.Insert(oldIndex - 1, tab);
+                MainTabs.SelectedItem = tab;
+                SaveCustomTabOrder();
+            }
+        }
+    }
+
+    private void TabContext_MoveRight_Click(object sender, RoutedEventArgs e)
+    {
+        var tab = GetTabFromSender(sender);
+        if (tab != null && MainTabs.TabItems.Contains(tab))
+        {
+            int oldIndex = MainTabs.TabItems.IndexOf(tab);
+            if (oldIndex >= 0 && oldIndex < MainTabs.TabItems.Count - 1)
+            {
+                MainTabs.TabItems.RemoveAt(oldIndex);
+                MainTabs.TabItems.Insert(oldIndex + 1, tab);
+                MainTabs.SelectedItem = tab;
+                SaveCustomTabOrder();
+            }
+        }
+    }
+
     private void TabContext_MoveFirst_Click(object sender, RoutedEventArgs e)
     {
         var tab = GetTabFromSender(sender);
@@ -663,6 +1209,7 @@ public sealed partial class MainWindow : Window
                 MainTabs.TabItems.RemoveAt(oldIndex);
                 MainTabs.TabItems.Insert(0, tab);
                 MainTabs.SelectedItem = tab;
+                SaveCustomTabOrder();
             }
         }
     }
@@ -679,6 +1226,7 @@ public sealed partial class MainWindow : Window
                 MainTabs.TabItems.RemoveAt(oldIndex);
                 MainTabs.TabItems.Add(tab);
                 MainTabs.SelectedItem = tab;
+                SaveCustomTabOrder();
             }
         }
     }
@@ -943,6 +1491,82 @@ public sealed partial class MainWindow : Window
         dockAllAccel.Invoked += (s, e) => { DockAll_Click(this, new RoutedEventArgs()); e.Handled = true; };
         AddHiddenAccel(dockAllAccel);
 
+        // Alt+Left (Move Tab Left)
+        var moveLeftAccel = new KeyboardAccelerator { Key = VirtualKey.Left, Modifiers = VirtualKeyModifiers.Menu };
+        moveLeftAccel.Invoked += (s, e) =>
+        {
+            if (MainTabs.SelectedItem is TabViewItem tab)
+            {
+                int idx = MainTabs.TabItems.IndexOf(tab);
+                if (idx > 0)
+                {
+                    MainTabs.TabItems.RemoveAt(idx);
+                    MainTabs.TabItems.Insert(idx - 1, tab);
+                    MainTabs.SelectedItem = tab;
+                    SaveCustomTabOrder();
+                    e.Handled = true;
+                }
+            }
+        };
+        AddHiddenAccel(moveLeftAccel);
+
+        // Alt+Right (Move Tab Right)
+        var moveRightAccel = new KeyboardAccelerator { Key = VirtualKey.Right, Modifiers = VirtualKeyModifiers.Menu };
+        moveRightAccel.Invoked += (s, e) =>
+        {
+            if (MainTabs.SelectedItem is TabViewItem tab)
+            {
+                int idx = MainTabs.TabItems.IndexOf(tab);
+                if (idx >= 0 && idx < MainTabs.TabItems.Count - 1)
+                {
+                    MainTabs.TabItems.RemoveAt(idx);
+                    MainTabs.TabItems.Insert(idx + 1, tab);
+                    MainTabs.SelectedItem = tab;
+                    SaveCustomTabOrder();
+                    e.Handled = true;
+                }
+            }
+        };
+        AddHiddenAccel(moveRightAccel);
+
+        // Alt+Home (Move Tab to First)
+        var moveFirstAccel = new KeyboardAccelerator { Key = VirtualKey.Home, Modifiers = VirtualKeyModifiers.Menu };
+        moveFirstAccel.Invoked += (s, e) =>
+        {
+            if (MainTabs.SelectedItem is TabViewItem tab)
+            {
+                int idx = MainTabs.TabItems.IndexOf(tab);
+                if (idx > 0)
+                {
+                    MainTabs.TabItems.RemoveAt(idx);
+                    MainTabs.TabItems.Insert(0, tab);
+                    MainTabs.SelectedItem = tab;
+                    SaveCustomTabOrder();
+                    e.Handled = true;
+                }
+            }
+        };
+        AddHiddenAccel(moveFirstAccel);
+
+        // Alt+End (Move Tab to Last)
+        var moveLastAccel = new KeyboardAccelerator { Key = VirtualKey.End, Modifiers = VirtualKeyModifiers.Menu };
+        moveLastAccel.Invoked += (s, e) =>
+        {
+            if (MainTabs.SelectedItem is TabViewItem tab)
+            {
+                int idx = MainTabs.TabItems.IndexOf(tab);
+                if (idx >= 0 && idx < MainTabs.TabItems.Count - 1)
+                {
+                    MainTabs.TabItems.RemoveAt(idx);
+                    MainTabs.TabItems.Add(tab);
+                    MainTabs.SelectedItem = tab;
+                    SaveCustomTabOrder();
+                    e.Handled = true;
+                }
+            }
+        };
+        AddHiddenAccel(moveLastAccel);
+
         // Ctrl+D for Export Diagnostics Report
         var exportDiagAccel = new KeyboardAccelerator { Key = VirtualKey.D, Modifiers = VirtualKeyModifiers.Control };
         exportDiagAccel.Invoked += async (s, e) =>
@@ -1058,6 +1682,13 @@ public sealed partial class MainWindow : Window
             "ja-JP" => "🌐 日本語",
             _ => "🌐 繁體中文"
         };
+        ToolTipService.SetToolTip(LanguageToggleBtn, loc.CurrentLanguage switch
+        {
+            "zh-CN" => "切换语言 (当前: 简体中文)",
+            "en-US" => "Switch Language (Current: English)",
+            "ja-JP" => "言語を切り替える (現在: 日本語)",
+            _ => "切換語言 (目前: 繁體中文)"
+        });
 
         FloatTabBtn.Content = loc.CurrentLanguage switch
         {
@@ -1092,62 +1723,21 @@ public sealed partial class MainWindow : Window
 
     public void NavigateToTag(string? tag)
     {
-        if (string.IsNullOrEmpty(tag) || tag == _currentNavigatedTag) return;
+        if (string.IsNullOrEmpty(tag)) return;
+
+        var tabItem = MainTabs.TabItems.OfType<TabViewItem>().FirstOrDefault(t => t.Tag?.ToString() == tag);
+        if (tabItem != null && !ReferenceEquals(MainTabs.SelectedItem, tabItem))
+        {
+            MainTabs.SelectedItem = tabItem;
+        }
+
+        if (tag == _currentNavigatedTag && ContentFrame.Content != null) return;
         _currentNavigatedTag = tag;
         var sw = System.Diagnostics.Stopwatch.StartNew();
         DebugLogService.Instance.Debug($"Navigating to tab '{tag}'...", "Navigation");
 
-        switch (tag)
-        {
-            case "Starter":
-                _starterPage ??= new StarterPage();
-                ContentFrame.Content = _starterPage;
-                break;
-            case "EasyMode":
-                _easyModePage ??= new EasyModePage();
-                ContentFrame.Content = _easyModePage;
-                break;
-            case "WimDeploy":
-                _wimDeployPage ??= new WimDeployPage();
-                ContentFrame.Content = _wimDeployPage;
-                break;
-            case "BootManager":
-                _bootManagerPage ??= new BootManagerPage();
-                ContentFrame.Content = _bootManagerPage;
-                break;
-            case "DiskTools":
-                _diskToolsPage ??= new DiskToolsPage();
-                ContentFrame.Content = _diskToolsPage;
-                break;
-            case "SystemHealth":
-                _systemHealthPage ??= new SystemHealthPage();
-                ContentFrame.Content = _systemHealthPage;
-                break;
-            case "NtfsPermissions":
-                _ntfsPermissionsPage ??= new NtfsPermissionsPage();
-                ContentFrame.Content = _ntfsPermissionsPage;
-                break;
-            case "AdvancedMode":
-                _advancedModePage ??= new AdvancedModePage();
-                ContentFrame.Content = _advancedModePage;
-                break;
-            case "SystemOptimizer":
-                _systemOptimizerPage ??= new SystemOptimizerPage();
-                ContentFrame.Content = _systemOptimizerPage;
-                break;
-            case "NetworkTools":
-                _networkToolsPage ??= new NetworkToolsPage();
-                ContentFrame.Content = _networkToolsPage;
-                break;
-            case "SystemPerformance":
-                _systemPerformancePage ??= new SystemPerformancePage();
-                ContentFrame.Content = _systemPerformancePage;
-                break;
-            case "Settings":
-                _settingsPage ??= new SettingsPage();
-                ContentFrame.Content = _settingsPage;
-                break;
-        }
+        ContentFrame.Content = GetOrCreatePageForTag(tag);
+        UpdateViewportLayout();
 
         sw.Stop();
         if (sw.ElapsedMilliseconds >= 200)
@@ -1189,6 +1779,7 @@ public sealed partial class MainWindow : Window
         if (ContentScrollViewer == null || ContentRoot == null) return;
         var factor = Math.Clamp(_currentZoom, 0.7, 1.8);
         var viewportW = ContentScrollViewer.ActualWidth;
+        var viewportH = ContentScrollViewer.ActualHeight;
         if (viewportW <= 0) return;
 
         // Browser Viewport logic:
@@ -1198,15 +1789,26 @@ public sealed partial class MainWindow : Window
         RootScaleTransform.ScaleX = factor;
         RootScaleTransform.ScaleY = factor;
 
-        // Bottom margin compensation so vertical scroll covers the full zoomed content height
-        var contentH = ContentFrame?.ActualHeight ?? ContentRoot.ActualHeight;
-        if (factor > 1.0 && contentH > 0)
+        if (_currentNavigatedTag == "EasyMode" && viewportH > 0)
         {
-            ContentRoot.Margin = new Thickness(0, 0, 0, (contentH * (factor - 1.0)) + 30);
+            ContentScrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
+            var layoutH = Math.Max(520, (viewportH - 4) / factor);
+            ContentRoot.Height = layoutH;
+            ContentRoot.Margin = new Thickness(0);
         }
         else
         {
-            ContentRoot.Margin = new Thickness(0);
+            ContentScrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+            ContentRoot.ClearValue(FrameworkElement.HeightProperty);
+            var contentH = ContentFrame?.ActualHeight ?? ContentRoot.ActualHeight;
+            if (factor > 1.0 && contentH > 0)
+            {
+                ContentRoot.Margin = new Thickness(0, 0, 0, (contentH * (factor - 1.0)) + 30);
+            }
+            else
+            {
+                ContentRoot.Margin = new Thickness(0);
+            }
         }
     }
 

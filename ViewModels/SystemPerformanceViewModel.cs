@@ -14,6 +14,7 @@ public partial class SystemPerformanceViewModel : ObservableObject
 
     [ObservableProperty] private SystemMetricsSnapshot _currentMetrics = new();
     [ObservableProperty] private SystemInfoSummary _systemInfo = new();
+    [ObservableProperty] private DiskPerformanceItem? _selectedDisk;
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private bool _isAutoRefresh = true;
     [ObservableProperty] private string _processSearchQuery = "";
@@ -22,13 +23,18 @@ public partial class SystemPerformanceViewModel : ObservableObject
 
     public ObservableCollection<ProcessHunterItem> AllProcesses { get; } = new();
     public ObservableCollection<ProcessHunterItem> FilteredProcesses { get; } = new();
+    public ObservableCollection<DiskPerformanceItem> DetectedDisks { get; } = new();
+
+    // 60-second historical disk usage buffer for Task Manager style chart
+    public Queue<double> DiskUsageHistory { get; } = new(Enumerable.Repeat(0.0, 60));
+    public event Action? DiskHistoryUpdated;
 
     private bool _isInitialized;
 
     public SystemPerformanceViewModel()
     {
         _refreshTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
-        _refreshTimer.Interval = TimeSpan.FromSeconds(3);
+        _refreshTimer.Interval = TimeSpan.FromSeconds(1.5);
         _refreshTimer.Tick += async (_, _) =>
         {
             if (IsAutoRefresh && !IsLoading)
@@ -83,12 +89,102 @@ public partial class SystemPerformanceViewModel : ObservableObject
     }
 
     [RelayCommand]
+    public void SelectDisk(DiskPerformanceItem? disk)
+    {
+        if (disk == null) return;
+        SelectedDisk = disk;
+        foreach (var d in DetectedDisks)
+        {
+            d.IsSelected = (d == disk);
+        }
+
+        // Synchronize active waveform history queue with selected disk
+        DiskUsageHistory.Clear();
+        foreach (var val in disk.UsageHistory)
+        {
+            DiskUsageHistory.Enqueue(val);
+        }
+        DiskHistoryUpdated?.Invoke();
+    }
+
+    [RelayCommand]
     public async Task RefreshMetricsAsync()
     {
         try
         {
             var snap = await _perfService.GetMetricsSnapshotAsync();
             CurrentMetrics = snap;
+
+            // Sync DetectedDisks collection with incoming snapshot disks
+            foreach (var incomingDisk in snap.Disks)
+            {
+                var existing = DetectedDisks.FirstOrDefault(d => d.InstanceName == incomingDisk.InstanceName);
+                if (existing == null)
+                {
+                    DetectedDisks.Add(incomingDisk);
+                    existing = incomingDisk;
+                }
+                else
+                {
+                    existing.ActiveTimePercent = incomingDisk.ActiveTimePercent;
+                    existing.ReadLatencyMs = incomingDisk.ReadLatencyMs;
+                    existing.WriteLatencyMs = incomingDisk.WriteLatencyMs;
+                    existing.ReadRateDisplay = incomingDisk.ReadRateDisplay;
+                    existing.WriteRateDisplay = incomingDisk.WriteRateDisplay;
+                    if (!string.IsNullOrEmpty(incomingDisk.ModelName) && incomingDisk.ModelName != existing.ModelName)
+                    {
+                        existing.ModelName = incomingDisk.ModelName;
+                    }
+                    if (!string.IsNullOrEmpty(incomingDisk.MediaType))
+                    {
+                        existing.MediaType = incomingDisk.MediaType;
+                    }
+                    if (!string.IsNullOrEmpty(incomingDisk.CapacityDisplay))
+                    {
+                        existing.CapacityDisplay = incomingDisk.CapacityDisplay;
+                    }
+                }
+
+                existing.UsageHistory.Enqueue(Math.Clamp(incomingDisk.ActiveTimePercent, 0, 100));
+                while (existing.UsageHistory.Count > 60)
+                {
+                    existing.UsageHistory.Dequeue();
+                }
+            }
+
+            var removed = DetectedDisks.Where(d => !snap.Disks.Any(s => s.InstanceName == d.InstanceName)).ToList();
+            foreach (var r in removed) DetectedDisks.Remove(r);
+
+            // Default selection: physical disk 0 (or first)
+            if (SelectedDisk == null || !DetectedDisks.Contains(SelectedDisk))
+            {
+                SelectedDisk = DetectedDisks.FirstOrDefault(d => d.DiskIndex >= 0) ?? DetectedDisks.FirstOrDefault();
+            }
+
+            foreach (var d in DetectedDisks)
+            {
+                d.IsSelected = (d == SelectedDisk);
+            }
+
+            // Sync the active display history
+            if (SelectedDisk != null)
+            {
+                DiskUsageHistory.Clear();
+                foreach (var val in SelectedDisk.UsageHistory)
+                {
+                    DiskUsageHistory.Enqueue(val);
+                }
+            }
+            else
+            {
+                DiskUsageHistory.Enqueue(Math.Clamp(snap.DiskUsagePercent, 0, 100));
+                while (DiskUsageHistory.Count > 60)
+                {
+                    DiskUsageHistory.Dequeue();
+                }
+            }
+
+            DiskHistoryUpdated?.Invoke();
         }
         catch { }
     }

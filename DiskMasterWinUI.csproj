@@ -19,6 +19,9 @@
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);MVVMTK0045</NoWarn>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Version>1.4.9</Version>
+    <AssemblyVersion>1.4.9.0</AssemblyVersion>
+    <FileVersion>1.4.9.0</FileVersion>
     <Description>DiskMaster Pro - Advanced Windows Disk &amp; Deployment Manager</Description>
   </PropertyGroup>
 

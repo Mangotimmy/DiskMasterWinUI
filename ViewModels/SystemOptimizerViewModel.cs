@@ -257,12 +257,7 @@ public partial class SystemOptimizerViewModel : ObservableObject
                 try { await RefreshOneDriveStatusAsync(); } catch { }
             });
 
-            var driversTask = Task.Run(async () =>
-            {
-                try { await RefreshDriversAsync(); } catch { }
-            });
-
-            await Task.WhenAll(powerTask, mmTask, wakeTask, blockersTask, restorePointsTask, oneDriveTask, driversTask);
+            await Task.WhenAll(powerTask, mmTask, wakeTask, blockersTask, restorePointsTask, oneDriveTask);
 
             DispatcherHelper.RunOnUIThread(() =>
             {
@@ -860,13 +855,19 @@ public partial class SystemOptimizerViewModel : ObservableObject
     {
         try
         {
-            IsLoadingWakeDevices = true;
-            WakeDevices.Clear();
+            DispatcherHelper.RunOnUIThread(() => IsLoadingWakeDevices = true);
             var devices = await _powerCfg.GetWakeDevicesAsync();
-            foreach (var d in devices) WakeDevices.Add(d);
+            DispatcherHelper.RunOnUIThread(() =>
+            {
+                WakeDevices.Clear();
+                foreach (var d in devices) WakeDevices.Add(d);
+            });
         }
         catch { }
-        finally { IsLoadingWakeDevices = false; }
+        finally
+        {
+            DispatcherHelper.RunOnUIThread(() => IsLoadingWakeDevices = false);
+        }
     }
 
     [RelayCommand]
@@ -874,15 +875,21 @@ public partial class SystemOptimizerViewModel : ObservableObject
     {
         try
         {
-            IsLoadingSleepBlockers = true;
-            SleepBlockers.Clear();
+            DispatcherHelper.RunOnUIThread(() => IsLoadingSleepBlockers = true);
             var blockers = await _powerCfg.GetSleepBlockersAsync();
-            foreach (var b in blockers) SleepBlockers.Add(b);
-            HasSleepBlockers = SleepBlockers.Count > 0;
-            HasScannedSleepBlockers = true;
+            DispatcherHelper.RunOnUIThread(() =>
+            {
+                SleepBlockers.Clear();
+                foreach (var b in blockers) SleepBlockers.Add(b);
+                HasSleepBlockers = SleepBlockers.Count > 0;
+                HasScannedSleepBlockers = true;
+            });
         }
         catch { }
-        finally { IsLoadingSleepBlockers = false; }
+        finally
+        {
+            DispatcherHelper.RunOnUIThread(() => IsLoadingSleepBlockers = false);
+        }
     }
 
     [RelayCommand]
@@ -1041,21 +1048,26 @@ public partial class SystemOptimizerViewModel : ObservableObject
     {
         try
         {
-            IsLoadingDrivers = true;
-            var drivers = await _driverService.EnumDriversStructuredAsync();
+            DispatcherHelper.RunOnUIThread(() => IsLoadingDrivers = true);
+            var drivers = await Task.Run(async () => await _driverService.EnumDriversStructuredAsync());
             DispatcherHelper.RunOnUIThread(() =>
             {
                 OemDrivers.Clear();
                 foreach (var d in drivers) OemDrivers.Add(d);
+                if (drivers.Count > 0)
+                {
+                    AppendLog($"[{DateTime.Now:HH:mm:ss}] 🏎️ 成功載入 {drivers.Count} 個 OEM 驅動程式封裝清單。");
+                }
             });
         }
         catch (Exception ex)
         {
-            AppendLog($"[ERROR] 列舉驅動失敗: {ex.Message}");
+            var msg = string.IsNullOrWhiteSpace(ex.Message) ? ex.GetType().Name : ex.Message;
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] ⚠️ 列舉 OEM 驅動程式失敗: {msg}");
         }
         finally
         {
-            IsLoadingDrivers = false;
+            DispatcherHelper.RunOnUIThread(() => IsLoadingDrivers = false);
         }
     }
 

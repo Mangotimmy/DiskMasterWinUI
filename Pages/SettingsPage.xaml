@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <Page
+    x:Name="RootSettingsPage"
     x:Class="DiskMasterWinUI.Pages.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:vm="using:DiskMasterWinUI.ViewModels"
+    xmlns:models="using:DiskMasterWinUI.Models"
     mc:Ignorable="d">
 
     <ScrollViewer Padding="24" VerticalScrollBarVisibility="Auto">
@@ -99,6 +101,88 @@
                     <ComboBox x:Name="WorkspacePresetBox" Header="工作區佈局預設檔" HorizontalAlignment="Stretch"
                               ItemsSource="{x:Bind ViewModel.WorkspacePresetOptions, Mode=OneWay}"
                               SelectedItem="{x:Bind ViewModel.SelectedWorkspacePreset, Mode=TwoWay}" />
+                </StackPanel>
+            </Border>
+
+            <!-- 0.3 Custom Tab Order & Enable/Disable Switches -->
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="16">
+                <StackPanel Spacing="14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Spacing="4">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE8B0;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                <TextBlock Text="🗂️ 自訂分頁順序與開關管理 (Custom Tab Position)" Style="{StaticResource SubtitleTextBlockStyle}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Text="自由調整頂部各分頁的排列順序，或停用不常用的功能分頁；調整將即刻連動主視窗頂部標籤列。"
+                                       Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Command="{x:Bind ViewModel.ResetTabOrderCommand}" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE777;" FontSize="13" />
+                                <TextBlock Text="🔄 恢復預設排序與開關" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+
+                    <!-- Tab Items Reordering & Toggle List -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="6">
+                        <ListView ItemsSource="{x:Bind ViewModel.TabOrderItems, Mode=OneWay}" SelectionMode="None">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="models:TabOrderItem">
+                                    <Grid Padding="8,6" ColumnSpacing="12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Badge Order -->
+                                        <Border Grid.Column="0" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock Text="{x:Bind DisplayOrderText, Mode=OneWay}" FontSize="11" FontWeight="Bold" Foreground="White" />
+                                        </Border>
+
+                                        <!-- Icon Glyph -->
+                                        <FontIcon Grid.Column="1" Glyph="{x:Bind IconGlyph}" FontSize="16" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+
+                                        <!-- Header & Description -->
+                                        <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                                            <TextBlock Text="{x:Bind Header}" FontWeight="SemiBold" FontSize="13" />
+                                            <TextBlock Text="{x:Bind Description}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+
+                                        <!-- Enable / Disable Switch -->
+                                        <ToggleSwitch Grid.Column="3" IsOn="{x:Bind IsEnabled, Mode=TwoWay}"
+                                                      OnContent="已啟用" OffContent="已隱藏"
+                                                      VerticalAlignment="Center" Margin="0,0,12,0" />
+
+                                        <!-- Reorder Action Buttons: ⬆️ ⬇️ ⏫ ⏬ -->
+                                        <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                            <Button ToolTipService.ToolTip="移至最頂部 [⏫]" Padding="6,4" Click="MoveTabToTop_Click">
+                                                <FontIcon Glyph="&#xE74A;" FontSize="11" />
+                                            </Button>
+                                            <Button ToolTipService.ToolTip="往上移動 [⬆️]" Padding="6,4" Click="MoveTabUp_Click">
+                                                <FontIcon Glyph="&#xE70E;" FontSize="11" />
+                                            </Button>
+                                            <Button ToolTipService.ToolTip="往下移動 [⬇️]" Padding="6,4" Click="MoveTabDown_Click">
+                                                <FontIcon Glyph="&#xE70D;" FontSize="11" />
+                                            </Button>
+                                            <Button ToolTipService.ToolTip="移至最底部 [⏬]" Padding="6,4" Click="MoveTabToBottom_Click">
+                                                <FontIcon Glyph="&#xE74B;" FontSize="11" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Border>
                 </StackPanel>
             </Border>
 
@@ -517,6 +601,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
                         <ToggleSwitch x:Name="MinimizeToTrayToggle" Grid.Row="0" Grid.Column="0" Header="視窗最小化時縮小至系統匣"
@@ -531,7 +616,52 @@
                         <ToggleSwitch x:Name="AudioFeedbackToggle" Grid.Row="1" Grid.Column="1" Header="操作成功與完成播放提示音效"
                                       OffContent="靜音" OnContent="音效啟用"
                                       IsOn="{x:Bind ViewModel.EnableAudioFeedback, Mode=TwoWay}" />
+                        <ToggleSwitch x:Name="WindowsNotificationCenterToggle" Grid.Row="2" Grid.Column="0" Header="同步發送至 Windows 通知中心清單"
+                                      OffContent="僅系統匣氣球" OnContent="長駐通知中心 (Win+N)"
+                                      IsOn="{x:Bind ViewModel.EnableWindowsNotificationCenter, Mode=TwoWay}" />
+                        <Button x:Name="SendTestNoticeBtn" Grid.Row="2" Grid.Column="1" Command="{x:Bind ViewModel.SendTestNotificationCommand}"
+                                VerticalAlignment="Center" HorizontalAlignment="Stretch">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE7E7;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                <TextBlock Text="🔔 發送測試通知至 Windows 通知清單" />
+                            </StackPanel>
+                        </Button>
                     </Grid>
+
+                    <!-- Custom Notification Sound Scheme -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12" Margin="0,4,0,0">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="🔔 通知音效方案與自訂聲音 (Notification Sound Scheme)" FontWeight="SemiBold" FontSize="13" />
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ComboBox Grid.Column="0" Header="選擇提示音效方案" HorizontalAlignment="Stretch"
+                                          ItemsSource="{x:Bind ViewModel.NotificationSoundSchemeOptions, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedNotificationSoundScheme, Mode=TwoWay}" />
+                                <Button Grid.Column="1" Command="{x:Bind ViewModel.PlayPreviewNotificationSoundCommand}"
+                                        VerticalAlignment="Bottom" Style="{StaticResource AccentButtonStyle}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon Glyph="&#xE767;" FontSize="13" />
+                                        <TextBlock Text="🔊 試聽音效" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Grid.Column="2" Command="{x:Bind ViewModel.BrowseCustomNotificationSoundCommand}"
+                                        Visibility="{x:Bind ViewModel.IsCustomNotificationSoundVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        VerticalAlignment="Bottom">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon Glyph="&#xED25;" FontSize="13" />
+                                        <TextBlock Text="📁 瀏覽自訂音效..." />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                            <TextBlock Text="{x:Bind ViewModel.CustomNotificationSoundPath, Mode=OneWay}"
+                                       Visibility="{x:Bind ViewModel.IsCustomNotificationSoundVisible, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                       FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </Border>
 
