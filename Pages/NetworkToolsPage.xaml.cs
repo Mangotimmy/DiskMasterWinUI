@@ -90,10 +90,10 @@ public sealed partial class NetworkToolsPage : Page
         };
     }
 
-    private async void Page_Loaded(object sender, RoutedEventArgs e)
+    private void Page_Loaded(object sender, RoutedEventArgs e)
     {
         ApplyLanguage();
-        await ViewModel.LoadInitialDataCommand.ExecuteAsync(null);
+        _ = ViewModel.InitializeAsync();
     }
 
     private void PresetMinecraft_Click(object sender, RoutedEventArgs e)
@@ -175,5 +175,21 @@ public sealed partial class NetworkToolsPage : Page
             XamlRoot = this.XamlRoot
         };
         await dlg.ShowAsync();
+    }
+
+    private async void NetstatPreset_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && int.TryParse(btn.Tag?.ToString(), out int port))
+        {
+            await ViewModel.ApplyPortPresetAsync(port);
+        }
+    }
+
+    private async void KillNetstatRow_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is int pid && pid > 0)
+        {
+            await ViewModel.KillProcessPidAsync(pid);
+        }
     }
 }

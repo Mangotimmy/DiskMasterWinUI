@@ -63,5 +63,13 @@ $content = @"
 
 Set-Content -Path $propsPath -Value $content -Encoding UTF8
 
+$issPath = Join-Path $projectRoot "DiskMasterSetup.iss"
+if (Test-Path $issPath) {
+    $issContent = Get-Content $issPath -Raw -Encoding UTF8
+    $issContent = $issContent -replace '(?m)^#define MyAppVersion ".*"', "#define MyAppVersion ""$semVer"""
+    Set-Content -Path $issPath -Value $issContent -Encoding UTF8
+    Write-Host "[SUCCESS] DiskMasterSetup.iss updated to v$semVer!" -ForegroundColor Green
+}
+
 Write-Host "[SUCCESS] Directory.Build.props successfully updated to $semVer!" -ForegroundColor Green
 Write-Host "All projects in the repository will now inherit version $semVer." -ForegroundColor Green

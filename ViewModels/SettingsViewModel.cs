@@ -96,6 +96,10 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _enableTaskbarFlash = true;
     [ObservableProperty] private bool _enableAudioFeedback = true;
 
+    // ── Debug & Diagnostic Logging ──
+    [ObservableProperty] private bool _enableDebugLogging = false;
+    [ObservableProperty] private string _debugLogStatsText = "讀取中...";
+
     public string[] UpdateFrequencyOptions { get; } = ["Manual", "Startup", "Daily", "Weekly"];
 
     public string[] ThemeOptions { get; } = ["System", "Dark", "Light"];
@@ -209,6 +213,10 @@ public partial class SettingsViewModel : ObservableObject
         EnableTaskbarFlash = s.EnableTaskbarFlash;
         EnableAudioFeedback = s.EnableAudioFeedback;
 
+        EnableDebugLogging = s.EnableDebugLogging;
+        DebugLogService.Instance.IsEnabled = s.EnableDebugLogging;
+        UpdateDebugLogStats();
+
         RefreshLocalizedOptions();
     }
 
@@ -307,6 +315,8 @@ public partial class SettingsViewModel : ObservableObject
         s.CloseToTray = CloseToTray;
         s.EnableTaskbarFlash = EnableTaskbarFlash;
         s.EnableAudioFeedback = EnableAudioFeedback;
+        s.EnableDebugLogging = EnableDebugLogging;
+        DebugLogService.Instance.IsEnabled = EnableDebugLogging;
 
         s.WorkspacePreset = SelectedWorkspacePreset switch
         {
@@ -640,8 +650,81 @@ public partial class SettingsViewModel : ObservableObject
         CustomFontFamily = "Segoe UI Variable";
         CustomFontScale = 100;
 
+        EnableDebugLogging = s.EnableDebugLogging;
+        DebugLogService.Instance.IsEnabled = s.EnableDebugLogging;
+        UpdateDebugLogStats();
+
         SaveSettings();
         StatusMessage = "已重設為預設值。(Reset to defaults)";
+    }
+
+    partial void OnEnableDebugLoggingChanged(bool value)
+    {
+        DebugLogService.Instance.IsEnabled = value;
+        SettingsService.Instance.Current.EnableDebugLogging = value;
+        SettingsService.Instance.Save();
+        if (value)
+        {
+            DebugLogService.Instance.Info("使用者已啟用即時偵錯日誌紀錄 (Debug logging enabled by user)", "Settings");
+        }
+        UpdateDebugLogStats();
+    }
+
+    [RelayCommand]
+    public void UpdateDebugLogStats()
+    {
+        try
+        {
+            var stats = DebugLogService.Instance.GetLogStats();
+            DebugLogStatsText = stats.FormattedText;
+        }
+        catch (Exception ex)
+        {
+            DebugLogStatsText = $"無法讀取統計: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    public void OpenDebugLogFolder()
+    {
+        DebugLogService.Instance.OpenLogsFolder();
+    }
+
+    [RelayCommand]
+    public void ViewCurrentDebugLog()
+    {
+        DebugLogService.Instance.ViewCurrentLog();
+    }
+
+    [RelayCommand]
+    public void ClearDebugLogs()
+    {
+        try
+        {
+            DebugLogService.Instance.ClearLogs();
+            UpdateDebugLogStats();
+            StatusMessage = LocalizationService.T("已清空偵錯日誌檔案！", "已清空调试日志文件！", "Debug logs cleared successfully!", "デバッグログファイルをクリアしました！");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"清理日誌失敗: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    public void CopyDebugLogPath()
+    {
+        try
+        {
+            var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            dp.SetText(DebugLogService.Instance.LogFilePath);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
+            StatusMessage = LocalizationService.T("日誌檔案路徑已複製到剪貼簿！", "日志文件路径已复制到剪贴板！", "Log file path copied to clipboard!", "ログファイルのパスをクリップボードにコピーしました！");
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"複製失敗: {ex.Message}";
+        }
     }
 
     [RelayCommand]

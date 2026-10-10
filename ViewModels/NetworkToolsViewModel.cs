@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DiskMasterWinUI.Helpers;
@@ -83,6 +84,16 @@ public partial class NetworkToolsViewModel : ObservableObject
     public ObservableCollection<NetstatConnectionItem> NetstatConnections { get; } = new();
     [ObservableProperty] private int? _filterPort;
     [ObservableProperty] private bool _isLoadingNetstat;
+    [ObservableProperty] private bool _hasScannedNetstat;
+    [ObservableProperty] private string _netstatEmptyStatus = "";
+
+    // ── Remote Port Reachability & Telnet ──
+    [ObservableProperty] private string _remoteTestHost = "google.com";
+    [ObservableProperty] private int _remoteTestPort = 443;
+    [ObservableProperty] private bool _isTestingRemotePort;
+    [ObservableProperty] private string _remotePortTestResult = "";
+    [ObservableProperty] private string _telnetInstallStatus = "";
+    [ObservableProperty] private bool _isInstallingTelnet;
 
     public ObservableCollection<OpenSharedFileItem> OpenFiles { get; } = new();
     [ObservableProperty] private bool _isLoadingOpenFiles;
@@ -93,11 +104,12 @@ public partial class NetworkToolsViewModel : ObservableObject
     [ObservableProperty] private string _testPollutionDomain = "github.com";
     [ObservableProperty] private bool _isTestingPollution;
 
+    private bool _isInitialized;
+    private bool _isLoadingData;
+
     public NetworkToolsViewModel()
     {
-        LocalIpAddress = _upnpService.GetLocalIpAddress();
-        IsMsAccountPolicyFixed = _netShareService.IsMicrosoftAccountSharingPolicyFixed();
-        RdpStatus = _rdpService.GetStatus();
+        // 0ms instant initialization: load in-memory presets without blocking network or WMI
         foreach (var preset in UpnpService.GetGamePresets())
         {
             GamePresets.Add(preset);
@@ -107,28 +119,88 @@ public partial class NetworkToolsViewModel : ObservableObject
             DnsPresets.Add(dns);
         }
         SelectedDnsPreset = DnsPresets.FirstOrDefault();
-        RefreshNetworkAdapters();
-        _ = LoadInitialDataAsync();
     }
 
     [RelayCommand]
+    public async Task RefreshNetworkAdaptersAsync()
+    {
+        var nics = await Task.Run(() => NetworkDiagnosticService.GetAvailableNetworkAdapters());
+        DispatcherHelper.RunOnUIThread(() =>
+        {
+            NetworkAdapters.Clear();
+            foreach (var nic in nics)
+            {
+                NetworkAdapters.Add(nic);
+            }
+            SelectedAdapter = NetworkAdapters.FirstOrDefault(a => a.IsPrimary) ?? NetworkAdapters.FirstOrDefault();
+        });
+    }
+
     public void RefreshNetworkAdapters()
     {
-        NetworkAdapters.Clear();
-        foreach (var nic in NetworkDiagnosticService.GetAvailableNetworkAdapters())
+        _ = RefreshNetworkAdaptersAsync();
+    }
+
+    [RelayCommand]
+    public async Task InitializeAsync(bool forceReload = false)
+    {
+        if (!forceReload && (_isInitialized || _isLoadingData)) return;
+        _isLoadingData = true;
+        IsLoading = true;
+        var sw = Stopwatch.StartNew();
+        DebugLogService.Instance.Debug("Starting non-blocking NetworkTools background initialization...", "NetworkTools");
+
+        try
         {
-            NetworkAdapters.Add(nic);
+            // 1. Resolve local IP and network adapters in background
+            var nicTask = Task.Run(async () =>
+            {
+                var ip = await _upnpService.GetLocalIpAddressAsync();
+                var nics = NetworkDiagnosticService.GetAvailableNetworkAdapters();
+                var isMsPolicy = await _netShareService.IsMicrosoftAccountSharingPolicyFixedAsync();
+                var rdp = await _rdpService.GetStatusAsync();
+
+                DispatcherHelper.RunOnUIThread(() =>
+                {
+                    LocalIpAddress = ip;
+                    IsMsAccountPolicyFixed = isMsPolicy;
+                    RdpStatus = rdp;
+                    NetworkAdapters.Clear();
+                    foreach (var nic in nics)
+                    {
+                        NetworkAdapters.Add(nic);
+                    }
+                    SelectedAdapter = NetworkAdapters.FirstOrDefault(a => a.IsPrimary) ?? NetworkAdapters.FirstOrDefault();
+                });
+            });
+
+            // 2. Fetch independent features in parallel
+            var upnpTask = RefreshUpnpAsync();
+            var hostsTask = RefreshHostsAsync();
+            var sharesTask = RefreshSharesAsync();
+            var rdpTask = RefreshRdpStatusAsync();
+
+            await Task.WhenAll(nicTask, upnpTask, hostsTask, sharesTask, rdpTask);
+            _isInitialized = true;
+            StatusMessage = LocalizationService.T("網路工具資料已同步完成", "网络工具数据已同步完成", "Network tools data synchronized", "ネットワークツールの同期完了");
         }
-        SelectedAdapter = NetworkAdapters.FirstOrDefault(a => a.IsPrimary) ?? NetworkAdapters.FirstOrDefault();
+        catch (Exception ex)
+        {
+            DebugLogService.Instance.Error("NetworkTools background initialization failed", ex, "NetworkTools");
+        }
+        finally
+        {
+            _isLoadingData = false;
+            IsLoading = false;
+            sw.Stop();
+            DebugLogService.Instance.Info($"NetworkTools background initialization completed in {sw.ElapsedMilliseconds}ms", "NetworkTools");
+        }
     }
 
     [RelayCommand]
     public async Task LoadInitialDataAsync()
     {
-        await RefreshUpnpAsync();
-        await RefreshHostsAsync();
-        await RefreshSharesAsync();
-        await RefreshRdpStatusAsync();
+        await InitializeAsync(forceReload: true);
     }
 
     // ══════════════════════════════════════════════════════════
@@ -141,8 +213,15 @@ public partial class NetworkToolsViewModel : ObservableObject
         try
         {
             IsLoadingUpnp = true;
-            LocalIpAddress = _upnpService.GetLocalIpAddress();
+            LocalIpAddress = await _upnpService.GetLocalIpAddressAsync();
             IsUpnpSupported = await _upnpService.IsUpnpSupportedAsync();
+
+            if (!IsUpnpSupported)
+            {
+                DispatcherHelper.RunOnUIThread(() => PortMappings.Clear());
+                StatusMessage = "路由器未啟用 UPnP 或無回應。";
+                return;
+            }
 
             var (success, list, err) = await _upnpService.GetPortMappingsAsync();
             DispatcherHelper.RunOnUIThread(() =>
@@ -559,9 +638,12 @@ public partial class NetworkToolsViewModel : ObservableObject
         try
         {
             var shares = await _netShareService.GetActiveSharesAsync();
-            NetShares.Clear();
-            foreach (var s in shares) NetShares.Add(s);
-            IsMsAccountPolicyFixed = _netShareService.IsMicrosoftAccountSharingPolicyFixed();
+            DispatcherHelper.RunOnUIThread(() =>
+            {
+                NetShares.Clear();
+                foreach (var s in shares) NetShares.Add(s);
+            });
+            IsMsAccountPolicyFixed = await _netShareService.IsMicrosoftAccountSharingPolicyFixedAsync();
             NetShareStatusMessage = $"已列出 {NetShares.Count} 個共用資源";
         }
         catch (Exception ex)
@@ -634,11 +716,21 @@ public partial class NetworkToolsViewModel : ObservableObject
     [RelayCommand]
     public async Task RefreshRdpStatusAsync()
     {
-        RdpStatus = _rdpService.GetStatus();
-        var sessions = await _rdpService.GetActiveSessionsAsync();
-        RdpSessions.Clear();
-        foreach (var s in sessions) RdpSessions.Add(s);
-        RdpStatusMessage = $"RDP 狀態已更新 ({RdpStatus.EditionName})";
+        try
+        {
+            RdpStatus = await _rdpService.GetStatusAsync();
+            var sessions = await _rdpService.GetActiveSessionsAsync();
+            DispatcherHelper.RunOnUIThread(() =>
+            {
+                RdpSessions.Clear();
+                foreach (var s in sessions) RdpSessions.Add(s);
+            });
+            RdpStatusMessage = $"RDP 狀態已更新 ({RdpStatus.EditionName})";
+        }
+        catch (Exception ex)
+        {
+            RdpStatusMessage = $"讀取 RDP 狀態失敗: {ex.Message}";
+        }
     }
 
     [RelayCommand]
@@ -723,7 +815,23 @@ public partial class NetworkToolsViewModel : ObservableObject
             var list = await _cliToolsService.GetActiveConnectionsAsync(FilterPort);
             NetstatConnections.Clear();
             foreach (var c in list) NetstatConnections.Add(c);
-            StatusMessage = $"連線清單已更新：共 {NetstatConnections.Count} 條記錄";
+            HasScannedNetstat = true;
+
+            if (NetstatConnections.Count == 0 && FilterPort.HasValue)
+            {
+                NetstatEmptyStatus = $"✅ 連接埠 {FilterPort.Value} 目前閒置可用，無任何背景程式佔用！";
+                StatusMessage = NetstatEmptyStatus;
+            }
+            else if (NetstatConnections.Count == 0)
+            {
+                NetstatEmptyStatus = "目前沒有符合條件的網路連線。";
+                StatusMessage = NetstatEmptyStatus;
+            }
+            else
+            {
+                NetstatEmptyStatus = "";
+                StatusMessage = $"連線清單已更新：共 {NetstatConnections.Count} 條記錄";
+            }
         }
         finally
         {
@@ -740,6 +848,73 @@ public partial class NetworkToolsViewModel : ObservableObject
         StatusMessage = msg;
         if (ok) AudioFeedbackService.PlaySuccess();
         await RefreshNetstatAsync();
+    }
+
+    [RelayCommand]
+    public async Task KillProcessPidAsync(int pid)
+    {
+        if (pid <= 0) return;
+        var (ok, msg) = await _cliToolsService.KillProcessByPidAsync(pid);
+        StatusMessage = msg;
+        if (ok) AudioFeedbackService.PlaySuccess();
+        await RefreshNetstatAsync();
+    }
+
+    [RelayCommand]
+    public async Task ApplyPortPresetAsync(int port)
+    {
+        FilterPort = port;
+        await RefreshNetstatAsync();
+    }
+
+    [RelayCommand]
+    public async Task TestRemotePortAsync()
+    {
+        if (string.IsNullOrWhiteSpace(RemoteTestHost) || RemoteTestPort <= 0)
+        {
+            RemotePortTestResult = "請輸入有效的主機名稱/IP 與連接埠。";
+            return;
+        }
+
+        try
+        {
+            IsTestingRemotePort = true;
+            RemotePortTestResult = $"正在探測 {RemoteTestHost}:{RemoteTestPort} 連通性...";
+            var (success, latency, msg) = await _cliToolsService.TestRemotePortAsync(RemoteTestHost, RemoteTestPort);
+            RemotePortTestResult = msg;
+            StatusMessage = msg;
+            if (success) AudioFeedbackService.PlaySuccess();
+        }
+        catch (Exception ex)
+        {
+            RemotePortTestResult = $"❌ 測試發生異常: {ex.Message}";
+        }
+        finally
+        {
+            IsTestingRemotePort = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task InstallTelnetClientAsync()
+    {
+        try
+        {
+            IsInstallingTelnet = true;
+            TelnetInstallStatus = "正在透過 DISM 啟用 Windows 內建 Telnet 用戶端功能...";
+            var (ok, msg) = await _cliToolsService.InstallTelnetClientAsync();
+            TelnetInstallStatus = msg;
+            StatusMessage = msg;
+            if (ok) AudioFeedbackService.PlaySuccess();
+        }
+        catch (Exception ex)
+        {
+            TelnetInstallStatus = $"❌ 安裝失敗: {ex.Message}";
+        }
+        finally
+        {
+            IsInstallingTelnet = false;
+        }
     }
 
     [RelayCommand]

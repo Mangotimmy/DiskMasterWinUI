@@ -40,6 +40,9 @@ public partial class SystemOptimizerViewModel : ObservableObject
     [ObservableProperty] private bool _hasSleepBlockers;
     [ObservableProperty] private bool _isLoadingWakeDevices;
     [ObservableProperty] private bool _isLoadingSleepBlockers;
+    [ObservableProperty] private bool _hasScannedSleepBlockers;
+    [ObservableProperty] private bool _isRebuildingIconCache;
+    [ObservableProperty] private string _iconCacheStatus = "";
 
     // ── CPU Scheduling (FPSHeaven & Presets) ──
     [ObservableProperty] private int _selectedCpuPresetIndex;
@@ -876,9 +879,40 @@ public partial class SystemOptimizerViewModel : ObservableObject
             var blockers = await _powerCfg.GetSleepBlockersAsync();
             foreach (var b in blockers) SleepBlockers.Add(b);
             HasSleepBlockers = SleepBlockers.Count > 0;
+            HasScannedSleepBlockers = true;
         }
         catch { }
         finally { IsLoadingSleepBlockers = false; }
+    }
+
+    [RelayCommand]
+    public async Task RebuildIconCacheAsync()
+    {
+        try
+        {
+            IsRebuildingIconCache = true;
+            IconCacheStatus = "正在清理圖示快取並重啟檔案總管...";
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🖼️ 開始執行檔案總管圖示與縮圖快取深度重建...");
+
+            var progress = new Progress<string>(msg =>
+            {
+                IconCacheStatus = msg;
+                AppendLog($"[{DateTime.Now:HH:mm:ss}] 🖼️ {msg}");
+            });
+
+            var res = await IconCacheRepairService.Instance.RebuildIconCacheAsync(progress);
+            IconCacheStatus = res.Message;
+            StatusMessage = res.Message;
+        }
+        catch (Exception ex)
+        {
+            IconCacheStatus = $"❌ 重建過程發生異常: {ex.Message}";
+            AppendLog($"[ERROR] {ex.Message}");
+        }
+        finally
+        {
+            IsRebuildingIconCache = false;
+        }
     }
 
     [RelayCommand]

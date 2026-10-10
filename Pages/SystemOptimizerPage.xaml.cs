@@ -153,13 +153,19 @@ public sealed partial class SystemOptimizerPage : Page
         ConsoleLogTitle.Text = lang switch { "zh-CN" => "系统最优化终端记录", "en-US" => "System Optimizer Console Log", "ja-JP" => "システム最適化コンソールログ", _ => "系統最佳化與排程調校終端記錄" };
     }
 
+    private bool _hasLoadedOnce;
+
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
         _suppressToggled = true;
         try
         {
             ApplyLanguage();
-            await ViewModel.RefreshAllCommand.ExecuteAsync(null);
+            if (!_hasLoadedOnce)
+            {
+                _hasLoadedOnce = true;
+                await ViewModel.RefreshAllCommand.ExecuteAsync(null);
+            }
         }
         finally
         {

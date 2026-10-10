@@ -23,10 +23,12 @@ public partial class SystemPerformanceViewModel : ObservableObject
     public ObservableCollection<ProcessHunterItem> AllProcesses { get; } = new();
     public ObservableCollection<ProcessHunterItem> FilteredProcesses { get; } = new();
 
+    private bool _isInitialized;
+
     public SystemPerformanceViewModel()
     {
         _refreshTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
-        _refreshTimer.Interval = TimeSpan.FromSeconds(2);
+        _refreshTimer.Interval = TimeSpan.FromSeconds(3);
         _refreshTimer.Tick += async (_, _) =>
         {
             if (IsAutoRefresh && !IsLoading)
@@ -34,17 +36,38 @@ public partial class SystemPerformanceViewModel : ObservableObject
                 await RefreshMetricsAsync();
             }
         };
-        _refreshTimer.Start();
+    }
+
+    public void StartAutoRefresh()
+    {
+        if (!_refreshTimer.IsRunning)
+        {
+            _refreshTimer.Start();
+        }
+    }
+
+    public void StopAutoRefresh()
+    {
+        if (_refreshTimer.IsRunning)
+        {
+            _refreshTimer.Stop();
+        }
     }
 
     public async Task InitializeAsync()
     {
+        if (_isInitialized) return;
+        _isInitialized = true;
+
         IsLoading = true;
         try
         {
-            await RefreshMetricsAsync();
-            await RefreshProcessesAsync();
-            await RefreshSystemInfoAsync();
+            // Execute metrics, process hunter, and system profile concurrently
+            await Task.WhenAll(
+                RefreshMetricsAsync(),
+                RefreshProcessesAsync(),
+                RefreshSystemInfoAsync()
+            );
         }
         finally
         {
@@ -55,6 +78,7 @@ public partial class SystemPerformanceViewModel : ObservableObject
     [RelayCommand]
     public async Task RefreshAllAsync()
     {
+        _isInitialized = false;
         await InitializeAsync();
     }
 

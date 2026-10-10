@@ -279,6 +279,44 @@
                                        Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
                         </Grid>
                     </StackPanel>
+
+                    <MenuFlyoutSeparator />
+
+                    <!-- Live Debug & Diagnostic Logging -->
+                    <StackPanel Spacing="8">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <ToggleSwitch x:Name="DebugLoggingToggle"
+                                              Header="🩺 啟用即時偵錯日誌紀錄 (Debug Log)"
+                                              OffContent="已停用 (零效能負擔)" OnContent="已啟用 (紀錄中)"
+                                              IsOn="{x:Bind ViewModel.EnableDebugLogging, Mode=TwoWay}" />
+                                <TextBlock x:Name="DebugLoggingDesc"
+                                           Text="記錄核心執行階段詳細資訊、非同步例外與未捕捉錯誤至本機記錄檔。預設關閉以追求極致執行效能。"
+                                           Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock x:Name="DebugLogStatsLabel" Text="日誌統計:" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Right" />
+                                <TextBlock Text="{x:Bind ViewModel.DebugLogStatsText, Mode=OneWay}" FontWeight="SemiBold" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource AccentFillColorDefaultBrush}" HorizontalAlignment="Right" />
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                            <Button x:Name="ViewDebugLogBtn" Content="📄 檢視日誌"
+                                    Command="{x:Bind ViewModel.ViewCurrentDebugLogCommand}" />
+                            <Button x:Name="OpenDebugLogFolderBtn" Content="📂 開啟日誌資料夾"
+                                    Command="{x:Bind ViewModel.OpenDebugLogFolderCommand}" />
+                            <Button x:Name="CopyDebugLogPathBtn" Content="📋 複製檔案路徑"
+                                    Command="{x:Bind ViewModel.CopyDebugLogPathCommand}" />
+                            <Button x:Name="ClearDebugLogsBtn" Content="🗑️ 清空日誌"
+                                    Command="{x:Bind ViewModel.ClearDebugLogsCommand}" />
+                            <Button x:Name="RefreshDebugLogStatsBtn" Content="🔄 重新整理"
+                                    Command="{x:Bind ViewModel.UpdateDebugLogStatsCommand}" />
+                        </StackPanel>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 

@@ -141,6 +141,21 @@ public sealed partial class SettingsPage : Page
             "OS、CPU、RAM、ディスク仕様、S.M.A.R.T.、更新状態、TCP スタックを診断レポートに出力します。");
         ExportDiagnosticsBtn.Content = LocalizationService.Instance["ExportDiag"];
 
+        DebugLoggingToggle.Header = LocalizationService.T("🩺 啟用即時偵錯日誌紀錄 (Debug Log)", "🩺 启用实时调试日志记录 (Debug Log)", "🩺 Enable Real-Time Debug Logging", "🩺 リアルタイム デバッグログを有効化");
+        DebugLoggingToggle.OffContent = LocalizationService.T("已停用 (零效能負擔)", "已停用 (零性能开销)", "Disabled (Zero Overhead)", "無効 (オーバーヘッドゼロ)");
+        DebugLoggingToggle.OnContent = LocalizationService.T("已啟用 (紀錄中)", "已启用 (记录中)", "Enabled (Logging Active)", "有効 (記録中)");
+        DebugLoggingDesc.Text = LocalizationService.T(
+            "記錄核心執行階段詳細資訊、非同步例外與未捕捉錯誤至本機記錄檔。預設關閉以追求極致執行效能。",
+            "记录核心运行时详细信息、异步异常与未捕获错误至本机记录文件。默认关闭以追求极致运行性能。",
+            "Logs runtime diagnostics, async exceptions, and unhandled errors to local file. Disabled by default for maximum performance.",
+            "実行時の診断情報、非同期例外、未処理エラーをローカルファイルに記録します。最高のパフォーマンスのため既定では無効です。");
+        DebugLogStatsLabel.Text = LocalizationService.T("日誌統計:", "日志统计:", "Log Stats:", "ログ統計:");
+        ViewDebugLogBtn.Content = LocalizationService.T("📄 檢視日誌", "📄 查看日志", "📄 View Log", "📄 ログを表示");
+        OpenDebugLogFolderBtn.Content = LocalizationService.T("📂 開啟日誌資料夾", "📂 打开日志文件夹", "📂 Open Log Folder", "📂 ログフォルダーを開く");
+        CopyDebugLogPathBtn.Content = LocalizationService.T("📋 複製檔案路徑", "📋 复制文件路径", "📋 Copy Path", "📋 パスをコピー");
+        ClearDebugLogsBtn.Content = LocalizationService.T("🗑️ 清空日誌", "🗑️ 清空日志", "🗑️ Clear Logs", "🗑️ ログを消去");
+        RefreshDebugLogStatsBtn.Content = LocalizationService.T("🔄 重新整理", "🔄 刷新", "🔄 Refresh", "🔄 更新");
+
         // Section 5: Defaults for Partitions & Disks
         DefaultsHeader.Text = LocalizationService.T("💾 磁碟與部署預設值", "💾 磁盘与部署默认值", "💾 Disk & Deployment Defaults", "💾 ディスクおよび展開の既定値");
         PartitionStyleBox.Header = LocalizationService.T("預設分割表樣式", "默认分区表样式", "Default Partition Style", "既定のパーティション スタイル");

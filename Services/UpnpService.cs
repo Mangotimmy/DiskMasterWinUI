@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -76,13 +77,20 @@ public class UpnpService
     }
 
     /// <summary>
+    /// Gets the primary local IPv4 address asynchronously on a background thread.
+    /// </summary>
+    public Task<string> GetLocalIpAddressAsync() => Task.Run(GetLocalIpAddress);
+
+    /// <summary>
     /// Tests whether the current local gateway/router supports and enables UPnP IGD.
+    /// Uses a strict 2.5-second timeout to prevent UI freezes on routers where UPnP is disabled.
     /// </summary>
     public async Task<bool> IsUpnpSupportedAsync()
     {
-        return await Task.Run(() =>
+        var sw = Stopwatch.StartNew();
+        try
         {
-            try
+            var task = Task.Run(() =>
             {
                 var natType = Type.GetTypeFromProgID("HNetCfg.NATUPnP");
                 if (natType == null) return false;
@@ -92,47 +100,61 @@ public class UpnpService
 
                 dynamic? mappings = nat.StaticPortMappingCollection;
                 return mappings != null;
-            }
-            catch
+            });
+
+            var completed = await Task.WhenAny(task, Task.Delay(2500));
+            if (completed == task)
             {
-                return false;
+                var isSupported = await task;
+                DebugLogService.Instance.Debug($"UPnP IGD discovery returned {isSupported} in {sw.ElapsedMilliseconds}ms", "UpnpService");
+                return isSupported;
             }
-        });
+
+            DebugLogService.Instance.Warning($"UPnP IGD detection timed out after {sw.ElapsedMilliseconds}ms (Router UPnP is likely disabled or blocked by firewall)", "UpnpService");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            DebugLogService.Instance.Warning($"UPnP support check exception: {ex.Message}", "UpnpService");
+            return false;
+        }
     }
 
     /// <summary>
-    /// Retrieves all active UPnP port mappings from the router.
+    /// Retrieves all active UPnP port mappings from the router with a 3-second timeout protection.
     /// </summary>
     public async Task<(bool Success, List<UpnpPortMappingItem> Mappings, string ErrorMessage)> GetPortMappingsAsync()
     {
-        return await Task.Run(() =>
+        var sw = Stopwatch.StartNew();
+        var list = new List<UpnpPortMappingItem>();
+        try
         {
-            var list = new List<UpnpPortMappingItem>();
-            try
+            var task = Task.Run(() =>
             {
+                var innerList = new List<UpnpPortMappingItem>();
                 var natType = Type.GetTypeFromProgID("HNetCfg.NATUPnP");
                 if (natType == null)
                 {
-                    return (false, list, "HNetCfg.NATUPnP COM component not available on this Windows edition.");
+                    return (false, innerList, "HNetCfg.NATUPnP COM component not available on this Windows edition.");
                 }
 
                 dynamic? nat = Activator.CreateInstance(natType);
                 if (nat == null)
                 {
-                    return (false, list, "Unable to instantiate NATUPnP COM object.");
+                    return (false, innerList, "Unable to instantiate NATUPnP COM object.");
                 }
 
                 dynamic? mappings = nat.StaticPortMappingCollection;
                 if (mappings == null)
                 {
-                    return (false, list, "Router/Gateway did not respond to UPnP IGD queries (UPnP may be disabled on router).");
+                    return (false, innerList, "Router/Gateway did not respond to UPnP IGD queries (UPnP may be disabled on router).");
                 }
 
                 foreach (dynamic item in mappings)
                 {
                     try
                     {
-                        list.Add(new UpnpPortMappingItem
+                        innerList.Add(new UpnpPortMappingItem
                         {
                             ExternalPort = (int)item.ExternalPort,
                             InternalPort = (int)item.InternalPort,
@@ -145,13 +167,25 @@ public class UpnpService
                     catch { }
                 }
 
-                return (true, list, string.Empty);
-            }
-            catch (Exception ex)
+                return (true, innerList, string.Empty);
+            });
+
+            var completed = await Task.WhenAny(task, Task.Delay(3000));
+            if (completed == task)
             {
-                return (false, list, ex.Message);
+                var result = await task;
+                DebugLogService.Instance.Debug($"UPnP retrieved {result.innerList.Count} mappings in {sw.ElapsedMilliseconds}ms", "UpnpService");
+                return (result.Item1, result.innerList, result.Item3);
             }
-        });
+
+            DebugLogService.Instance.Warning($"UPnP port mappings query timed out after {sw.ElapsedMilliseconds}ms", "UpnpService");
+            return (false, list, "UPnP 查詢逾時 (3秒無回應，路由器可能未開啟 UPnP 或被防火牆阻擋)。");
+        }
+        catch (Exception ex)
+        {
+            DebugLogService.Instance.Warning($"UPnP GetPortMappingsAsync failed: {ex.Message}", "UpnpService");
+            return (false, list, ex.Message);
+        }
     }
 
     /// <summary>

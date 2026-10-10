@@ -50,16 +50,16 @@ param(
     [string[]]$TargetPath,
 
     [Parameter(Mandatory = $false)]
-    [string]$CertThumbprint = ($env:SIGNING_CERT_THUMBPRINT ?? $env:CERT_THUMBPRINT),
+    [string]$CertThumbprint = "",
 
     [Parameter(Mandatory = $false)]
-    [string]$PfxPath = ($env:SIGNING_CERT_PATH ?? $env:CERT_PATH),
+    [string]$PfxPath = "",
 
     [Parameter(Mandatory = $false)]
-    [string]$PfxPassword = ($env:SIGNING_CERT_PASSWORD ?? $env:CERT_PASSWORD ?? $env:CSC_KEY_PASSWORD ?? ""),
+    [string]$PfxPassword = "",
 
     [Parameter(Mandatory = $false)]
-    [string]$PfxBase64 = ($env:SIGNING_CERT_BASE64 ?? $env:CERT_BASE64 ?? $env:CSC_LINK),
+    [string]$PfxBase64 = "",
 
     [Parameter(Mandatory = $false)]
     [string[]]$TimestampServers = @(
@@ -78,6 +78,11 @@ param(
     [Parameter(Mandatory = $false)]
     [bool]$ExportCert = $true
 )
+
+if (-not $CertThumbprint) { $CertThumbprint = if ($env:SIGNING_CERT_THUMBPRINT) { $env:SIGNING_CERT_THUMBPRINT } else { $env:CERT_THUMBPRINT } }
+if (-not $PfxPath) { $PfxPath = if ($env:SIGNING_CERT_PATH) { $env:SIGNING_CERT_PATH } else { $env:CERT_PATH } }
+if (-not $PfxPassword) { $PfxPassword = if ($env:SIGNING_CERT_PASSWORD) { $env:SIGNING_CERT_PASSWORD } elseif ($env:CERT_PASSWORD) { $env:CERT_PASSWORD } elseif ($env:CSC_KEY_PASSWORD) { $env:CSC_KEY_PASSWORD } else { "" } }
+if (-not $PfxBase64) { $PfxBase64 = if ($env:SIGNING_CERT_BASE64) { $env:SIGNING_CERT_BASE64 } elseif ($env:CERT_BASE64) { $env:CERT_BASE64 } else { $env:CSC_LINK } }
 
 Set-StrictMode -Off
 $ErrorActionPreference = "Stop"

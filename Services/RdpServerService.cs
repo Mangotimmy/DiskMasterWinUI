@@ -32,7 +32,7 @@ public class RdpSessionItem
 /// </summary>
 public class RdpServerService
 {
-    public RdpStatusInfo GetStatus()
+    public async Task<RdpStatusInfo> GetStatusAsync(CancellationToken ct = default)
     {
         var info = new RdpStatusInfo();
 
@@ -59,9 +59,9 @@ public class RdpServerService
         // 3. Check TermService status
         try
         {
-            var proc = Process.GetProcessesByName("svchost");
-            // Check via sc query
-            var (outStr, _, _) = ProcessHelper.RunProcessAsync("sc.exe", "query TermService").GetAwaiter().GetResult();
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(2));
+            var (outStr, _, _) = await ProcessHelper.RunProcessAsync("sc.exe", "query TermService", cancellationToken: timeoutCts.Token);
             info.IsServiceRunning = outStr.Contains("RUNNING", StringComparison.OrdinalIgnoreCase);
         }
         catch { }
@@ -71,6 +71,37 @@ public class RdpServerService
         info.ConnectAddressIp = !string.IsNullOrEmpty(ip) ? $"{ip}:3389" : "3389";
         info.ConnectAddressHost = $"{host}:3389";
 
+        return info;
+    }
+
+    public RdpStatusInfo GetStatus()
+    {
+        var info = new RdpStatusInfo();
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion");
+            info.EditionId = key?.GetValue("EditionID")?.ToString() ?? "";
+            info.EditionName = key?.GetValue("ProductName")?.ToString() ?? "";
+            info.IsHomeEdition = info.EditionId.Contains("Home", StringComparison.OrdinalIgnoreCase) ||
+                                 info.EditionName.Contains("Home", StringComparison.OrdinalIgnoreCase);
+        }
+        catch { }
+        try
+        {
+            using var tsKey = Registry.LocalMachine.OpenSubKey(@"System\CurrentControlSet\Control\Terminal Server");
+            var fDeny = tsKey?.GetValue("fDenyTSConnections");
+            info.IsRdpEnabled = (fDeny is int val && val == 0);
+        }
+        catch { }
+        try
+        {
+            var proc = Process.GetProcessesByName("svchost");
+            info.IsServiceRunning = proc.Length > 0;
+        }
+        catch { }
+        var (ip, host) = NetShareService.GetPrimaryLanEndpoints();
+        info.ConnectAddressIp = !string.IsNullOrEmpty(ip) ? $"{ip}:3389" : "3389";
+        info.ConnectAddressHost = $"{host}:3389";
         return info;
     }
 
@@ -145,50 +176,62 @@ public class RdpServerService
 
     public async Task<List<RdpSessionItem>> GetActiveSessionsAsync(CancellationToken ct = default)
     {
-        return await Task.Run(() =>
+        var sw = Stopwatch.StartNew();
+        var list = new List<RdpSessionItem>();
+        try
         {
-            var list = new List<RdpSessionItem>();
-            try
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(2.5));
+
+            var (outStr, _, _) = await ProcessHelper.RunProcessAsync("qwinsta.exe", "", cancellationToken: cts.Token);
+            if (string.IsNullOrWhiteSpace(outStr)) return list;
+
+            var lines = outStr.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+            foreach (var line in lines.Skip(1)) // Skip header
             {
-                var (outStr, _, _) = ProcessHelper.RunProcessAsync("qwinsta.exe", "", cancellationToken: ct).GetAwaiter().GetResult();
-                if (string.IsNullOrWhiteSpace(outStr)) return list;
-
-                var lines = outStr.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-                foreach (var line in lines.Skip(1)) // Skip header
+                var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 3)
                 {
-                    var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length >= 3)
+                    var sessionName = parts[0];
+                    var userName = "";
+                    int sessionId = 0;
+                    var state = "";
+
+                    if (int.TryParse(parts[1], out int id1))
                     {
-                        var sessionName = parts[0];
-                        var userName = "";
-                        int sessionId = 0;
-                        var state = "";
-
-                        if (int.TryParse(parts[1], out int id1))
-                        {
-                            sessionId = id1;
-                            state = parts[2];
-                        }
-                        else if (parts.Length >= 4 && int.TryParse(parts[2], out int id2))
-                        {
-                            userName = parts[1];
-                            sessionId = id2;
-                            state = parts[3];
-                        }
-
-                        list.Add(new RdpSessionItem
-                        {
-                            SessionName = sessionName,
-                            UserName = userName,
-                            SessionId = sessionId,
-                            State = state
-                        });
+                        sessionId = id1;
+                        state = parts[2];
                     }
+                    else if (parts.Length >= 4 && int.TryParse(parts[2], out int id2))
+                    {
+                        userName = parts[1];
+                        sessionId = id2;
+                        state = parts[3];
+                    }
+
+                    list.Add(new RdpSessionItem
+                    {
+                        SessionName = sessionName,
+                        UserName = userName,
+                        SessionId = sessionId,
+                        State = state
+                    });
                 }
             }
-            catch { }
+
+            DebugLogService.Instance.Debug($"RdpServer enumerated {list.Count} active sessions in {sw.ElapsedMilliseconds}ms", "RdpServerService");
             return list;
-        }, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            DebugLogService.Instance.Warning($"RdpServer session query timed out after {sw.ElapsedMilliseconds}ms", "RdpServerService");
+            return list;
+        }
+        catch (Exception ex)
+        {
+            DebugLogService.Instance.Warning($"RdpServer GetActiveSessionsAsync failed: {ex.Message}", "RdpServerService");
+            return list;
+        }
     }
 
     public void LaunchLoopbackTest()

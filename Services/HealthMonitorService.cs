@@ -12,7 +12,7 @@ public class HealthMonitorService
 {
     public async Task<List<DiskHealthInfo>> GetDiskHealthAsync()
     {
-        return await Task.Run(() =>
+        return await Task.Run(async () =>
         {
             var disks = new List<DiskHealthInfo>();
 
@@ -87,7 +87,7 @@ public class HealthMonitorService
                 if (disks.Count > 0)
                 {
                     EnrichWithTemperaturesInProc(scope, disks);
-                    EnrichWithSmartReader(disks);
+                    await EnrichWithSmartReaderAsync(disks);
                     return disks;
                 }
             }
@@ -97,7 +97,7 @@ public class HealthMonitorService
             }
 
             // Attempt 2: Fallback to root\cimv2 Win32_DiskDrive (always available)
-            return FallbackToWin32DiskDrive();
+            return await FallbackToWin32DiskDriveAsync();
         });
     }
 
@@ -127,7 +127,7 @@ public class HealthMonitorService
         catch { }
     }
 
-    private static void EnrichWithSmartReader(List<DiskHealthInfo> disks)
+    private static async Task EnrichWithSmartReaderAsync(List<DiskHealthInfo> disks)
     {
         try
         {
@@ -136,7 +136,7 @@ public class HealthMonitorService
             {
                 if (disk.TemperatureCelsius == null || disk.TemperatureCelsius <= 0)
                 {
-                    var nativeTemp = smartReader.GetDiskTemperatureCelsiusAsync(disk.DeviceId, disk.BusType).GetAwaiter().GetResult();
+                    var nativeTemp = await smartReader.GetDiskTemperatureCelsiusAsync(disk.DeviceId, disk.BusType);
                     if (nativeTemp.HasValue && nativeTemp.Value > 0)
                     {
                         disk.TemperatureCelsius = nativeTemp.Value;
@@ -147,7 +147,7 @@ public class HealthMonitorService
         catch { }
     }
 
-    private static List<DiskHealthInfo> FallbackToWin32DiskDrive()
+    private static async Task<List<DiskHealthInfo>> FallbackToWin32DiskDriveAsync()
     {
         var disks = new List<DiskHealthInfo>();
         try
@@ -183,7 +183,7 @@ public class HealthMonitorService
 
             if (disks.Count > 0)
             {
-                EnrichWithSmartReader(disks);
+                await EnrichWithSmartReaderAsync(disks);
             }
         }
         catch { }
@@ -192,7 +192,7 @@ public class HealthMonitorService
 
     public async Task<List<DiskReliabilityInfo>> GetReliabilityCountersAsync()
     {
-        return await Task.Run(() =>
+        return await Task.Run(async () =>
         {
             var list = new List<DiskReliabilityInfo>();
             try
@@ -242,10 +242,10 @@ public class HealthMonitorService
                 try
                 {
                     var smartReader = new SmartReaderService();
-                    var disks = FallbackToWin32DiskDrive();
+                    var disks = await FallbackToWin32DiskDriveAsync();
                     foreach (var d in disks)
                     {
-                        var nvme = smartReader.GetNvmeHealthAsync(d.DeviceId, d.FriendlyName, d.SizeBytes).GetAwaiter().GetResult();
+                        var nvme = await smartReader.GetNvmeHealthAsync(d.DeviceId, d.FriendlyName, d.SizeBytes);
                         list.Add(new DiskReliabilityInfo
                         {
                             DeviceId = d.DeviceId,

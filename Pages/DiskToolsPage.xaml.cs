@@ -409,6 +409,8 @@ public sealed partial class DiskToolsPage : Page
     private void CardChkdsk_MoveTop_Click(object sender, RoutedEventArgs e) => MoveCardToExtreme(ChkdskCard, true);
     private void CardChkdsk_MoveBottom_Click(object sender, RoutedEventArgs e) => MoveCardToExtreme(ChkdskCard, false);
 
+    private bool _hasLoadedOnce;
+
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
         _suppressToggled = true;
@@ -416,7 +418,11 @@ public sealed partial class DiskToolsPage : Page
         {
             ApplyLanguage();
             RestoreCardOrder();
-            await ViewModel.RefreshAllCommand.ExecuteAsync(null);
+            if (!_hasLoadedOnce)
+            {
+                _hasLoadedOnce = true;
+                await ViewModel.RefreshAllCommand.ExecuteAsync(null);
+            }
         }
         finally
         {

@@ -11,7 +11,7 @@ public class KeyReaderService
 {
     public async Task<WindowsLicenseInfo> GetLicenseInfoAsync()
     {
-        return await Task.Run(() =>
+        return await Task.Run(async () =>
         {
             var info = new WindowsLicenseInfo();
             var sb = new StringBuilder();
@@ -42,7 +42,11 @@ public class KeyReaderService
                 // Fallback: MSDM ACPI raw table via PowerShell if in-process WMI service is unavailable
                 try
                 {
-                    var (oemKey, _, _) = ProcessHelper.RunProcessAsync("powershell.exe", "-NoProfile -Command \"(Get-CimInstance -ClassName SoftwareLicensingService).OA3xOriginalProductKey\"").GetAwaiter().GetResult();
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                    var (oemKey, _, _) = await ProcessHelper.RunProcessAsync(
+                        "powershell.exe",
+                        "-NoProfile -Command \"(Get-CimInstance -ClassName SoftwareLicensingService).OA3xOriginalProductKey\"",
+                        cancellationToken: cts.Token);
                     oemKey = oemKey.Trim();
                     if (!string.IsNullOrEmpty(oemKey) && oemKey.Contains('-'))
                     {

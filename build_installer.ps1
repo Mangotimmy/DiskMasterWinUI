@@ -2,12 +2,17 @@
 [CmdletBinding()]
 param(
     [string]$Architecture = "win-x64",
-    [string]$CertThumbprint = ($env:SIGNING_CERT_THUMBPRINT ?? $env:CERT_THUMBPRINT),
-    [string]$PfxPath = ($env:SIGNING_CERT_PATH ?? $env:CERT_PATH),
-    [string]$PfxPassword = ($env:SIGNING_CERT_PASSWORD ?? $env:CERT_PASSWORD ?? $env:CSC_KEY_PASSWORD),
-    [string]$PfxBase64 = ($env:SIGNING_CERT_BASE64 ?? $env:CERT_BASE64 ?? $env:CSC_LINK),
+    [string]$CertThumbprint = "",
+    [string]$PfxPath = "",
+    [string]$PfxPassword = "",
+    [string]$PfxBase64 = "",
     [switch]$SkipTimestamp
 )
+
+if (-not $CertThumbprint) { $CertThumbprint = if ($env:SIGNING_CERT_THUMBPRINT) { $env:SIGNING_CERT_THUMBPRINT } else { $env:CERT_THUMBPRINT } }
+if (-not $PfxPath) { $PfxPath = if ($env:SIGNING_CERT_PATH) { $env:SIGNING_CERT_PATH } else { $env:CERT_PATH } }
+if (-not $PfxPassword) { $PfxPassword = if ($env:SIGNING_CERT_PASSWORD) { $env:SIGNING_CERT_PASSWORD } elseif ($env:CERT_PASSWORD) { $env:CERT_PASSWORD } else { $env:CSC_KEY_PASSWORD } }
+if (-not $PfxBase64) { $PfxBase64 = if ($env:SIGNING_CERT_BASE64) { $env:SIGNING_CERT_BASE64 } elseif ($env:CERT_BASE64) { $env:CERT_BASE64 } else { $env:CSC_LINK } }
 
 $ErrorActionPreference = "Stop"
 
@@ -44,20 +49,23 @@ if (-not (Test-Path $outputDir)) {
 }
 
 # 1. Ensure publish directory is fresh
-if (-not (Test-Path "$publishDir\DiskMasterWinUI.exe")) {
-    Write-Host "`n[1/5] Publishing main WinUI 3 project ($Architecture)..." -ForegroundColor Yellow
-    dotnet publish "$projectDir\DiskMasterWinUI.csproj" -c Release -r $Architecture --self-contained true -o $publishDir
-    Copy-Item -Recurse -Force "$projectDir\Scripts" "$publishDir\"
-} else {
-    Write-Host "`n[1/5] Using existing published binaries in $publishDir..." -ForegroundColor Yellow
-}
+Write-Host "`n[1/5] Publishing main WinUI 3 project ($Architecture)..." -ForegroundColor Yellow
+dotnet publish "$projectDir\DiskMasterWinUI.csproj" -c Release -r $Architecture --self-contained true -o $publishDir
+Copy-Item -Recurse -Force "$projectDir\Scripts" "$publishDir\"
+
+# 1.0 Prune unused WindowsAppSDK satellite language folders (keeps en-us, zh-cn, zh-tw, ja-jp)
+$supportedLangs = @('en-us', 'zh-cn', 'zh-tw', 'ja-jp')
+Get-ChildItem -Path $publishDir -Directory | Where-Object {
+    $n = $_.Name.ToLowerInvariant()
+    $n -match '^[a-z]{2,3}(-[a-z0-9]+)*$' -and -not ($supportedLangs -contains $n)
+} | Remove-Item -Recurse -Force
 
 # 1.1 Ensure native uninstaller binary is compiled into publish directory
 $uninstallerProj = "$projectDir\tools\DiskMasterUninstaller\DiskMasterUninstaller.csproj"
 if (Test-Path $uninstallerProj) {
     Write-Host "`n[1.1/5] Compiling Native Uninstaller executable ($Architecture)..." -ForegroundColor Yellow
-    $uninstTempOut = "$projectDir\tools\DiskMasterUninstaller\bin\temp_uninst_out"
-    if (Test-Path $uninstTempOut) { Remove-Item $uninstTempOut -Recurse -Force }
+    $uninstTempOut = "$projectDir\tools\DiskMasterUninstaller\bin\temp_uninst_out_$(Get-Random)"
+    if (Test-Path $uninstTempOut) { Remove-Item $uninstTempOut -Recurse -Force -ErrorAction SilentlyContinue }
     dotnet publish $uninstallerProj `
         -c Release `
         -r $Architecture `
@@ -66,6 +74,9 @@ if (Test-Path $uninstallerProj) {
         -p:IncludeNativeLibrariesForSelfExtract=true `
         -p:EnableCompressionInSingleFile=true `
         -o $uninstTempOut
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to publish uninstaller executable (exit code $LASTEXITCODE)"
+    }
     Copy-Item "$uninstTempOut\DiskMasterUninstaller.exe" "$publishDir\Uninstall.exe" -Force
     Remove-Item $uninstTempOut -Recurse -Force -ErrorAction SilentlyContinue
 }
@@ -93,47 +104,76 @@ if (Test-Path $signScript) {
     }
 }
 
-# 3. Compress publish directory into payload.zip
-Write-Host "`n[3/5] Compacting payload archive into installer..." -ForegroundColor Yellow
-if (Test-Path $payloadZip) { Remove-Item $payloadZip -Force }
-
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-[System.IO.Compression.ZipFile]::CreateFromDirectory($publishDir, $payloadZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
-
-$zipSizeMb = [math]::Round((Get-Item $payloadZip).Length / 1MB, 2)
-Write-Host "[OK] Compressed installer payload size: $zipSizeMb MB" -ForegroundColor Green
-
-# Ensure Certificate is copied for installer embedding
-$existingCert = "$outputDir\DiskMaster_Certificate.cer"
-if (Test-Path $existingCert) {
-    Copy-Item -Force $existingCert $installerCert
+# 3. Compile Standard Setup Installer or Fallback Native Installer
+$isccCandidates = @(
+    "C:\Users\Atszl\AppData\Local\Programs\Inno Setup 6\ISCC.exe",
+    "${env:LOCALAPPDATA}\Programs\Inno Setup 6\ISCC.exe",
+    "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+    "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
+)
+$isccPath = $isccCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $isccPath) {
+    $cmd = Get-Command "ISCC.exe" -ErrorAction SilentlyContinue
+    if ($cmd) { $isccPath = $cmd.Source }
 }
 
-# 4. Compile Installer into single-file executable
-Write-Host "`n[4/5] Compiling Single-File Setup Installer ($Architecture)..." -ForegroundColor Yellow
-$tempOut = "$projectDir\tools\DiskMasterInstaller\bin\temp_out"
-if (Test-Path $tempOut) { Remove-Item $tempOut -Recurse -Force }
-
-dotnet publish $installerProj `
-    -c Release `
-    -r $Architecture `
-    --self-contained true `
-    -p:PublishSingleFile=true `
-    -p:IncludeNativeLibrariesForSelfExtract=true `
-    -p:EnableCompressionInSingleFile=true `
-    -o $tempOut
-
-# 5. Finalize and move output
 $archSuffix = if ($Architecture -eq "win-arm64") { "_arm64" } else { "" }
 $finalExeName = "DiskMaster${archSuffix}_Setup.exe"
 $finalExePath = Join-Path $outputDir $finalExeName
 
-Copy-Item "$tempOut\DiskMasterInstaller.exe" -Destination $finalExePath -Force
+$useInnoSetup = ($isccPath -and (Test-Path "$projectDir\DiskMasterSetup.iss") -and ($Architecture -eq "win-x64"))
 
-# Cleanup temp files
-Remove-Item $payloadZip -Force -ErrorAction SilentlyContinue
-Remove-Item $installerCert -Force -ErrorAction SilentlyContinue
-Remove-Item $tempOut -Recurse -Force -ErrorAction SilentlyContinue
+if ($useInnoSetup) {
+    Write-Host "`n[3/5] Compiling Standard Inno Setup Installer ($Architecture)..." -ForegroundColor Yellow
+    Write-Host "Compiler: $isccPath" -ForegroundColor DarkGray
+    & $isccPath "/DMyAppVersion=$appVersion" "$projectDir\DiskMasterSetup.iss"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to compile Inno Setup script (exit code $LASTEXITCODE)"
+    }
+    Write-Host "[OK] Standard Inno Setup Installer compiled successfully." -ForegroundColor Green
+}
+else {
+    # 3. Compress publish directory into payload.zip
+    Write-Host "`n[3/5] Compacting payload archive into installer..." -ForegroundColor Yellow
+    if (Test-Path $payloadZip) { Remove-Item $payloadZip -Force }
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    [System.IO.Compression.ZipFile]::CreateFromDirectory($publishDir, $payloadZip, [System.IO.Compression.CompressionLevel]::Optimal, $false)
+
+    $zipSizeMb = [math]::Round((Get-Item $payloadZip).Length / 1MB, 2)
+    Write-Host "[OK] Compressed installer payload size: $zipSizeMb MB" -ForegroundColor Green
+
+    # Ensure Certificate is copied for installer embedding
+    $existingCert = "$outputDir\DiskMaster_Certificate.cer"
+    if (Test-Path $existingCert) {
+        Copy-Item -Force $existingCert $installerCert
+    }
+
+    # 4. Compile Installer into single-file executable
+    Write-Host "`n[4/5] Compiling Single-File Setup Installer ($Architecture)..." -ForegroundColor Yellow
+    $tempOut = "$projectDir\tools\DiskMasterInstaller\bin\temp_out_$(Get-Random)"
+    if (Test-Path $tempOut) { Remove-Item $tempOut -Recurse -Force -ErrorAction SilentlyContinue }
+
+    dotnet publish $installerProj `
+        -c Release `
+        -r $Architecture `
+        --self-contained true `
+        -p:PublishSingleFile=true `
+        -p:IncludeNativeLibrariesForSelfExtract=true `
+        -p:EnableCompressionInSingleFile=true `
+        -o $tempOut
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to publish installer executable (exit code $LASTEXITCODE)"
+    }
+
+    Copy-Item "$tempOut\DiskMasterInstaller.exe" -Destination $finalExePath -Force
+
+    # Cleanup temp files
+    Remove-Item $payloadZip -Force -ErrorAction SilentlyContinue
+    Remove-Item $installerCert -Force -ErrorAction SilentlyContinue
+    Remove-Item $tempOut -Recurse -Force -ErrorAction SilentlyContinue
+}
 
 # 6. Sign final Setup installer binary
 if (Test-Path $signScript) {

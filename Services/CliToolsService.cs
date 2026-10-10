@@ -165,12 +165,14 @@ public class CliToolsService
 
     public async Task<List<NetstatConnectionItem>> GetActiveConnectionsAsync(int? filterPort = null, CancellationToken ct = default)
     {
-        return await Task.Run(() =>
+        return await Task.Run(async () =>
         {
             var list = new List<NetstatConnectionItem>();
             try
             {
-                var (outStr, _, code) = ProcessHelper.RunProcessAsync("netstat.exe", "-ano", cancellationToken: ct).GetAwaiter().GetResult();
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+                var (outStr, _, code) = await ProcessHelper.RunProcessAsync("netstat.exe", "-ano", cancellationToken: timeoutCts.Token);
                 if (string.IsNullOrWhiteSpace(outStr)) return list;
 
                 var lines = outStr.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
@@ -285,18 +287,69 @@ public class CliToolsService
         return (true, string.Join("; ", results));
     }
 
+    public async Task<(bool Success, string Message)> KillProcessByPidAsync(int pid)
+    {
+        if (pid <= 0) return (false, "無效的 PID。");
+        var (outStr, errStr, code) = await ProcessHelper.RunProcessAsync("taskkill.exe", $"/F /PID {pid} /T");
+        if (code == 0)
+        {
+            return (true, $"已成功強制終結 PID {pid} 程序！");
+        }
+        return (false, $"終結 PID {pid} 失敗: {errStr}");
+    }
+
+    public async Task<(bool Success, double LatencyMs, string Message)> TestRemotePortAsync(string host, int port, int timeoutMs = 3000)
+    {
+        if (string.IsNullOrWhiteSpace(host) || port <= 0 || port > 65535)
+        {
+            return (false, 0, "請輸入有效的主機名稱/IP 與連接埠 (1-65535)。");
+        }
+
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            using var client = new System.Net.Sockets.TcpClient();
+            using var cts = new CancellationTokenSource(timeoutMs);
+            await client.ConnectAsync(host, port, cts.Token);
+            sw.Stop();
+            return (true, Math.Round(sw.Elapsed.TotalMilliseconds, 1), $"🟢 連線成功！目標 {host}:{port} 正常開放連線，回應延遲: {sw.Elapsed.TotalMilliseconds:F1} ms");
+        }
+        catch (OperationCanceledException)
+        {
+            sw.Stop();
+            return (false, 0, $"🔴 連線逾時！目標 {host}:{port} 未在 {timeoutMs}ms 內回應 (連接埠可能未開放或被防火牆阻擋)。");
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            return (false, 0, $"🔴 連線失敗！無法連接至 {host}:{port} ({ex.Message})");
+        }
+    }
+
+    public async Task<(bool Success, string Message)> InstallTelnetClientAsync()
+    {
+        var (outStr, errStr, code) = await ProcessHelper.RunProcessAsync("dism.exe", "/online /Enable-Feature /FeatureName:TelnetClient /NoRestart");
+        if (code == 0)
+        {
+            return (true, "✅ Windows 內建 Telnet 用戶端功能已成功啟用安裝！");
+        }
+        return (false, $"❌ 安裝失敗 (代碼 {code}): {errStr}");
+    }
+
     // ═════════════════════════════════════════════════════════════════════
     // 3. OPENFILES: Query SMB File Locks + 1-Click Forced Disconnect
     // ═════════════════════════════════════════════════════════════════════
 
     public async Task<List<OpenSharedFileItem>> GetOpenSharedFilesAsync(CancellationToken ct = default)
     {
-        return await Task.Run(() =>
+        return await Task.Run(async () =>
         {
             var list = new List<OpenSharedFileItem>();
             try
             {
-                var (outStr, _, code) = ProcessHelper.RunProcessAsync("openfiles.exe", "/query /fo csv /nh", cancellationToken: ct).GetAwaiter().GetResult();
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(4));
+                var (outStr, _, code) = await ProcessHelper.RunProcessAsync("openfiles.exe", "/query /fo csv /nh", cancellationToken: timeoutCts.Token);
                 if (string.IsNullOrWhiteSpace(outStr)) return list;
 
                 var lines = outStr.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
@@ -376,15 +429,17 @@ public class CliToolsService
     // 6. WHERE: Path Resolution & Executable Precedence Conflict Hunter
     // ═════════════════════════════════════════════════════════════════════
 
-    public async Task<List<WhereResultItem>> LocateExecutableWithConflictsAsync(string commandPattern, string? rootDir = null)
+    public async Task<List<WhereResultItem>> LocateExecutableWithConflictsAsync(string commandPattern, string? rootDir = null, CancellationToken ct = default)
     {
-        return await Task.Run(() =>
+        return await Task.Run(async () =>
         {
             var list = new List<WhereResultItem>();
             try
             {
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
                 var rArg = string.IsNullOrWhiteSpace(rootDir) ? "" : $"/R \"{rootDir}\"";
-                var (outStr, _, code) = ProcessHelper.RunProcessAsync("where.exe", $"{rArg} /T /F {commandPattern}").GetAwaiter().GetResult();
+                var (outStr, _, code) = await ProcessHelper.RunProcessAsync("where.exe", $"{rArg} /T /F {commandPattern}", cancellationToken: timeoutCts.Token);
                 if (string.IsNullOrWhiteSpace(outStr)) return list;
 
                 var lines = outStr.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);

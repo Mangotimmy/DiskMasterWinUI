@@ -211,13 +211,21 @@ public sealed partial class BootManagerPage : Page
         };
     }
 
+    private bool _hasLoadedOnce;
+
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
         ApplyLanguage();
-        await ViewModel.RefreshEntriesCommand.ExecuteAsync(null);
-        await ViewModel.LoadSafeBootConfigCommand.ExecuteAsync(null);
-        await ViewModel.LoadTpmStatusCommand.ExecuteAsync(null);
-        await ViewModel.RefreshWinReStatusCommand.ExecuteAsync(null);
+        if (!_hasLoadedOnce)
+        {
+            _hasLoadedOnce = true;
+            await Task.WhenAll(
+                ViewModel.RefreshEntriesCommand.ExecuteAsync(null),
+                ViewModel.LoadSafeBootConfigCommand.ExecuteAsync(null),
+                ViewModel.LoadTpmStatusCommand.ExecuteAsync(null),
+                ViewModel.RefreshWinReStatusCommand.ExecuteAsync(null)
+            );
+        }
     }
     private void AddToBcd_Click(object sender, RoutedEventArgs e)
     {

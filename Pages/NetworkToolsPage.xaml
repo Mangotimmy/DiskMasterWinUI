@@ -720,28 +720,98 @@
                                         <Button Grid.Column="2" Content="⚡ 一鍵終結佔用此端口程式" Command="{x:Bind ViewModel.KillPortOccupantCommand}" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Bottom" Padding="14,8" />
                                     </Grid>
 
+                                    <!-- Quick Port Presets -->
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="常用連接埠快速篩選：" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                        <Button Content="Web (80)" Tag="80" Click="NetstatPreset_Click" Padding="8,3" FontSize="11" />
+                                        <Button Content="HTTPS (443)" Tag="443" Click="NetstatPreset_Click" Padding="8,3" FontSize="11" />
+                                        <Button Content="Dev (8080)" Tag="8080" Click="NetstatPreset_Click" Padding="8,3" FontSize="11" />
+                                        <Button Content="Node (3000)" Tag="3000" Click="NetstatPreset_Click" Padding="8,3" FontSize="11" />
+                                        <Button Content="RDP (3389)" Tag="3389" Click="NetstatPreset_Click" Padding="8,3" FontSize="11" />
+                                        <Button Content="MC (25565)" Tag="25565" Click="NetstatPreset_Click" Padding="8,3" FontSize="11" />
+                                    </StackPanel>
+
+                                    <!-- Empty / Vacant State Banner -->
+                                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12,10"
+                                            Visibility="{x:Bind ViewModel.NetstatEmptyStatus, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}">
+                                        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                            <FontIcon Glyph="&#xE73E;" FontSize="15" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                                            <TextBlock Text="{x:Bind ViewModel.NetstatEmptyStatus, Mode=OneWay}"
+                                                       FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Border>
+
                                     <ListView ItemsSource="{x:Bind ViewModel.NetstatConnections, Mode=OneWay}" MaxHeight="220" SelectionMode="None">
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="models:NetstatConnectionItem">
                                                 <Grid Padding="4,6" ColumnSpacing="10" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
                                                     <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="60" />
-                                                        <ColumnDefinition Width="150" />
-                                                        <ColumnDefinition Width="150" />
-                                                        <ColumnDefinition Width="100" />
-                                                        <ColumnDefinition Width="80" />
+                                                        <ColumnDefinition Width="50" />
+                                                        <ColumnDefinition Width="140" />
+                                                        <ColumnDefinition Width="140" />
+                                                        <ColumnDefinition Width="90" />
+                                                        <ColumnDefinition Width="70" />
                                                         <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" Text="{x:Bind Protocol}" FontWeight="SemiBold" FontSize="11" />
-                                                    <TextBlock Grid.Column="1" Text="{x:Bind LocalAddress}" FontSize="11" FontFamily="Consolas" />
-                                                    <TextBlock Grid.Column="2" Text="{x:Bind ForeignAddress}" FontSize="11" FontFamily="Consolas" />
-                                                    <TextBlock Grid.Column="3" Text="{x:Bind State}" FontSize="11" />
-                                                    <TextBlock Grid.Column="4" Text="{x:Bind Pid}" FontSize="11" FontFamily="Consolas" />
-                                                    <TextBlock Grid.Column="5" Text="{x:Bind ProcessName}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Grid.Column="0" Text="{x:Bind Protocol}" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind LocalAddress}" FontSize="11" FontFamily="Consolas" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="2" Text="{x:Bind ForeignAddress}" FontSize="11" FontFamily="Consolas" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="3" Text="{x:Bind State}" FontSize="11" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="4" Text="{x:Bind Pid}" FontSize="11" FontFamily="Consolas" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="5" Text="{x:Bind ProcessName}" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                                    <Button Grid.Column="6" Content="⚡ 終止 PID" Tag="{x:Bind Pid}" Click="KillNetstatRow_Click"
+                                                            Padding="8,3" FontSize="11" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center" />
                                                 </Grid>
                                             </DataTemplate>
                                         </ListView.ItemTemplate>
                                     </ListView>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- 🌐 遠端伺服器 Port 連通性測試 (Remote Port Reachability Tester) -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="2">
+                                            <TextBlock Text="🌐 遠端伺服器 Port 連通性測試 (Remote Port Reachability Tester)" FontWeight="Bold" FontSize="14" />
+                                            <TextBlock Text="測試遠端伺服器或特定 IP 的連接埠是否對外開放 (免安裝 Telnet，原生非同步探測)，精確偵測回應延遲與防火牆阻擋狀態。"
+                                                       Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="📦 啟用 Windows 內建 Telnet 用戶端" Command="{x:Bind ViewModel.InstallTelnetClientCommand}"
+                                                IsEnabled="{x:Bind ViewModel.IsInstallingTelnet, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}"
+                                                Padding="10,6" FontSize="11" VerticalAlignment="Center" />
+                                    </Grid>
+
+                                    <Grid ColumnSpacing="10" RowSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="2*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0" Header="目標伺服器主機名稱或 IP" Text="{x:Bind ViewModel.RemoteTestHost, Mode=TwoWay}" PlaceholderText="例如: google.com 或 192.168.1.1" />
+                                        <TextBox Grid.Column="1" Header="目標 Port (1-65535)" Text="{x:Bind ViewModel.RemoteTestPort, Mode=TwoWay}" PlaceholderText="例如: 443" />
+                                        <Button Grid.Column="2" Content="🚀 測試連通性" Command="{x:Bind ViewModel.TestRemotePortCommand}"
+                                                IsEnabled="{x:Bind ViewModel.IsTestingRemotePort, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}"
+                                                Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Bottom" Padding="16,8" />
+                                    </Grid>
+
+                                    <!-- Remote Test Status & Output -->
+                                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12,10"
+                                            Visibility="{x:Bind ViewModel.RemotePortTestResult, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}">
+                                        <TextBlock Text="{x:Bind ViewModel.RemotePortTestResult, Mode=OneWay}"
+                                                   FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                    </Border>
+
+                                    <TextBlock Text="{x:Bind ViewModel.TelnetInstallStatus, Mode=OneWay}"
+                                               FontSize="11" Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                               Visibility="{x:Bind ViewModel.TelnetInstallStatus, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}" />
                                 </StackPanel>
                             </Border>
 

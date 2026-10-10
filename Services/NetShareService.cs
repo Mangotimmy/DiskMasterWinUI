@@ -15,81 +15,95 @@ public class NetShareService
 {
     public async Task<List<NetShareItem>> GetActiveSharesAsync(CancellationToken ct = default)
     {
-        return await Task.Run(() =>
+        var sw = Stopwatch.StartNew();
+        var list = new List<NetShareItem>();
+        try
         {
-            var list = new List<NetShareItem>();
-            try
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(TimeSpan.FromSeconds(3));
+
+            var (outStr, _, _) = await ProcessHelper.RunProcessAsync("net.exe", "share", cancellationToken: cts.Token);
+            if (string.IsNullOrWhiteSpace(outStr)) return list;
+
+            var (primaryIp, hostName) = GetPrimaryLanEndpoints();
+
+            var lines = outStr.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+            bool startParsing = false;
+
+            foreach (var line in lines)
             {
-                var (outStr, _, _) = ProcessHelper.RunProcessAsync("net.exe", "share", cancellationToken: ct).GetAwaiter().GetResult();
-                if (string.IsNullOrWhiteSpace(outStr)) return list;
-
-                var (primaryIp, hostName) = GetPrimaryLanEndpoints();
-
-                var lines = outStr.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-                bool startParsing = false;
-
-                foreach (var line in lines)
+                if (line.StartsWith("---") || line.StartsWith("==="))
                 {
-                    if (line.StartsWith("---") || line.StartsWith("==="))
+                    startParsing = true;
+                    continue;
+                }
+
+                if (!startParsing) continue;
+                if (line.Contains("The command completed successfully", StringComparison.OrdinalIgnoreCase) ||
+                    line.Contains("命令已經成功完成", StringComparison.OrdinalIgnoreCase) ||
+                    line.Contains("命令成功完成", StringComparison.OrdinalIgnoreCase))
+                {
+                    break;
+                }
+
+                // Format: Share name   Resource   Remark
+                // Usually: ShareName   C:\Folder   Remark
+                var match = Regex.Match(line, @"^(\S+)\s+([A-Za-z]:\\[^\s]*|\\\\.*|[A-Za-z]:)\s*(.*)$");
+                if (match.Success)
+                {
+                    var name = match.Groups[1].Value.Trim();
+                    var resource = match.Groups[2].Value.Trim();
+                    var remark = match.Groups[3].Value.Trim();
+
+                    bool isAdmin = name.EndsWith('$') || name.Equals("IPC$", StringComparison.OrdinalIgnoreCase);
+
+                    list.Add(new NetShareItem
                     {
-                        startParsing = true;
-                        continue;
-                    }
-
-                    if (!startParsing) continue;
-                    if (line.Contains("The command completed successfully", StringComparison.OrdinalIgnoreCase) ||
-                        line.Contains("命令已經成功完成", StringComparison.OrdinalIgnoreCase) ||
-                        line.Contains("命令成功完成", StringComparison.OrdinalIgnoreCase))
+                        ShareName = name,
+                        ResourcePath = resource,
+                        Remark = remark,
+                        IsAdminShare = isAdmin,
+                        UncIpPath = !string.IsNullOrEmpty(primaryIp) ? $@"\\{primaryIp}\{name}" : "",
+                        UncHostPath = $@"\\{hostName}\{name}"
+                    });
+                }
+                else
+                {
+                    var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 2)
                     {
-                        break;
-                    }
-
-                    // Format: Share name   Resource   Remark
-                    // Usually: ShareName   C:\Folder   Remark
-                    var match = Regex.Match(line, @"^(\S+)\s+([A-Za-z]:\\[^\s]*|\\\\.*|[A-Za-z]:)\s*(.*)$");
-                    if (match.Success)
-                    {
-                        var name = match.Groups[1].Value.Trim();
-                        var resource = match.Groups[2].Value.Trim();
-                        var remark = match.Groups[3].Value.Trim();
-
-                        bool isAdmin = name.EndsWith('$') || name.Equals("IPC$", StringComparison.OrdinalIgnoreCase);
-
+                        var name = parts[0];
+                        var resource = parts[1];
+                        bool isAdmin = name.EndsWith('$');
                         list.Add(new NetShareItem
                         {
                             ShareName = name,
                             ResourcePath = resource,
-                            Remark = remark,
+                            Remark = parts.Length > 2 ? string.Join(" ", parts.Skip(2)) : "",
                             IsAdminShare = isAdmin,
                             UncIpPath = !string.IsNullOrEmpty(primaryIp) ? $@"\\{primaryIp}\{name}" : "",
                             UncHostPath = $@"\\{hostName}\{name}"
                         });
                     }
-                    else
-                    {
-                        var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                        if (parts.Length >= 2)
-                        {
-                            var name = parts[0];
-                            var resource = parts[1];
-                            bool isAdmin = name.EndsWith('$');
-                            list.Add(new NetShareItem
-                            {
-                                ShareName = name,
-                                ResourcePath = resource,
-                                Remark = parts.Length > 2 ? string.Join(" ", parts.Skip(2)) : "",
-                                IsAdminShare = isAdmin,
-                                UncIpPath = !string.IsNullOrEmpty(primaryIp) ? $@"\\{primaryIp}\{name}" : "",
-                                UncHostPath = $@"\\{hostName}\{name}"
-                            });
-                        }
-                    }
                 }
             }
-            catch { }
+
+            DebugLogService.Instance.Debug($"NetShare enumerated {list.Count} active shares in {sw.ElapsedMilliseconds}ms", "NetShareService");
             return list;
-        }, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            DebugLogService.Instance.Warning($"NetShare query timed out after {sw.ElapsedMilliseconds}ms", "NetShareService");
+            return list;
+        }
+        catch (Exception ex)
+        {
+            DebugLogService.Instance.Warning($"NetShare GetActiveSharesAsync failed: {ex.Message}", "NetShareService");
+            return list;
+        }
     }
+
+    public Task<bool> IsMicrosoftAccountSharingPolicyFixedAsync() => Task.Run(IsMicrosoftAccountSharingPolicyFixed);
 
     public static (string PrimaryIp, string HostName) GetPrimaryLanEndpoints()
     {

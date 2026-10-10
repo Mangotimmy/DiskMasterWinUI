@@ -698,7 +698,24 @@
                                                 VerticalAlignment="Center" />
                                     </Grid>
 
-                                    <!-- Blockers List or Clean State -->
+                                    <!-- 1. Progress Indicator -->
+                                    <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0"
+                                                Visibility="{x:Bind ViewModel.IsLoadingSleepBlockers, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <ProgressRing IsActive="{x:Bind ViewModel.IsLoadingSleepBlockers, Mode=OneWay}" Width="16" Height="16" />
+                                        <TextBlock Text="正在執行 powercfg /requests 深入掃描系統背景待命與休眠阻擋..." FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                    </StackPanel>
+
+                                    <!-- 2. Clean State (When 0 Blockers found) -->
+                                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12,10" Margin="0,6,0,0"
+                                            Visibility="{x:Bind ViewModel.HasSleepBlockers, Mode=OneWay, Converter={StaticResource InvertBoolToVisibilityConverter}}">
+                                        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                            <FontIcon Glyph="&#xE73E;" FontSize="15" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                                            <TextBlock Text="經診斷，目前系統沒有任何背景程序或驅動程式阻擋電腦休眠 (系統處於最佳待命狀態)"
+                                                       FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- 3. Blockers List (When Blockers detected) -->
                                     <ListView ItemsSource="{x:Bind ViewModel.SleepBlockers, Mode=OneWay}" SelectionMode="None" MaxHeight="160"
                                               Visibility="{x:Bind ViewModel.HasSleepBlockers, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
                                         <ListView.ItemTemplate>
@@ -727,6 +744,34 @@
                 <TabViewItem x:Name="TabBackup" Header="💾 登錄檔備份與還原 (Backup &amp; Restore)" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
                         <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
+
+                            <!-- 🖼️ Windows 圖示與縮圖快取修復 (Explorer Icon & Thumbnail Cache Rebuilder) -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <Grid ColumnSpacing="14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Grid.Column="0" Glyph="&#xEB9F;" FontSize="24" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="🖼️ Windows 檔案總管圖示與縮圖快取深度修復" FontWeight="SemiBold" FontSize="15" />
+                                        <TextBlock Text="當桌面或資料夾圖示變為空白白紙、破圖損壞或關聯顯示錯誤時，一鍵安全結束檔案總管並完整清除 IconCache.db 與現代 iconcache*/thumbcache* 資料庫。"
+                                                   Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                        <TextBlock Text="{x:Bind ViewModel.IconCacheStatus, Mode=OneWay}"
+                                                   FontSize="11" Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                                   Visibility="{x:Bind ViewModel.IconCacheStatus, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <ProgressRing IsActive="{x:Bind ViewModel.IsRebuildingIconCache, Mode=OneWay}" Width="20" Height="20" />
+                                        <Button Content="⚡ 一鍵徹底重建圖示快取" Command="{x:Bind ViewModel.RebuildIconCacheCommand}"
+                                                IsEnabled="{x:Bind ViewModel.IsRebuildingIconCache, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}"
+                                                Style="{StaticResource AccentButtonStyle}" Padding="14,8" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
 
                             <!-- Backup Actions Bar -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"

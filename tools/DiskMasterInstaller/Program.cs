@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Security.Principal;
+using System.Threading;
 using Microsoft.Win32;
 
 namespace DiskMasterInstaller;
@@ -54,6 +55,17 @@ internal static class Program
             return;
         }
 
+        // Single-instance installer check
+        using var singleInstanceMutex = new Mutex(initiallyOwned: true, @"Global\DiskMasterInstaller_SingleInstanceMutex", out bool isNewInstance);
+        if (!isNewInstance)
+        {
+            if (!isSilent)
+            {
+                MessageBox(IntPtr.Zero, "安裝程式已在運行中，請勿重複啟動。\nSetup is already running.", "DiskMaster Pro", MB_OK | MB_ICONINFORMATION);
+            }
+            return;
+        }
+
         bool isAdmin = IsAdministrator();
         string customDir = "";
 
@@ -79,6 +91,85 @@ internal static class Program
                                isJa ? "DiskMaster Pro セットアップウィザード" :
                                isEn ? "DiskMaster Pro Setup Wizard" :
                                "DiskMaster Pro 安裝精靈";
+
+        // Check for Existing Installation to avoid duplicate / accidental reinstallation
+        var assemblyVer = typeof(Program).Assembly.GetName().Version;
+        string currentVersionStr = assemblyVer != null ? $"{assemblyVer.Major}.{assemblyVer.Minor}.{assemblyVer.Build}" : "1.4.6";
+
+        bool hasExisting = FindExistingInstallation(out string existingVersion, out string existingLocation, out bool isExistingMachine);
+
+        if (hasExisting && string.IsNullOrEmpty(customDir))
+        {
+            int verCompare = CompareVersionStrings(existingVersion, currentVersionStr);
+            if (!isSilent)
+            {
+                if (verCompare == 0)
+                {
+                    // Exactly same version is already installed -> prevent accidental repeated installation
+                    string samePrompt = isZhCn
+                        ? $"DiskMaster Pro 旗舰版 (v{existingVersion}) 已经安装在以下位置：\n{existingLocation}\n\n您是否要重新安装或修复现有安装？\n\n【是 (Yes)】重新安装 / 修复\n【否 (No)】退出安装向导"
+                        : isJa
+                        ? $"DiskMaster Pro Flagship (v{existingVersion}) は既に以下の場所にインストールされています：\n{existingLocation}\n\n現在のインストールを再インストールまたは修復しますか？\n\n【はい (Yes)】再インストール / 修復\n【いいえ (No)】セットアップを終了"
+                        : isEn
+                        ? $"DiskMaster Pro Flagship (v{existingVersion}) is already installed at:\n{existingLocation}\n\nDo you want to reinstall or repair the existing installation?\n\n[Yes] Reinstall / Repair\n[No] Exit Setup"
+                        : $"DiskMaster Pro 旗艦版 (v{existingVersion}) 已經安裝在以下路徑：\n{existingLocation}\n\n您是否要重新安裝或修復現有安裝？\n\n【是 (Yes)】重新安裝 / 修復\n【否 (No)】退出安裝精靈";
+
+                    int res = MessageBox(IntPtr.Zero, samePrompt, installerTitle, MB_YESNO | MB_ICONQUESTION);
+                    if (res != IDYES) return;
+                }
+                else if (verCompare < 0)
+                {
+                    // Existing is older -> Upgrade!
+                    string upPrompt = isZhCn
+                        ? $"检测到已安装的旧版 DiskMaster Pro (v{existingVersion})：\n位置：{existingLocation}\n\n安装向导将为您升级至最新版本 v{currentVersionStr}。\n\n是否立即开始升级？"
+                        : isJa
+                        ? $"既存の DiskMaster Pro (v{existingVersion}) が見つかりました：\n場所：{existingLocation}\n\nセットアップにより最新バージョン v{currentVersionStr} にアップグレードされます。\n\n今すぐアップグレードを開始しますか？"
+                        : isEn
+                        ? $"An existing installation of DiskMaster Pro (v{existingVersion}) was found at:\n{existingLocation}\n\nSetup will upgrade your installation to version v{currentVersionStr}.\n\nDo you want to proceed with the upgrade?"
+                        : $"偵測到已安裝的舊版 DiskMaster Pro (v{existingVersion})：\n路徑：{existingLocation}\n\n安裝精靈將為您升級至最新版本 v{currentVersionStr}。\n\n是否立即開始升級？";
+
+                    int res = MessageBox(IntPtr.Zero, upPrompt, installerTitle, MB_YESNO | MB_ICONQUESTION);
+                    if (res != IDYES) return;
+                }
+                else
+                {
+                    // Existing is newer -> Downgrade warning
+                    string downPrompt = isZhCn
+                        ? $"检测到已安装较新版本的 DiskMaster Pro (v{existingVersion})：\n位置：{existingLocation}\n\n不建议降级覆盖安装至 v{currentVersionStr}。\n\n是否仍要继续？"
+                        : isJa
+                        ? $"より新しいバージョンの DiskMaster Pro (v{existingVersion}) が見つかりました：\n場所：{existingLocation}\n\nバージョン v{currentVersionStr} へのダウングレードは推奨されません。\n\n続行しますか？"
+                        : isEn
+                        ? $"A newer version of DiskMaster Pro (v{existingVersion}) is already installed at:\n{existingLocation}\n\nDowngrading to v{currentVersionStr} is not recommended.\n\nDo you want to proceed anyway?"
+                        : $"偵測到已安裝較新版本的 DiskMaster Pro (v{existingVersion})：\n路徑：{existingLocation}\n\n不建議降級覆蓋安裝至 v{currentVersionStr}。\n\n是否仍要繼續？";
+
+                    int res = MessageBox(IntPtr.Zero, downPrompt, installerTitle, MB_YESNO | MB_ICONQUESTION);
+                    if (res != IDYES) return;
+                }
+            }
+
+            // Reuse existing directory to guarantee no duplicate installations
+            customDir = existingLocation;
+            isAllUsers = isExistingMachine;
+            isCurrentUser = !isExistingMachine;
+
+            // If existing install was machine-level (Program Files) and we are not elevated, elevate!
+            if (isAllUsers && !isAdmin)
+            {
+                try
+                {
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = Environment.ProcessPath ?? "DiskMaster_Setup.exe",
+                        Arguments = "/ALLUSERS " + string.Join(" ", args.Where(a => !a.Equals("/CURRENTUSER", StringComparison.OrdinalIgnoreCase) && !a.Equals("--currentuser", StringComparison.OrdinalIgnoreCase))),
+                        UseShellExecute = true,
+                        Verb = "runas"
+                    };
+                    Process.Start(psi);
+                    return;
+                }
+                catch { return; }
+            }
+        }
 
         // Determine mode and default target directory
         if (!isAllUsers && !isCurrentUser)
@@ -437,5 +528,119 @@ internal static class Program
             }
         }
         catch { }
+    }
+
+    private static bool FindExistingInstallation(out string version, out string location, out bool isMachine)
+    {
+        version = "";
+        location = "";
+        isMachine = false;
+
+        string[] subKeys = new[]
+        {
+            @"Software\Microsoft\Windows\CurrentVersion\Uninstall\{5C17D77F-5A8E-47C2-9118-E8DE79B278AA}_is1",
+            @"Software\Microsoft\Windows\CurrentVersion\Uninstall\DiskMasterPro"
+        };
+
+        // 1. Check HKLM
+        foreach (var subKey in subKeys)
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(subKey);
+                if (key != null)
+                {
+                    string? loc = key.GetValue("InstallLocation") as string;
+                    string? ver = key.GetValue("DisplayVersion") as string;
+                    if (!string.IsNullOrEmpty(loc) && Directory.Exists(loc))
+                    {
+                        location = loc;
+                        version = ver ?? "1.0.0";
+                        isMachine = true;
+                        return true;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        // 2. Check HKCU
+        foreach (var subKey in subKeys)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(subKey);
+                if (key != null)
+                {
+                    string? loc = key.GetValue("InstallLocation") as string;
+                    string? ver = key.GetValue("DisplayVersion") as string;
+                    if (!string.IsNullOrEmpty(loc) && Directory.Exists(loc))
+                    {
+                        location = loc;
+                        version = ver ?? "1.0.0";
+                        isMachine = false;
+                        return true;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        // 3. Check well-known default Program Files
+        string pfDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "DiskMaster Pro");
+        string pfExe = Path.Combine(pfDir, "DiskMasterWinUI.exe");
+        if (File.Exists(pfExe))
+        {
+            try
+            {
+                var fvi = FileVersionInfo.GetVersionInfo(pfExe);
+                version = fvi.ProductVersion ?? fvi.FileVersion ?? "1.0.0";
+                location = pfDir;
+                isMachine = true;
+                return true;
+            }
+            catch { }
+        }
+
+        // 4. Check well-known default LocalAppData
+        string userDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "DiskMaster Pro");
+        string userExe = Path.Combine(userDir, "DiskMasterWinUI.exe");
+        if (File.Exists(userExe))
+        {
+            try
+            {
+                var fvi = FileVersionInfo.GetVersionInfo(userExe);
+                version = fvi.ProductVersion ?? fvi.FileVersion ?? "1.0.0";
+                location = userDir;
+                isMachine = false;
+                return true;
+            }
+            catch { }
+        }
+
+        return false;
+    }
+
+    private static int CompareVersionStrings(string v1, string v2)
+    {
+        try
+        {
+            var p1 = v1.Split('.').Select(s => int.TryParse(new string(s.TakeWhile(char.IsDigit).ToArray()), out int n) ? n : 0).ToList();
+            var p2 = v2.Split('.').Select(s => int.TryParse(new string(s.TakeWhile(char.IsDigit).ToArray()), out int n) ? n : 0).ToList();
+            int maxLen = Math.Max(p1.Count, p2.Count);
+            while (p1.Count < maxLen) p1.Add(0);
+            while (p2.Count < maxLen) p2.Add(0);
+
+            for (int i = 0; i < maxLen; i++)
+            {
+                if (p1[i] > p2[i]) return 1;
+                if (p1[i] < p2[i]) return -1;
+            }
+            return 0;
+        }
+        catch
+        {
+            return string.Compare(v1, v2, StringComparison.OrdinalIgnoreCase);
+        }
     }
 }

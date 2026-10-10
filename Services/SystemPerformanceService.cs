@@ -32,63 +32,120 @@ public partial class SystemPerformanceService
         "winlogon.exe", "fontdrvhost.exe", "dwm.exe", "Registry", "Memory Compression"
     };
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    private struct MEMORYSTATUSEX
+    {
+        public uint dwLength;
+        public uint dwMemoryLoad;
+        public ulong ullTotalPhys;
+        public ulong ullAvailPhys;
+        public ulong ullTotalPageFile;
+        public ulong ullAvailPageFile;
+        public ulong ullTotalVirtual;
+        public ulong ullAvailVirtual;
+        public ulong ullAvailExtendedVirtual;
+
+        public void Init()
+        {
+            dwLength = (uint)Marshal.SizeOf<MEMORYSTATUSEX>();
+        }
+    }
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
+
     // ═════════════════════════════════════════════════════════════════════
-    // 1. Real-Time Hardware Performance Metrics (typeperf / API)
+    // 1. Real-Time Hardware Performance Metrics (GlobalMemoryStatusEx + typeperf)
     // ═════════════════════════════════════════════════════════════════════
 
     public async Task<SystemMetricsSnapshot> GetMetricsSnapshotAsync(CancellationToken ct = default)
     {
-        return await Task.Run(() =>
-        {
-            var snap = new SystemMetricsSnapshot();
+        var snap = new SystemMetricsSnapshot();
 
-            // 1. CPU % via Process.GetCurrentProcess() or system calculation
+        // 1. Memory Load & Physical RAM via Win32 GlobalMemoryStatusEx (0ms latency, 100% accurate)
+        try
+        {
+            var memStatus = new MEMORYSTATUSEX();
+            memStatus.Init();
+            if (GlobalMemoryStatusEx(ref memStatus))
+            {
+                snap.RamUsagePercent = Math.Clamp(memStatus.dwMemoryLoad, 0, 100);
+                snap.TotalRamMb = (long)(memStatus.ullTotalPhys / (1024 * 1024));
+                snap.AvailableRamMb = (long)(memStatus.ullAvailPhys / (1024 * 1024));
+            }
+        }
+        catch { }
+
+        // Fallback for RAM if Win32 API returned 0
+        if (snap.TotalRamMb == 0)
+        {
             try
             {
-                // Quick typeperf sample or calculate total CPU
-                var (outStr, _, code) = ProcessHelper.RunProcessAsync("typeperf.exe", "\"\\Processor(_Total)\\% Processor Time\" \"\\Memory\\Available MBytes\" -sc 1", cancellationToken: ct).GetAwaiter().GetResult();
-                if (code == 0 && !string.IsNullOrWhiteSpace(outStr))
+                var memInfo = GC.GetGCMemoryInfo();
+                if (memInfo.TotalAvailableMemoryBytes > 0)
                 {
-                    var lines = outStr.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-                    var dataLine = lines.LastOrDefault(l => l.Contains(','));
-                    if (dataLine != null)
+                    snap.TotalRamMb = memInfo.TotalAvailableMemoryBytes / (1024 * 1024);
+                }
+            }
+            catch { }
+        }
+
+        // 2. CPU & Real-Time PhysicalDisk Metrics via typeperf sample
+        try
+        {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(4));
+            const string typeperfCounters = "\"\\Processor(_Total)\\% Processor Time\" \"\\PhysicalDisk(_Total)\\% Disk Time\" \"\\PhysicalDisk(_Total)\\Avg. Disk sec/Read\" \"\\PhysicalDisk(_Total)\\Avg. Disk sec/Write\" \"\\PhysicalDisk(_Total)\\Disk Read Bytes/sec\" \"\\PhysicalDisk(_Total)\\Disk Write Bytes/sec\" -sc 1";
+            var (outStr, _, code) = await ProcessHelper.RunProcessAsync("typeperf.exe", typeperfCounters, cancellationToken: timeoutCts.Token);
+            if (code == 0 && !string.IsNullOrWhiteSpace(outStr))
+            {
+                var lines = outStr.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+                var dataLine = lines.LastOrDefault(l => l.Contains(','));
+                if (dataLine != null)
+                {
+                    var parts = dataLine.Split('"').Where(p => p != "," && !string.IsNullOrWhiteSpace(p)).ToArray();
+                    if (parts.Length >= 7)
                     {
-                        var parts = dataLine.Split('"').Where(p => p != "," && !string.IsNullOrWhiteSpace(p)).ToArray();
-                        if (parts.Length >= 2)
+                        if (double.TryParse(parts[1], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double cpu))
                         {
-                            if (double.TryParse(parts[parts.Length - 2], out double cpu))
-                            {
-                                snap.CpuUsagePercent = Math.Clamp(Math.Round(cpu, 1), 0.0, 100.0);
-                            }
-                            if (long.TryParse(parts[parts.Length - 1], out long availMb))
-                            {
-                                snap.AvailableRamMb = availMb;
-                            }
+                            snap.CpuUsagePercent = Math.Clamp(Math.Round(cpu, 1), 0.0, 100.0);
+                        }
+                        if (double.TryParse(parts[2], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double diskPct))
+                        {
+                            snap.DiskUsagePercent = Math.Clamp(Math.Round(diskPct, 1), 0.0, 100.0);
+                        }
+                        if (double.TryParse(parts[3], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double readSec))
+                        {
+                            snap.DiskReadLatencyMs = Math.Max(0, Math.Round(readSec * 1000.0, 2));
+                        }
+                        if (double.TryParse(parts[4], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double writeSec))
+                        {
+                            snap.DiskWriteLatencyMs = Math.Max(0, Math.Round(writeSec * 1000.0, 2));
+                        }
+                        if (double.TryParse(parts[5], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double readBytes))
+                        {
+                            snap.DiskReadRateDisplay = FormatBytesPerSec(readBytes);
+                        }
+                        if (double.TryParse(parts[6], System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double writeBytes))
+                        {
+                            snap.DiskWriteRateDisplay = FormatBytesPerSec(writeBytes);
                         }
                     }
                 }
             }
-            catch { }
+        }
+        catch { }
 
-            // Total Physical RAM via GC / MemoryInfo
-            try
-            {
-                var memInfo = GC.GetGCMemoryInfo();
-                long totalBytes = memInfo.TotalAvailableMemoryBytes;
-                if (totalBytes > 0)
-                {
-                    snap.TotalRamMb = totalBytes / (1024 * 1024);
-                    if (snap.AvailableRamMb > 0)
-                    {
-                        long usedMb = Math.Max(0, snap.TotalRamMb - snap.AvailableRamMb);
-                        snap.RamUsagePercent = Math.Clamp(Math.Round((double)usedMb / snap.TotalRamMb * 100.0, 1), 0.0, 100.0);
-                    }
-                }
-            }
-            catch { }
+        return snap;
+    }
 
-            return snap;
-        }, ct);
+    private static string FormatBytesPerSec(double bytesPerSec)
+    {
+        if (bytesPerSec <= 0) return "0 KB/s";
+        if (bytesPerSec >= 1024 * 1024 * 1024) return $"{bytesPerSec / (1024 * 1024 * 1024):F1} GB/s";
+        if (bytesPerSec >= 1024 * 1024) return $"{bytesPerSec / (1024 * 1024):F1} MB/s";
+        return $"{bytesPerSec / 1024:F0} KB/s";
     }
 
     // ═════════════════════════════════════════════════════════════════════
@@ -97,7 +154,7 @@ public partial class SystemPerformanceService
 
     public async Task<List<ProcessHunterItem>> GetRunningProcessesDeepAsync(CancellationToken ct = default)
     {
-        return await Task.Run(() =>
+        return await Task.Run(async () =>
         {
             var list = new List<ProcessHunterItem>();
             var activePids = new HashSet<int>();
@@ -118,7 +175,9 @@ public partial class SystemPerformanceService
 
             try
             {
-                var (wmicOut, _, code) = ProcessHelper.RunProcessAsync("wmic.exe", "process get ProcessId,ParentProcessId,CommandLine,ExecutablePath /format:csv", cancellationToken: ct).GetAwaiter().GetResult();
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(4));
+                var (wmicOut, _, code) = await ProcessHelper.RunProcessAsync("wmic.exe", "process get ProcessId,ParentProcessId,CommandLine,ExecutablePath /format:csv", cancellationToken: timeoutCts.Token);
                 if (code == 0 && !string.IsNullOrWhiteSpace(wmicOut))
                 {
                     var lines = wmicOut.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
@@ -242,12 +301,14 @@ public partial class SystemPerformanceService
 
     public async Task<SystemInfoSummary> GetSystemInfoSummaryAsync(CancellationToken ct = default)
     {
-        return await Task.Run(() =>
+        return await Task.Run(async () =>
         {
             var summary = new SystemInfoSummary();
             try
             {
-                var (outStr, _, code) = ProcessHelper.RunProcessAsync("systeminfo.exe", "", cancellationToken: ct).GetAwaiter().GetResult();
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(6));
+                var (outStr, _, code) = await ProcessHelper.RunProcessAsync("systeminfo.exe", "", cancellationToken: timeoutCts.Token);
                 if (string.IsNullOrWhiteSpace(outStr)) return summary;
 
                 var lines = outStr.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);

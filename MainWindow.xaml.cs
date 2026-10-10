@@ -746,7 +746,7 @@ public sealed partial class MainWindow : Window
             case "NetworkTools":
                 if (_networkToolsPage != null)
                 {
-                    await _networkToolsPage.ViewModel.RefreshUpnpCommand.ExecuteAsync(null);
+                    await _networkToolsPage.ViewModel.InitializeAsync(forceReload: true);
                 }
                 break;
             case "SystemPerformance":
@@ -872,6 +872,13 @@ public sealed partial class MainWindow : Window
 
     private void SetupKeyboardAccelerators()
     {
+        NormalView.KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
+
+        void AddHiddenAccel(KeyboardAccelerator a)
+        {
+            NormalView.KeyboardAccelerators.Add(a);
+        }
+
         // Ctrl+1 through Ctrl+8 for Tab navigation
         for (int i = 0; i < 8; i++)
         {
@@ -886,7 +893,7 @@ public sealed partial class MainWindow : Window
                     e.Handled = true;
                 }
             };
-            NormalView.KeyboardAccelerators.Add(accel);
+            AddHiddenAccel(accel);
         }
 
         // Ctrl+Tab (Next Tab)
@@ -899,7 +906,7 @@ public sealed partial class MainWindow : Window
                 e.Handled = true;
             }
         };
-        NormalView.KeyboardAccelerators.Add(nextTabAccel);
+        AddHiddenAccel(nextTabAccel);
 
         // Ctrl+Shift+Tab (Previous Tab)
         var prevTabAccel = new KeyboardAccelerator { Key = VirtualKey.Tab, Modifiers = VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift };
@@ -911,16 +918,16 @@ public sealed partial class MainWindow : Window
                 e.Handled = true;
             }
         };
-        NormalView.KeyboardAccelerators.Add(prevTabAccel);
+        AddHiddenAccel(prevTabAccel);
 
         // F5 & Ctrl+R for Smart Refresh
         var f5Accel = new KeyboardAccelerator { Key = VirtualKey.F5 };
         f5Accel.Invoked += (s, e) => { SmartRefreshCurrentPage(); e.Handled = true; };
-        NormalView.KeyboardAccelerators.Add(f5Accel);
+        AddHiddenAccel(f5Accel);
 
         var ctrlRAccel = new KeyboardAccelerator { Key = VirtualKey.R, Modifiers = VirtualKeyModifiers.Control };
         ctrlRAccel.Invoked += (s, e) => { SmartRefreshCurrentPage(); e.Handled = true; };
-        NormalView.KeyboardAccelerators.Add(ctrlRAccel);
+        AddHiddenAccel(ctrlRAccel);
 
         // Ctrl+Shift+F for Float Tab
         var floatAccel = new KeyboardAccelerator { Key = VirtualKey.F, Modifiers = VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift };
@@ -929,12 +936,12 @@ public sealed partial class MainWindow : Window
             if (MainTabs.SelectedItem is TabViewItem tab) FloatTab(tab);
             e.Handled = true;
         };
-        NormalView.KeyboardAccelerators.Add(floatAccel);
+        AddHiddenAccel(floatAccel);
 
         // Ctrl+Shift+D for Dock All
         var dockAllAccel = new KeyboardAccelerator { Key = VirtualKey.D, Modifiers = VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift };
         dockAllAccel.Invoked += (s, e) => { DockAll_Click(this, new RoutedEventArgs()); e.Handled = true; };
-        NormalView.KeyboardAccelerators.Add(dockAllAccel);
+        AddHiddenAccel(dockAllAccel);
 
         // Ctrl+D for Export Diagnostics Report
         var exportDiagAccel = new KeyboardAccelerator { Key = VirtualKey.D, Modifiers = VirtualKeyModifiers.Control };
@@ -943,7 +950,7 @@ public sealed partial class MainWindow : Window
             e.Handled = true;
             await DiagnosticExportService.Instance.ExportReportToFileAsync(autoOpenFile: true);
         };
-        NormalView.KeyboardAccelerators.Add(exportDiagAccel);
+        AddHiddenAccel(exportDiagAccel);
 
         // Ctrl+L for Clear Log
         var clearLogAccel = new KeyboardAccelerator { Key = VirtualKey.L, Modifiers = VirtualKeyModifiers.Control };
@@ -1087,6 +1094,9 @@ public sealed partial class MainWindow : Window
     {
         if (string.IsNullOrEmpty(tag) || tag == _currentNavigatedTag) return;
         _currentNavigatedTag = tag;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        DebugLogService.Instance.Debug($"Navigating to tab '{tag}'...", "Navigation");
+
         switch (tag)
         {
             case "Starter":
@@ -1137,6 +1147,16 @@ public sealed partial class MainWindow : Window
                 _settingsPage ??= new SettingsPage();
                 ContentFrame.Content = _settingsPage;
                 break;
+        }
+
+        sw.Stop();
+        if (sw.ElapsedMilliseconds >= 200)
+        {
+            DebugLogService.Instance.Warning($"Tab navigation to '{tag}' took {sw.ElapsedMilliseconds}ms (Potential UI hitch detected!)", "Navigation");
+        }
+        else
+        {
+            DebugLogService.Instance.Debug($"Tab navigation to '{tag}' completed in {sw.ElapsedMilliseconds}ms (Smooth)", "Navigation");
         }
     }
 

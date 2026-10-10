@@ -30,9 +30,15 @@ public sealed partial class StarterPage : Page
         };
     }
 
+    private bool _hasLoadedOnce;
+
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
         ApplyLanguage();
-        await ViewModel.RefreshStatusCommand.ExecuteAsync(null);
+        if (!_hasLoadedOnce)
+        {
+            _hasLoadedOnce = true;
+            await ViewModel.RefreshStatusCommand.ExecuteAsync(null);
+        }
     }
 }

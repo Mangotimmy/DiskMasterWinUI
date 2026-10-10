@@ -37,7 +37,7 @@
                    Opacity="0.25"
                    Visibility="Collapsed" />
 
-            <Grid x:Name="NormalView" PointerMoved="NormalView_PointerMoved">
+            <Grid x:Name="NormalView" PointerMoved="NormalView_PointerMoved" KeyboardAcceleratorPlacementMode="Hidden">
                 <Grid.Resources>
                     <SolidColorBrush x:Name="DynamicCardBrush" x:Key="CardBackgroundFillColorDefaultBrush" Color="#B0202020" />
                     <SolidColorBrush x:Name="DynamicCardSecBrush" x:Key="CardBackgroundFillColorSecondaryBrush" Color="#80282828" />

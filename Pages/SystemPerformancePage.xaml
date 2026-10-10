@@ -8,8 +8,8 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:models="using:DiskMasterWinUI.Models"
     xmlns:vm="using:DiskMasterWinUI.ViewModels"
-    mc:Ignorable="d"
-    Loaded="Page_Loaded">
+    Loaded="Page_Loaded"
+    Unloaded="Page_Unloaded">
 
     <Grid Padding="16" RowSpacing="12">
         <Grid.RowDefinitions>
@@ -52,19 +52,23 @@
             <TabView.TabItems>
 
                 <!-- ════ Tab 1: Real-Time Hardware Performance ════ -->
-                <TabViewItem x:Name="TabPerfMetrics" Header="📊 即時硬體資源 (typeperf 效能儀表)" IsClosable="False">
+                <TabViewItem x:Name="TabPerfMetrics" Header="📊 即時硬體效能" ToolTipService.ToolTip="即時硬體資源與磁碟延遲監控 (typeperf &amp; Win32)" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
                         <StackPanel Spacing="16" Margin="0,0,16,20">
 
-                            <!-- Live Resource Cards (CPU & RAM) -->
-                            <Grid ColumnSpacing="16">
+                            <!-- Live Resource Cards (CPU, RAM, Disk Active & Throughput, Disk Response Latency) -->
+                            <Grid ColumnSpacing="16" RowSpacing="16">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
 
-                                <!-- CPU Card -->
-                                <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                <!-- 1. CPU Card -->
+                                <Border Grid.Row="0" Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                                         CornerRadius="8" Padding="16">
                                     <StackPanel Spacing="12">
@@ -84,8 +88,8 @@
                                     </StackPanel>
                                 </Border>
 
-                                <!-- RAM Card -->
-                                <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                <!-- 2. RAM Card -->
+                                <Border Grid.Row="0" Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                                         CornerRadius="8" Padding="16">
                                     <StackPanel Spacing="12">
@@ -96,13 +100,87 @@
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Grid.Column="0" Spacing="2">
                                                 <TextBlock Text="實體記憶體使用率 (RAM)" FontWeight="SemiBold" FontSize="14" />
-                                                <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.AvailableRamMb, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='可用記憶體: {0} MB'}"
+                                                <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.DisplayRamDetail, Mode=OneWay}"
                                                            FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                             </StackPanel>
                                             <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.CurrentMetrics.DisplayRamPercent, Mode=OneWay}"
                                                        FontSize="24" FontWeight="Bold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
                                         </Grid>
                                         <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.RamUsagePercent, Mode=OneWay}" Maximum="100" Height="8" />
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- 3. Disk Active Time & Throughput Card -->
+                                <Border Grid.Row="1" Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                        CornerRadius="8" Padding="16">
+                                    <StackPanel Spacing="12">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Spacing="2">
+                                                <TextBlock Text="磁碟活動時間與傳輸量 (Disk %)" FontWeight="SemiBold" FontSize="14" />
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                                        <Run Text="讀取: " /><Run Text="{x:Bind ViewModel.CurrentMetrics.DiskReadRateDisplay, Mode=OneWay}" FontWeight="SemiBold" />
+                                                    </TextBlock>
+                                                    <TextBlock Text="|" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                    <TextBlock FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                                        <Run Text="寫入: " /><Run Text="{x:Bind ViewModel.CurrentMetrics.DiskWriteRateDisplay, Mode=OneWay}" FontWeight="SemiBold" />
+                                                    </TextBlock>
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.CurrentMetrics.DisplayDiskUsagePercent, Mode=OneWay}"
+                                                       FontSize="24" FontWeight="Bold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                        </Grid>
+                                        <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.DiskUsagePercent, Mode=OneWay}" Maximum="100" Height="8" />
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- 4. Disk Response Time / Latency (ms Delay) Card -->
+                                <Border Grid.Row="1" Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                        CornerRadius="8" Padding="16">
+                                    <StackPanel Spacing="12">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Spacing="2">
+                                                <TextBlock Text="磁碟讀寫存取延遲 (Response Time)" FontWeight="SemiBold" FontSize="14" />
+                                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                                    <TextBlock FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                                        <Run Text="讀取延遲: " /><Run Text="{x:Bind ViewModel.CurrentMetrics.DisplayDiskReadLatency, Mode=OneWay}" FontWeight="SemiBold" />
+                                                    </TextBlock>
+                                                    <TextBlock Text="|" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                    <TextBlock FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                                        <Run Text="寫入延遲: " /><Run Text="{x:Bind ViewModel.CurrentMetrics.DisplayDiskWriteLatency, Mode=OneWay}" FontWeight="SemiBold" />
+                                                    </TextBlock>
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                                    CornerRadius="4" Padding="8,4" VerticalAlignment="Center">
+                                                <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.DiskLatencyBadge, Mode=OneWay}"
+                                                           FontSize="12" FontWeight="SemiBold" />
+                                            </Border>
+                                        </Grid>
+                                        <Grid ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Spacing="3">
+                                                <TextBlock Text="讀取延遲 (Read)" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.DiskReadLatencyMs, Mode=OneWay}" Maximum="50" Height="4" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Spacing="3">
+                                                <TextBlock Text="寫入延遲 (Write)" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.DiskWriteLatencyMs, Mode=OneWay}" Maximum="50" Height="4" />
+                                            </StackPanel>
+                                        </Grid>
                                     </StackPanel>
                                 </Border>
                             </Grid>
@@ -112,7 +190,7 @@
                 </TabViewItem>
 
                 <!-- ════ Tab 2: Deep Process Hunter ════ -->
-                <TabViewItem x:Name="TabProcessHunter" Header="🎯 進程獵手與強制終結 (Process Hunter &amp; Tree Killer)" IsClosable="False">
+                <TabViewItem x:Name="TabProcessHunter" Header="🎯 進程獵手與樹狀終結" ToolTipService.ToolTip="進程獵手與強制終結進程樹 (Process Hunter &amp; Tree Killer)" IsClosable="False">
                     <Grid RowSpacing="12" Margin="0,10,0,0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
@@ -188,7 +266,7 @@
                 </TabViewItem>
 
                 <!-- ════ Tab 3: SystemInfo Hardware Profile ════ -->
-                <TabViewItem x:Name="TabSystemInfo" Header="📋 系統配置與修補程式報告 (systeminfo)" IsClosable="False">
+                <TabViewItem x:Name="TabSystemInfo" Header="📋 系統硬體與修補報告" ToolTipService.ToolTip="系統硬體基本規格與 Windows 修補程式報告 (systeminfo)" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
                         <StackPanel Spacing="16" Margin="0,0,16,20">
 

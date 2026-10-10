@@ -152,7 +152,7 @@ public class NtfsPermissionService
 
     public async Task<NtfsFeatureSummary> InspectNtfsFeaturesAsync(string path, CancellationToken ct = default)
     {
-        return await Task.Run(() =>
+        return await Task.Run(async () =>
         {
             var summary = new NtfsFeatureSummary();
             var cleanPath = path.TrimEnd('\\');
@@ -174,7 +174,9 @@ public class NtfsPermissionService
             // 2. Query Owner and ACLs via icacls
             try
             {
-                var (outStr, _, _) = ProcessHelper.RunProcessAsync("icacls.exe", $"\"{cleanPath}\"", cancellationToken: ct).GetAwaiter().GetResult();
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(3));
+                var (outStr, _, _) = await ProcessHelper.RunProcessAsync("icacls.exe", $"\"{cleanPath}\"", cancellationToken: timeoutCts.Token);
                 if (!string.IsNullOrWhiteSpace(outStr))
                 {
                     var lines = outStr.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
@@ -208,8 +210,10 @@ public class NtfsPermissionService
             // 3. Query Alternate Data Streams via PowerShell Get-Item -Stream *
             try
             {
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(4));
                 var psCmd = $"Get-Item -LiteralPath '{cleanPath.Replace("'", "''")}' -Stream * | Select-Object Stream, Length | ConvertTo-Csv -NoTypeInformation";
-                var (streamOut, _, _) = ProcessHelper.RunProcessAsync("powershell.exe", $"-NoProfile -Command \"{psCmd}\"", cancellationToken: ct).GetAwaiter().GetResult();
+                var (streamOut, _, _) = await ProcessHelper.RunProcessAsync("powershell.exe", $"-NoProfile -Command \"{psCmd}\"", cancellationToken: timeoutCts.Token);
                 if (!string.IsNullOrWhiteSpace(streamOut))
                 {
                     var lines = streamOut.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
@@ -241,7 +245,9 @@ public class NtfsPermissionService
             {
                 if (File.Exists(cleanPath))
                 {
-                    var (hlOut, _, _) = ProcessHelper.RunProcessAsync("fsutil.exe", $"hardlink list \"{cleanPath}\"", cancellationToken: ct).GetAwaiter().GetResult();
+                    using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    timeoutCts.CancelAfter(TimeSpan.FromSeconds(3));
+                    var (hlOut, _, _) = await ProcessHelper.RunProcessAsync("fsutil.exe", $"hardlink list \"{cleanPath}\"", cancellationToken: timeoutCts.Token);
                     if (!string.IsNullOrWhiteSpace(hlOut))
                     {
                         var hlLines = hlOut.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)

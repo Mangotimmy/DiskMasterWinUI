@@ -30,6 +30,58 @@ public static class TabReorderHelper
             _currentDraggedItem = args.Tab;
         };
 
+        tabView.TabStripDragOver += (sender, args) =>
+        {
+            if (_currentDraggedItem != null)
+            {
+                args.AcceptedOperation = DataPackageOperation.Move;
+            }
+        };
+
+        tabView.TabStripDrop += (sender, args) =>
+        {
+            if (_currentDraggedItem != null)
+            {
+                int fromIndex = tabView.TabItems.IndexOf(_currentDraggedItem);
+                if (fromIndex < 0) return;
+
+                var dropPoint = args.GetPosition(tabView);
+                int targetIndex = -1;
+
+                for (int i = 0; i < tabView.TabItems.Count; i++)
+                {
+                    if (tabView.TabItems[i] is TabViewItem item && item.Visibility == Visibility.Visible)
+                    {
+                        try
+                        {
+                            var transform = item.TransformToVisual(tabView);
+                            var bounds = transform.TransformBounds(new Windows.Foundation.Rect(0, 0, item.ActualWidth, item.ActualHeight));
+                            if (dropPoint.X < bounds.X + bounds.Width / 2)
+                            {
+                                targetIndex = i;
+                                break;
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                if (targetIndex < 0)
+                {
+                    targetIndex = tabView.TabItems.Count - 1;
+                }
+
+                if (fromIndex != targetIndex && targetIndex >= 0 && targetIndex < tabView.TabItems.Count)
+                {
+                    tabView.TabItems.RemoveAt(fromIndex);
+                    tabView.TabItems.Insert(targetIndex, _currentDraggedItem);
+                    tabView.SelectedItem = _currentDraggedItem;
+                    AudioFeedbackService.PlaySuccess();
+                    onReordered?.Invoke();
+                }
+            }
+        };
+
         tabView.TabDragCompleted += (sender, args) =>
         {
             _currentDraggedItem = null;

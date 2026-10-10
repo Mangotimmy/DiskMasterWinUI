@@ -284,12 +284,15 @@ public class RufusDownloadService
             proc.BeginOutputReadLine();
             proc.BeginErrorReadLine();
 
-            using var reg = ct.Register(() =>
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(60));
+
+            using var reg = timeoutCts.Token.Register(() =>
             {
                 try { proc.Kill(true); } catch { }
             });
 
-            await proc.WaitForExitAsync(ct);
+            await proc.WaitForExitAsync(timeoutCts.Token);
 
             var fullOutput = outputSb.ToString();
 

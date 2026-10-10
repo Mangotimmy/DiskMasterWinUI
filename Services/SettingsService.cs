@@ -81,6 +81,9 @@ public class AppSettings
     public Dictionary<string, bool> ComponentVisibility { get; set; } = new();
     public Dictionary<string, double> LayoutSplitterSizes { get; set; } = new();
     public List<string> DiskHealthCardOrder { get; set; } = new();
+
+    // ── Debug & Diagnostic Logging ──
+    public bool EnableDebugLogging { get; set; } = false;
 }
 
 public class SettingsService

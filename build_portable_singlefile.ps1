@@ -39,6 +39,13 @@ Write-Host "`n[1/5] Publishing main WinUI 3 project ($Architecture)..." -Foregro
 dotnet publish "$projectDir\DiskMasterWinUI.csproj" -c Release -r $Architecture --self-contained true -o $publishDir
 Copy-Item -Recurse -Force "$projectDir\Scripts" "$publishDir\"
 
+# 1.0 Prune unused WindowsAppSDK satellite language folders (keeps en-us, zh-cn, zh-tw, ja-jp)
+$supportedLangs = @('en-us', 'zh-cn', 'zh-tw', 'ja-jp')
+Get-ChildItem -Path $publishDir -Directory | Where-Object {
+    $n = $_.Name.ToLowerInvariant()
+    $n -match '^[a-z]{2,3}(-[a-z0-9]+)*$' -and -not ($supportedLangs -contains $n)
+} | Remove-Item -Recurse -Force
+
 # 2. Sign core internal binaries prior to compression
 if (Test-Path $signScript) {
     Write-Host "`n[2/5] Signing core payload binaries with Authenticode..." -ForegroundColor Yellow
@@ -70,8 +77,8 @@ Write-Host "[OK] Compressed payload size: $zipSizeMb MB" -ForegroundColor Green
 
 # 4. Compile Launcher into single-file executable
 Write-Host "`n[4/5] Compiling Single-File Native Launcher ($Architecture)..." -ForegroundColor Yellow
-$tempOut = "$projectDir\tools\DiskMasterPortableLauncher\bin\temp_out"
-if (Test-Path $tempOut) { Remove-Item $tempOut -Recurse -Force }
+$tempOut = "$projectDir\tools\DiskMasterPortableLauncher\bin\temp_out_$(Get-Random)"
+if (Test-Path $tempOut) { Remove-Item $tempOut -Recurse -Force -ErrorAction SilentlyContinue }
 
 dotnet publish $launcherProj `
     -c Release `
@@ -81,6 +88,10 @@ dotnet publish $launcherProj `
     -p:IncludeNativeLibrariesForSelfExtract=true `
     -p:EnableCompressionInSingleFile=true `
     -o $tempOut
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to publish portable launcher executable (exit code $LASTEXITCODE)"
+}
 
 # 5. Finalize and move output
 $archSuffix = if ($Architecture -eq "win-arm64") { "_arm64" } else { "" }

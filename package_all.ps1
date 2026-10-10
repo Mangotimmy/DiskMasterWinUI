@@ -45,35 +45,12 @@ if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 Compress-Archive -Path "$projectDir\publish\*" -DestinationPath $zipPath -Force
 Write-Host "[OK] WinPE Portable ZIP created: $zipPath" -ForegroundColor Green
 
-# 4. Optional: Compile Inno Setup Installer if compiler is present
-Write-Host "`n[4/4] Checking Inno Setup Compiler (DiskMasterSetup.iss)..." -ForegroundColor Yellow
-$iscc = "C:\Users\Atszl\AppData\Local\Programs\Inno Setup 6\ISCC.exe"
-if (Test-Path $iscc) {
-    & $iscc "$projectDir\DiskMasterSetup.iss"
-    Write-Host "[OK] Inno Setup Installer compiled successfully in installer_output/" -ForegroundColor Green
-    
-    # Sign Inno Setup executable if present
-    $innoSetupExe = "$outputDir\DiskMasterSetup.exe"
-    $signScript = "$projectDir\tools\Sign-ReleaseBinary.ps1"
-    if ((Test-Path $innoSetupExe) -and (Test-Path $signScript)) {
-        Write-Host "Signing Inno Setup output..." -ForegroundColor Yellow
-        $innoSignArgs = @{
-            TargetPath = @($innoSetupExe)
-        }
-        if ($CertThumbprint) { $innoSignArgs["CertThumbprint"] = $CertThumbprint }
-        if ($PfxPath) { $innoSignArgs["PfxPath"] = $PfxPath }
-        if ($PfxPassword) { $innoSignArgs["PfxPassword"] = $PfxPassword }
-        if ($PfxBase64) { $innoSignArgs["PfxBase64"] = $PfxBase64 }
-        if ($SkipTimestamp) { $innoSignArgs["SkipTimestamp"] = $true }
-        
-        try {
-            & $signScript @innoSignArgs
-        } catch {
-            Write-Warning "Inno setup signing note: $_"
-        }
-    }
-} else {
-    Write-Host "Note: Inno Setup compiler ISCC.exe not found. Native installer was generated above." -ForegroundColor Yellow
+# 4. Standard Setup Installer status
+Write-Host "`n[4/4] Verifying Setup Installer..." -ForegroundColor Yellow
+$setupExe = "$outputDir\DiskMaster_Setup.exe"
+if (Test-Path $setupExe) {
+    $setupSize = [math]::Round((Get-Item $setupExe).Length / 1MB, 2)
+    Write-Host "[OK] Setup Installer is ready: $setupExe ($setupSize MB)" -ForegroundColor Green
 }
 
 Write-Host "`n===================================================" -ForegroundColor Cyan
