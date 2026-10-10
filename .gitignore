@@ -55,3 +55,4 @@ Generated\ Files/
 # Agent & AI tool directories
 .gemini/
 .agents/
+*.DMP
