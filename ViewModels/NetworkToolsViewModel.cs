@@ -72,6 +72,12 @@ public partial class NetworkToolsViewModel : ObservableObject
     [ObservableProperty] private RdpStatusInfo _rdpStatus = new();
     public ObservableCollection<RdpSessionItem> RdpSessions { get; } = new();
     [ObservableProperty] private string _rdpStatusMessage = "";
+    [ObservableProperty] private int _customRdpPort = 3389;
+    [ObservableProperty] private bool _isSingleSessionPerUser = true;
+    [ObservableProperty] private bool _isNlaRequired = false;
+    [ObservableProperty] private int _selectedShadowMode = 1;
+    [ObservableProperty] private bool _isUpdatingRdpIni = false;
+    [ObservableProperty] private string _rdpEnableButtonText = "⚡ 一鍵啟用遠端桌面 (3389)";
 
     // ── 7. CMD CLI Network Tools (Ping, Netstat, OpenFiles, Nbtstat) ──
     private readonly CliToolsService _cliToolsService = new();
@@ -722,10 +728,16 @@ public partial class NetworkToolsViewModel : ObservableObject
             var sessions = await _rdpService.GetActiveSessionsAsync();
             DispatcherHelper.RunOnUIThread(() =>
             {
+                CustomRdpPort = RdpStatus.Port;
+                IsSingleSessionPerUser = RdpStatus.SingleSessionPerUser;
+                IsNlaRequired = RdpStatus.NetworkLevelAuthRequired;
+                SelectedShadowMode = RdpStatus.ShadowMode;
+                RdpEnableButtonText = $"⚡ 一鍵啟用遠端桌面 ({RdpStatus.Port})";
+
                 RdpSessions.Clear();
                 foreach (var s in sessions) RdpSessions.Add(s);
             });
-            RdpStatusMessage = $"RDP 狀態已更新 ({RdpStatus.EditionName})";
+            RdpStatusMessage = $"RDP 狀態已更新 ({RdpStatus.EditionName}，連接埠: {RdpStatus.Port})";
         }
         catch (Exception ex)
         {
@@ -736,8 +748,8 @@ public partial class NetworkToolsViewModel : ObservableObject
     [RelayCommand]
     public async Task EnableRdpAsync()
     {
-        RdpStatusMessage = "正在啟用遠端桌面並設定防火牆與服務...";
-        var (ok, msg) = await _rdpService.EnableRdpServerAsync(RdpStatus.IsHomeEdition);
+        RdpStatusMessage = $"正在啟用遠端桌面並設定防火牆 (連接埠: {RdpStatus.Port})...";
+        var (ok, msg) = await _rdpService.EnableRdpServerAsync(RdpStatus.IsHomeEdition, RdpStatus.Port);
         RdpStatusMessage = msg;
         if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
         await RefreshRdpStatusAsync();
@@ -754,7 +766,108 @@ public partial class NetworkToolsViewModel : ObservableObject
     [RelayCommand]
     public void LaunchRdpLoopback()
     {
-        _rdpService.LaunchLoopbackTest();
+        _rdpService.LaunchLoopbackTest(RdpStatus.Port);
+    }
+
+    [RelayCommand]
+    public async Task ApplyCustomPortAsync()
+    {
+        if (CustomRdpPort < 1 || CustomRdpPort > 65535)
+        {
+            RdpStatusMessage = "請輸入有效的連接埠號 (1-65535)";
+            AudioFeedbackService.PlayError();
+            return;
+        }
+
+        RdpStatusMessage = $"正在切換連接埠至 {CustomRdpPort} 並更新防火牆規則...";
+        var (ok, msg) = await _rdpService.SetRdpPortAsync(CustomRdpPort);
+        RdpStatusMessage = msg;
+        if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+        await RefreshRdpStatusAsync();
+    }
+
+    [RelayCommand]
+    public void SetPortPreset(string portStr)
+    {
+        if (int.TryParse(portStr, out int p))
+        {
+            CustomRdpPort = p;
+        }
+    }
+
+    [RelayCommand]
+    public async Task ToggleSingleSessionAsync()
+    {
+        var (ok, msg) = await _rdpService.SetSingleSessionPerUserAsync(IsSingleSessionPerUser);
+        RdpStatusMessage = msg;
+        if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+        await RefreshRdpStatusAsync();
+    }
+
+    [RelayCommand]
+    public async Task ToggleNlaAsync()
+    {
+        var (ok, msg) = await _rdpService.SetNetworkLevelAuthAsync(IsNlaRequired);
+        RdpStatusMessage = msg;
+        if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+        await RefreshRdpStatusAsync();
+    }
+
+    [RelayCommand]
+    public async Task ApplyShadowModeAsync()
+    {
+        var (ok, msg) = await _rdpService.SetShadowModeAsync(SelectedShadowMode);
+        RdpStatusMessage = msg;
+        if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+        await RefreshRdpStatusAsync();
+    }
+
+    [RelayCommand]
+    public async Task RestartTermServiceAsync()
+    {
+        RdpStatusMessage = "正在重啟 TermService 遠端桌面服務...";
+        var (ok, msg) = await _rdpService.RestartTermServiceAsync();
+        RdpStatusMessage = msg;
+        if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+        await RefreshRdpStatusAsync();
+    }
+
+    [RelayCommand]
+    public async Task UpdateRdpWrapIniAsync()
+    {
+        IsUpdatingRdpIni = true;
+        RdpStatusMessage = "正在從社群最新鏡像下載 rdpwrap.ini 並套用...";
+        try
+        {
+            var (ok, msg) = await _rdpService.UpdateRdpWrapIniAsync();
+            RdpStatusMessage = msg;
+            if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+            await RefreshRdpStatusAsync();
+        }
+        finally
+        {
+            IsUpdatingRdpIni = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task DisconnectSessionAsync(RdpSessionItem? session)
+    {
+        if (session == null) return;
+        var (ok, msg) = await _rdpService.DisconnectSessionAsync(session.SessionId);
+        RdpStatusMessage = msg;
+        if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+        await RefreshRdpStatusAsync();
+    }
+
+    [RelayCommand]
+    public async Task LogoffSessionAsync(RdpSessionItem? session)
+    {
+        if (session == null) return;
+        var (ok, msg) = await _rdpService.LogoffSessionAsync(session.SessionId);
+        RdpStatusMessage = msg;
+        if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+        await RefreshRdpStatusAsync();
     }
 
     // ══════════════════════════════════════════════════════════

@@ -192,4 +192,20 @@ public sealed partial class NetworkToolsPage : Page
             await ViewModel.KillProcessPidAsync(pid);
         }
     }
+
+    private async void DisconnectSession_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is RdpSessionItem item)
+        {
+            await ViewModel.DisconnectSessionCommand.ExecuteAsync(item);
+        }
+    }
+
+    private async void LogoffSession_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is RdpSessionItem item)
+        {
+            await ViewModel.LogoffSessionCommand.ExecuteAsync(item);
+        }
+    }
 }

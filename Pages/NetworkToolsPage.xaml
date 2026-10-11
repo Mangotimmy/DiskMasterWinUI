@@ -576,33 +576,117 @@
                     </ScrollViewer>
                 </TabViewItem>
 
-                <!-- ════ Tab 6: 遠端桌面服務 (Remote RDP Server) ════ -->
+                <!-- ════ Tab 6: 遠端桌面服務 (Remote RDP Server & RDP Wrapper) ════ -->
                 <TabViewItem x:Name="TabRdp" Header="🖥️ 遠端桌面 (RDP Server)" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
                         <StackPanel Spacing="16" Margin="0,0,16,20">
 
-                            <!-- Status & Unlock Card -->
+                            <!-- Status & Diagnostics Card -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                                     CornerRadius="8" Padding="16">
-                                <StackPanel Spacing="12">
+                                <StackPanel Spacing="14">
+                                    <!-- Title & Actions Header -->
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0" Spacing="3">
                                             <StackPanel Orientation="Horizontal" Spacing="8">
                                                 <FontIcon Glyph="&#xE7F4;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                                                <TextBlock Text="Windows 遠端桌面伺服器 (RDP Server)" FontWeight="Bold" FontSize="16" />
+                                                <TextBlock Text="Windows 遠端桌面伺服器 (RDP Server) &amp; RDP Wrapper 增強診斷" FontWeight="Bold" FontSize="16" />
                                             </StackPanel>
                                             <TextBlock Text="{x:Bind ViewModel.RdpStatus.EditionName, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='目前系統版本: {0}'}"
                                                        Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                         </StackPanel>
-                                        <Button Grid.Column="1" Content="🔄 檢查狀態" Command="{x:Bind ViewModel.RefreshRdpStatusCommand}" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Command="{x:Bind ViewModel.RestartTermServiceCommand}" Margin="0,0,8,0" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE72C;" FontSize="13" />
+                                                <TextBlock Text="🔄 重啟 TermService" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Column="2" Content="🔍 重新檢查狀態" Command="{x:Bind ViewModel.RefreshRdpStatusCommand}" VerticalAlignment="Center" />
                                     </Grid>
 
-                                    <!-- Action Buttons -->
+                                    <!-- 4 Diagnostic Badges / Cards -->
+                                    <Grid ColumnSpacing="10" RowSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Badge 1: TermService Status -->
+                                        <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10,8">
+                                            <StackPanel Spacing="3">
+                                                <TextBlock Text="TermService 服務狀態" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <FontIcon Glyph="&#xE73E;" FontSize="14" Foreground="{ThemeResource SystemFillColorSuccessBrush}"
+                                                              Visibility="{x:Bind ViewModel.RdpStatus.IsServiceRunning, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                    <FontIcon Glyph="&#xE711;" FontSize="14" Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                                                              Visibility="{x:Bind ViewModel.RdpStatus.IsServiceRunning, Mode=OneWay, Converter={StaticResource InvertBoolToVisibilityConverter}}" />
+                                                    <TextBlock Text="服務運作中 (Running)" FontWeight="SemiBold" FontSize="12"
+                                                               Visibility="{x:Bind ViewModel.RdpStatus.IsServiceRunning, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                    <TextBlock Text="已停止 / 停用 (Stopped)" FontWeight="SemiBold" FontSize="12"
+                                                               Visibility="{x:Bind ViewModel.RdpStatus.IsServiceRunning, Mode=OneWay, Converter={StaticResource InvertBoolToVisibilityConverter}}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Badge 2: Listener Status -->
+                                        <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10,8">
+                                            <StackPanel Spacing="3">
+                                                <TextBlock Text="通訊埠監聽狀態" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <FontIcon Glyph="&#xE8B0;" FontSize="14" Foreground="{ThemeResource SystemFillColorSuccessBrush}"
+                                                              Visibility="{x:Bind ViewModel.RdpStatus.IsListening, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                    <FontIcon Glyph="&#xE783;" FontSize="14" Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                                                              Visibility="{x:Bind ViewModel.RdpStatus.IsListening, Mode=OneWay, Converter={StaticResource InvertBoolToVisibilityConverter}}" />
+                                                    <TextBlock Text="{x:Bind ViewModel.RdpStatus.Port, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='監聽中: 0.0.0.0:{0}'}"
+                                                               FontWeight="SemiBold" FontSize="12"
+                                                               Visibility="{x:Bind ViewModel.RdpStatus.IsListening, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                    <TextBlock Text="{x:Bind ViewModel.RdpStatus.Port, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='未在埠 {0} 監聽'}"
+                                                               FontWeight="SemiBold" FontSize="12"
+                                                               Visibility="{x:Bind ViewModel.RdpStatus.IsListening, Mode=OneWay, Converter={StaticResource InvertBoolToVisibilityConverter}}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Badge 3: termsrv.dll Core Version -->
+                                        <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10,8">
+                                            <StackPanel Spacing="3">
+                                                <TextBlock Text="termsrv.dll 核心版本" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <FontIcon Glyph="&#xE8A5;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                    <TextBlock Text="{x:Bind ViewModel.RdpStatus.TermsrvVersion, Mode=OneWay}"
+                                                               FontWeight="SemiBold" FontSize="12" FontFamily="Consolas" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Badge 4: RDP Wrapper Status -->
+                                        <Border Grid.Column="3" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10,8">
+                                            <StackPanel Spacing="3">
+                                                <TextBlock Text="RDP Wrapper 模組" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <FontIcon Glyph="&#xE774;" FontSize="14" Foreground="{ThemeResource SystemFillColorSuccessBrush}"
+                                                              Visibility="{x:Bind ViewModel.RdpStatus.IsWrapperInstalled, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                    <FontIcon Glyph="&#xE71A;" FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                              Visibility="{x:Bind ViewModel.RdpStatus.IsWrapperInstalled, Mode=OneWay, Converter={StaticResource InvertBoolToVisibilityConverter}}" />
+                                                    <TextBlock Text="{x:Bind ViewModel.RdpStatus.WrapperVersion, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='已載入: {0}'}"
+                                                               FontWeight="SemiBold" FontSize="12"
+                                                               Visibility="{x:Bind ViewModel.RdpStatus.IsWrapperInstalled, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                                    <TextBlock Text="未載入 (原生模式)" FontWeight="SemiBold" FontSize="12"
+                                                               Visibility="{x:Bind ViewModel.RdpStatus.IsWrapperInstalled, Mode=OneWay, Converter={StaticResource InvertBoolToVisibilityConverter}}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+
+                                    <!-- Main Action Buttons -->
                                     <Grid ColumnSpacing="10">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
@@ -612,7 +696,7 @@
                                         <Button Grid.Column="0" Command="{x:Bind ViewModel.EnableRdpCommand}" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch">
                                             <StackPanel Orientation="Horizontal" Spacing="6">
                                                 <FontIcon Glyph="&#xE768;" FontSize="13" />
-                                                <TextBlock Text="⚡ 一鍵啟用遠端桌面 (3389)" />
+                                                <TextBlock Text="{x:Bind ViewModel.RdpEnableButtonText, Mode=OneWay}" />
                                             </StackPanel>
                                         </Button>
                                         <Button Grid.Column="1" Command="{x:Bind ViewModel.DisableRdpCommand}" HorizontalAlignment="Stretch">
@@ -624,18 +708,164 @@
                                         <Button Grid.Column="2" Command="{x:Bind ViewModel.LaunchRdpLoopbackCommand}" HorizontalAlignment="Stretch">
                                             <StackPanel Orientation="Horizontal" Spacing="6">
                                                 <FontIcon Glyph="&#xE7F4;" FontSize="13" />
-                                                <TextBlock Text="🖥️ 本機連線測試 (mstsc)" />
+                                                <TextBlock Text="{x:Bind ViewModel.RdpStatus.Port, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='🖥️ 本機連線測試 (mstsc :{0})'}" />
                                             </StackPanel>
                                         </Button>
                                     </Grid>
 
-                                    <!-- Connection Info -->
+                                    <!-- Feedback Status Message -->
+                                    <TextBlock Text="{x:Bind ViewModel.RdpStatusMessage, Mode=OneWay}"
+                                               FontSize="12" Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                               Visibility="{x:Bind ViewModel.RdpStatusMessage, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Port Configuration & Connection Guide Card -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="14">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE8B0;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        <TextBlock Text="📡 通訊埠設定與連線位址指引 (Port &amp; Connection Guide)" FontWeight="Bold" FontSize="14" />
+                                    </StackPanel>
+
+                                    <!-- Connection Info Banner -->
                                     <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
-                                        <StackPanel Spacing="6">
-                                            <TextBlock Text="連線位址指引：" FontWeight="SemiBold" FontSize="12" />
-                                            <TextBlock Text="{x:Bind ViewModel.RdpStatus.ConnectAddressIp, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='區域網路 IP 連線位址: {0}'}" FontFamily="Consolas" FontSize="13" Foreground="{ThemeResource AccentFillColorDefaultBrush}" FontWeight="Bold" />
-                                            <TextBlock Text="{x:Bind ViewModel.RdpStatus.ConnectAddressHost, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='電腦主機名稱連線位址: {0}'}" FontFamily="Consolas" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <Grid ColumnSpacing="20">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Spacing="4">
+                                                <TextBlock Text="區域網路 IP 連線指令 (其他電腦或手機使用)：" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Text="{x:Bind ViewModel.RdpStatus.ConnectAddressIp, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='mstsc /v:{0}'}"
+                                                           FontFamily="Consolas" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" FontWeight="Bold" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Spacing="4">
+                                                <TextBlock Text="電腦主機名稱連線指令：" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Text="{x:Bind ViewModel.RdpStatus.ConnectAddressHost, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='mstsc /v:{0}'}"
+                                                           FontFamily="Consolas" FontSize="13" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Port Customization Form -->
+                                    <Grid ColumnSpacing="12" RowSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="220" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBox Grid.Column="0" Header="RDP 服務通訊埠 (PortNumber)"
+                                                 Text="{x:Bind ViewModel.CustomRdpPort, Mode=TwoWay}"
+                                                 PlaceholderText="例如 3387 或 3389" />
+
+                                        <!-- Quick Presets -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Bottom" Spacing="4">
+                                            <TextBlock Text="常用通訊埠快速選取：" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <Button Content="預設 3389" Command="{x:Bind ViewModel.SetPortPresetCommand}" CommandParameter="3389" Padding="8,4" FontSize="11" />
+                                                <Button Content="本機 3387" Command="{x:Bind ViewModel.SetPortPresetCommand}" CommandParameter="3387" Padding="8,4" FontSize="11" />
+                                                <Button Content="備用 8389" Command="{x:Bind ViewModel.SetPortPresetCommand}" CommandParameter="8389" Padding="8,4" FontSize="11" />
+                                                <Button Content="高位 33890" Command="{x:Bind ViewModel.SetPortPresetCommand}" CommandParameter="33890" Padding="8,4" FontSize="11" />
+                                            </StackPanel>
                                         </StackPanel>
+
+                                        <Button Grid.Column="2" Content="💾 套用新通訊埠" Command="{x:Bind ViewModel.ApplyCustomPortCommand}"
+                                                Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Bottom" Padding="14,8" />
+                                    </Grid>
+                                    <TextBlock Text="💡 提示: 套用新通訊埠將自動修改登錄檔 PortNumber、增建 Windows 防火牆 TCP/UDP 放行規則，並重啟 TermService。"
+                                               FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Advanced RDP Wrapper & Multi-Session Policies Card -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="14">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE713;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        <TextBlock Text="⚙️ RDP Wrapper 架構多工作階段與安全政策 (Multi-Session &amp; Security)" FontWeight="Bold" FontSize="14" />
+                                    </StackPanel>
+                                    <TextBlock Text="依據 stascorp/rdpwrap 核心功能，管理 Windows 終端機服務多連線並存、網路層身分驗證 (NLA) 與遠端陰影監視模式。"
+                                               Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+
+                                    <Grid ColumnSpacing="16" RowSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Setting 1: Concurrent Sessions (fSingleSessionPerUser) -->
+                                        <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="👥 多人同帳號連線政策" FontWeight="SemiBold" FontSize="13" />
+                                                <TextBlock Text="是否限制每位使用者僅能單一連線 (開起會踢掉先前連線，關閉可多視窗並存)"
+                                                           FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Height="32" />
+                                                <ToggleSwitch IsOn="{x:Bind ViewModel.IsSingleSessionPerUser, Mode=TwoWay}"
+                                                              OnContent="僅限單一連線 (踢舊連線)"
+                                                              OffContent="允許多人/多視窗並存" />
+                                                <Button Content="套用多連線政策" Command="{x:Bind ViewModel.ToggleSingleSessionCommand}" HorizontalAlignment="Stretch" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Setting 2: Network Level Authentication (NLA) -->
+                                        <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="🔒 網路層身分驗證 (NLA)" FontWeight="SemiBold" FontSize="13" />
+                                                <TextBlock Text="強制連線前進行網路層使用者身分驗證 (關閉時相容性最佳，未勾選 NLA 的裝置也能連)"
+                                                           FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Height="32" />
+                                                <ToggleSwitch IsOn="{x:Bind ViewModel.IsNlaRequired, Mode=TwoWay}"
+                                                              OnContent="強制 NLA 驗證 (高安全性)"
+                                                              OffContent="不強制 NLA (相容性最佳)" />
+                                                <Button Content="套用 NLA 設定" Command="{x:Bind ViewModel.ToggleNlaCommand}" HorizontalAlignment="Stretch" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Setting 3: Shadow Mode -->
+                                        <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="👁️ 遠端陰影監視模式" FontWeight="SemiBold" FontSize="13" />
+                                                <TextBlock Text="設定管理者是否能即時查看或接管被控端工作階段 (Shadowing Mode)"
+                                                           FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Height="32" />
+                                                <ComboBox SelectedIndex="{x:Bind ViewModel.SelectedShadowMode, Mode=TwoWay}" HorizontalAlignment="Stretch">
+                                                    <ComboBoxItem Content="0: 停用陰影 (Disable)" />
+                                                    <ComboBoxItem Content="1: 完整控制 (需使用者同意)" />
+                                                    <ComboBoxItem Content="2: 完整控制 (無需同意)" />
+                                                    <ComboBoxItem Content="3: 僅檢視 (需使用者同意)" />
+                                                    <ComboBoxItem Content="4: 僅檢視 (無需同意)" />
+                                                </ComboBox>
+                                                <Button Content="套用陰影模式" Command="{x:Bind ViewModel.ApplyShadowModeCommand}" HorizontalAlignment="Stretch" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+
+                                    <!-- Community INI Auto-Updater Card -->
+                                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Spacing="3">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <FontIcon Glyph="&#xE774;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                    <TextBlock Text="🌐 社群 rdpwrap.ini 偏移量設定庫同步更新 (Windows 11 / 10 支援檔)" FontWeight="SemiBold" FontSize="12" />
+                                                </StackPanel>
+                                                <TextBlock Text="當 Windows 累積更新升級 termsrv.dll 導致 RDP Wrapper 提示 Not Supported 時，可一鍵從 GitHub / jsDelivr CDN 自動下載最新社群偏移量資料庫並重新載入服務。"
+                                                           FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Command="{x:Bind ViewModel.UpdateRdpWrapIniCommand}" VerticalAlignment="Center" Padding="12,8">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <ProgressRing IsActive="{x:Bind ViewModel.IsUpdatingRdpIni, Mode=OneWay}" Width="16" Height="16" />
+                                                    <TextBlock Text="📥 線上更新 rdpwrap.ini" />
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
                                     </Border>
                                 </StackPanel>
                             </Border>
@@ -645,19 +875,40 @@
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                                     CornerRadius="8" Padding="16">
                                 <StackPanel Spacing="10">
-                                    <TextBlock Text="👥 當前遠端工作階段 (qwinsta)" FontWeight="Bold" FontSize="14" />
-                                    <ListView ItemsSource="{x:Bind ViewModel.RdpSessions, Mode=OneWay}" MaxHeight="200" SelectionMode="None">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="👥 當前遠端工作階段管理 (qwinsta / rwinsta)" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Content="🔄 重新整理清單" Command="{x:Bind ViewModel.RefreshRdpStatusCommand}" Padding="8,4" FontSize="11" />
+                                    </Grid>
+
+                                    <ListView ItemsSource="{x:Bind ViewModel.RdpSessions, Mode=OneWay}" MaxHeight="220" SelectionMode="None">
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="services:RdpSessionItem">
                                                 <Grid Padding="6,6" ColumnSpacing="12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
                                                     <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="150" />
-                                                        <ColumnDefinition Width="150" />
+                                                        <ColumnDefinition Width="140" />
+                                                        <ColumnDefinition Width="140" />
+                                                        <ColumnDefinition Width="100" />
                                                         <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" Text="{x:Bind SessionName}" FontWeight="SemiBold" FontSize="12" />
-                                                    <TextBlock Grid.Column="1" Text="{x:Bind UserName}" FontSize="12" />
-                                                    <TextBlock Grid.Column="2" Text="{x:Bind State}" FontSize="12" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                        <FontIcon Glyph="&#xE7F4;" FontSize="13" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                        <TextBlock Text="{x:Bind SessionName}" FontWeight="SemiBold" FontSize="12" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                        <FontIcon Glyph="&#xE77B;" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                        <TextBlock Text="{x:Bind UserName}" FontSize="12" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="2" Text="{x:Bind State}" FontSize="12" Foreground="{ThemeResource AccentFillColorDefaultBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="3" Text="{x:Bind SessionId, Converter={StaticResource StringFormatConverter}, ConverterParameter='ID: {0}'}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                                    <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                        <Button Content="🛑 中斷" Click="DisconnectSession_Click" Padding="8,4" FontSize="11" />
+                                                        <Button Content="🚪 登出" Click="LogoffSession_Click" Padding="8,4" FontSize="11" />
+                                                    </StackPanel>
                                                 </Grid>
                                             </DataTemplate>
                                         </ListView.ItemTemplate>
