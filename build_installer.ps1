@@ -20,7 +20,7 @@ $projectDir = $PSScriptRoot
 Set-Location $projectDir
 
 $versionFile = Join-Path $projectDir "Directory.Build.props"
-$appVersion = "1.4.2"
+$appVersion = "1.5.1"
 if (Test-Path $versionFile) {
     [xml]$xmlProps = Get-Content $versionFile
     $appVersion = $xmlProps.Project.PropertyGroup.Version
@@ -52,6 +52,7 @@ if (-not (Test-Path $outputDir)) {
 Write-Host "`n[1/5] Publishing main WinUI 3 project ($Architecture)..." -ForegroundColor Yellow
 dotnet publish "$projectDir\DiskMasterWinUI.csproj" -c Release -r $Architecture --self-contained true -o $publishDir
 Copy-Item -Recurse -Force "$projectDir\Scripts" "$publishDir\"
+Copy-Item -Recurse -Force "$projectDir\Assets" "$publishDir\"
 
 # 1.0 Prune unused WindowsAppSDK satellite language folders (keeps en-us, zh-cn, zh-tw, ja-jp)
 $supportedLangs = @('en-us', 'zh-cn', 'zh-tw', 'ja-jp')

@@ -94,7 +94,7 @@ internal static class Program
 
         // Check for Existing Installation to avoid duplicate / accidental reinstallation
         var assemblyVer = typeof(Program).Assembly.GetName().Version;
-        string currentVersionStr = assemblyVer != null ? $"{assemblyVer.Major}.{assemblyVer.Minor}.{assemblyVer.Build}" : "1.4.9";
+        string currentVersionStr = assemblyVer != null ? $"{assemblyVer.Major}.{assemblyVer.Minor}.{assemblyVer.Build}" : "1.5.1";
 
         bool hasExisting = FindExistingInstallation(out string existingVersion, out string existingLocation, out bool isExistingMachine);
 
@@ -478,7 +478,7 @@ internal static class Program
             if (key != null)
             {
                 var ver = typeof(Program).Assembly.GetName().Version;
-                string displayVer = ver != null ? $"{ver.Major}.{ver.Minor}.{ver.Build}" : "1.4.2";
+                string displayVer = ver != null ? $"{ver.Major}.{ver.Minor}.{ver.Build}" : "1.5.1";
 
                 key.SetValue("DisplayName", "DiskMaster Pro 旗艦版");
                 key.SetValue("DisplayVersion", displayVer);

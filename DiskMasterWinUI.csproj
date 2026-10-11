@@ -19,9 +19,6 @@
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);MVVMTK0045</NoWarn>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>1.4.9</Version>
-    <AssemblyVersion>1.4.9.0</AssemblyVersion>
-    <FileVersion>1.4.9.0</FileVersion>
     <Description>DiskMaster Pro - Advanced Windows Disk &amp; Deployment Manager</Description>
   </PropertyGroup>
 
@@ -32,20 +29,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Assets\SplashScreen.scale-200.png" />
-    <Content Include="Assets\LockScreenLogo.scale-200.png" />
-    <Content Include="Assets\Square150x150Logo.scale-200.png" />
-    <Content Include="Assets\Square44x44Logo.scale-200.png" />
-    <Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
-    <Content Include="Assets\Square44x44Logo.targetsize-48_altform-lightunplated.png" />
-    <Content Include="Assets\StoreLogo.png" />
-    <Content Include="Assets\AppIcon.ico" />
-    <Content Include="Assets\Wide310x150Logo.scale-200.png" />
-    <Content Include="Assets\Companion\**">
+    <Content Include="Assets\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
     <Content Include="Locales\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
 
