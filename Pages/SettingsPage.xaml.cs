@@ -1,6 +1,7 @@
 using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
 using Windows.ApplicationModel.DataTransfer;
@@ -315,69 +316,176 @@ public sealed partial class SettingsPage : Page
         }
     }
 
-    private Models.TabOrderItem? _draggedTabItem;
+    private Models.TabOrderItem? _pointerDraggedItem;
+    private FrameworkElement? _pointerCapturedElement;
+    private ListViewItem? _draggedVisualContainer;
+    private Windows.Foundation.Point _pointerStartPos;
+    private bool _isPointerDragging = false;
 
-    private void TabOrderListView_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
+    private void DragGrip_PointerEntered(object sender, PointerRoutedEventArgs e)
     {
-        _draggedTabItem = e.Items.FirstOrDefault() as Models.TabOrderItem;
-        if (_draggedTabItem != null)
+        try
         {
-            e.Data.RequestedOperation = DataPackageOperation.Move;
-            e.Data.SetText(_draggedTabItem.Tag);
+            this.ProtectedCursor = Microsoft.UI.Input.InputSystemCursor.Create(Microsoft.UI.Input.InputSystemCursorShape.SizeAll);
+        }
+        catch { }
+    }
+
+    private void DragGrip_PointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_isPointerDragging)
+        {
+            try
+            {
+                this.ProtectedCursor = null;
+            }
+            catch { }
         }
     }
 
-    private void TabOrderListView_DragOver(object sender, DragEventArgs e)
+    private void TabRow_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        if (_draggedTabItem != null)
+        var ptr = e.GetCurrentPoint(sender as UIElement);
+        if (!ptr.Properties.IsLeftButtonPressed) return;
+
+        // Ignore clicks if originating from child interactive controls (ToggleSwitch, Button)
+        if (e.OriginalSource is DependencyObject dep)
         {
-            e.AcceptedOperation = DataPackageOperation.Move;
-            e.DragUIOverride.IsCaptionVisible = false;
-            e.DragUIOverride.IsGlyphVisible = false;
+            if (FindAscendant<Button>(dep) != null || FindAscendant<ToggleSwitch>(dep) != null)
+            {
+                return;
+            }
+        }
+
+        if (sender is FrameworkElement fe && fe.DataContext is Models.TabOrderItem item)
+        {
+            _pointerDraggedItem = item;
+            _pointerCapturedElement = fe;
+            _pointerStartPos = e.GetCurrentPoint(TabOrderListView).Position;
+            _isPointerDragging = false;
+            fe.CapturePointer(e.Pointer);
+            e.Handled = true;
         }
     }
 
-    private void TabOrderListView_Drop(object sender, DragEventArgs e)
+    private void TabRow_PointerMoved(object sender, PointerRoutedEventArgs e)
     {
-        if (_draggedTabItem == null || ViewModel?.TabOrderItems == null || ViewModel.TabOrderItems.Count == 0) return;
+        if (_pointerCapturedElement == null || _pointerDraggedItem == null || ViewModel?.TabOrderItems == null || ViewModel.TabOrderItems.Count == 0) return;
 
-        var dropPos = e.GetPosition(TabOrderListView);
+        var curPos = e.GetCurrentPoint(TabOrderListView).Position;
+        double deltaY = curPos.Y - _pointerStartPos.Y;
+
+        if (!_isPointerDragging)
+        {
+            if (Math.Abs(deltaY) > 5)
+            {
+                _isPointerDragging = true;
+                _draggedVisualContainer = TabOrderListView.ContainerFromItem(_pointerDraggedItem) as ListViewItem;
+                if (_draggedVisualContainer != null)
+                {
+                    _draggedVisualContainer.Opacity = 0.55;
+                }
+            }
+            else
+            {
+                return;
+            }
+        }
+
+        // Find which item row the pointer is currently hovering over
         int targetIndex = -1;
-
         for (int i = 0; i < ViewModel.TabOrderItems.Count; i++)
         {
-            if (TabOrderListView.ContainerFromIndex(i) is ListViewItem item)
+            if (TabOrderListView.ContainerFromIndex(i) is ListViewItem lvi)
             {
-                var transform = item.TransformToVisual(TabOrderListView);
-                var bounds = transform.TransformBounds(new Windows.Foundation.Rect(0, 0, item.ActualWidth, item.ActualHeight));
-                if (dropPos.Y < bounds.Y + bounds.Height / 2)
+                try
                 {
-                    targetIndex = i;
-                    break;
+                    var transform = lvi.TransformToVisual(TabOrderListView);
+                    var bounds = transform.TransformBounds(new Windows.Foundation.Rect(0, 0, lvi.ActualWidth, lvi.ActualHeight));
+                    if (curPos.Y >= bounds.Y && curPos.Y <= bounds.Y + bounds.Height)
+                    {
+                        targetIndex = i;
+                        break;
+                    }
                 }
+                catch { }
             }
         }
 
         if (targetIndex < 0)
         {
-            targetIndex = ViewModel.TabOrderItems.Count - 1;
+            if (curPos.Y <= 10) targetIndex = 0;
+            else if (curPos.Y >= TabOrderListView.ActualHeight - 10) targetIndex = ViewModel.TabOrderItems.Count - 1;
         }
 
-        targetIndex = Math.Clamp(targetIndex, 0, ViewModel.TabOrderItems.Count - 1);
-
-        int oldIndex = ViewModel.TabOrderItems.IndexOf(_draggedTabItem);
-        if (oldIndex >= 0 && targetIndex >= 0 && oldIndex != targetIndex)
+        if (targetIndex >= 0 && targetIndex < ViewModel.TabOrderItems.Count)
         {
-            ViewModel.TabOrderItems.Move(oldIndex, targetIndex);
+            int currentIndex = ViewModel.TabOrderItems.IndexOf(_pointerDraggedItem);
+            if (currentIndex >= 0 && currentIndex != targetIndex)
+            {
+                ViewModel.TabOrderItems.Move(currentIndex, targetIndex);
+
+                for (int i = 0; i < ViewModel.TabOrderItems.Count; i++)
+                {
+                    ViewModel.TabOrderItems[i].DisplayOrder = i + 1;
+                }
+            }
+        }
+
+        e.Handled = true;
+    }
+
+    private void TabRow_PointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        EndPointerDrag(e.Pointer);
+        e.Handled = true;
+    }
+
+    private void TabRow_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
+    {
+        EndPointerDrag(e.Pointer);
+    }
+
+    private void EndPointerDrag(Pointer? ptr = null)
+    {
+        if (_pointerCapturedElement != null)
+        {
+            if (ptr != null)
+            {
+                try { _pointerCapturedElement.ReleasePointerCapture(ptr); } catch { }
+            }
+            else
+            {
+                try { _pointerCapturedElement.ReleasePointerCaptures(); } catch { }
+            }
+        }
+
+        if (_draggedVisualContainer != null)
+        {
+            _draggedVisualContainer.Opacity = 1.0;
+        }
+
+        if (_isPointerDragging && ViewModel != null)
+        {
             ViewModel.SaveAndApplyTabOrder();
             Services.AudioFeedbackService.PlaySuccess();
         }
 
-        _draggedTabItem = null;
+        try { this.ProtectedCursor = null; } catch { }
+
+        _pointerDraggedItem = null;
+        _pointerCapturedElement = null;
+        _draggedVisualContainer = null;
+        _isPointerDragging = false;
     }
 
-    private void TabOrderListView_DragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs args)
+    private static T? FindAscendant<T>(DependencyObject? element) where T : DependencyObject
     {
-        _draggedTabItem = null;
+        while (element != null)
+        {
+            if (element is T match) return match;
+            element = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(element);
+        }
+        return null;
     }
 }

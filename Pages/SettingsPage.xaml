@@ -134,14 +134,10 @@
                     <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="6">
                         <ListView x:Name="TabOrderListView"
                                   ItemsSource="{x:Bind ViewModel.TabOrderItems, Mode=OneWay}"
-                                  CanDragItems="True"
-                                  AllowDrop="True"
+                                  CanDragItems="False"
+                                  AllowDrop="False"
                                   CanReorderItems="False"
-                                  SelectionMode="None"
-                                  DragItemsStarting="TabOrderListView_DragItemsStarting"
-                                  DragOver="TabOrderListView_DragOver"
-                                  Drop="TabOrderListView_Drop"
-                                  DragItemsCompleted="TabOrderListView_DragItemsCompleted">
+                                  SelectionMode="None">
                             <ListView.ItemContainerStyle>
                                 <Style TargetType="ListViewItem">
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -151,9 +147,13 @@
                             </ListView.ItemContainerStyle>
                             <ListView.ItemTemplate>
                                 <DataTemplate x:DataType="models:TabOrderItem">
-                                    <Grid Background="Transparent" Padding="8,6" ColumnSpacing="12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
+                                    <Grid Background="Transparent" Padding="8,6" ColumnSpacing="12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                          PointerPressed="TabRow_PointerPressed"
+                                          PointerMoved="TabRow_PointerMoved"
+                                          PointerReleased="TabRow_PointerReleased"
+                                          PointerCaptureLost="TabRow_PointerCaptureLost">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="28" />
+                                            <ColumnDefinition Width="32" />
                                             <ColumnDefinition Width="40" />
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
@@ -163,8 +163,14 @@
 
                                         <!-- Drag Handle Grip -->
                                         <Border Grid.Column="0" Background="Transparent" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
+                                                PointerEntered="DragGrip_PointerEntered"
+                                                PointerExited="DragGrip_PointerExited"
+                                                PointerPressed="TabRow_PointerPressed"
+                                                PointerMoved="TabRow_PointerMoved"
+                                                PointerReleased="TabRow_PointerReleased"
+                                                PointerCaptureLost="TabRow_PointerCaptureLost"
                                                 ToolTipService.ToolTip="按住此處滑鼠拖曳調整順序 (Drag to reorder)">
-                                            <FontIcon Glyph="&#xE700;" FontSize="13" Opacity="0.65"
+                                            <FontIcon Glyph="&#xE700;" FontSize="13" Opacity="0.75"
                                                       VerticalAlignment="Center" HorizontalAlignment="Center" />
                                         </Border>
 
