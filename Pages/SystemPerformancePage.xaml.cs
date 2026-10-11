@@ -66,10 +66,27 @@ public sealed partial class SystemPerformancePage : Page
     private async void Page_Loaded(object sender, RoutedEventArgs e)
     {
         ApplyLanguage();
+        UpdateOverlayButtonState();
         ViewModel.DiskHistoryUpdated += OnDiskHistoryUpdated;
         ViewModel.StartAutoRefresh();
         await ViewModel.InitializeAsync();
         RedrawDiskChart();
+    }
+
+    private void TogglePerformanceOverlay_Click(object sender, RoutedEventArgs e)
+    {
+        DiskMasterWinUI.Controls.PerformanceOverlayWindow.Toggle();
+        UpdateOverlayButtonState();
+    }
+
+    private void UpdateOverlayButtonState()
+    {
+        if (OverlayToggleBtnText != null)
+        {
+            OverlayToggleBtnText.Text = DiskMasterWinUI.Controls.PerformanceOverlayWindow.CurrentInstance != null
+                ? "🪟 關閉效能懸浮窗 (HUD 開啟中)"
+                : "🪟 置頂效能懸浮窗 (FPS HUD)";
+        }
     }
 
     private void Page_Unloaded(object sender, RoutedEventArgs e)

@@ -38,6 +38,12 @@
                         <TextBlock Text="一鍵終結所有無響應程式" />
                     </StackPanel>
                 </Button>
+                <Button Click="TogglePerformanceOverlay_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE737;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                        <TextBlock x:Name="OverlayToggleBtnText" Text="🪟 置頂效能懸浮窗 (FPS HUD)" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
 
             <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
@@ -56,7 +62,7 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
                         <StackPanel Spacing="16" Margin="0,0,16,20">
 
-                            <!-- Live Resource Cards (CPU, RAM, Disk Active & Throughput, Disk Response Latency) -->
+                            <!-- Live Resource Cards (CPU, RAM, GPU, LAN, Disk Active & Throughput, Disk Response Latency) -->
                             <!-- 1. CPU & RAM Resource Cards -->
                             <Grid ColumnSpacing="16">
                                 <Grid.ColumnDefinitions>
@@ -108,7 +114,79 @@
                                 </Border>
                             </Grid>
 
-                            <!-- 2. Physical Disk Auto-Detection & Task Manager Selector -->
+                            <!-- 2. GPU & LAN Card Row -->
+                            <Grid ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- 3. GPU Card -->
+                                <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                        CornerRadius="8" Padding="16">
+                                    <StackPanel Spacing="12">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Spacing="2">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <FontIcon Glyph="&#xE790;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                    <TextBlock Text="圖形處理器 (GPU 3D Engine)" FontWeight="SemiBold" FontSize="14" />
+                                                </StackPanel>
+                                                <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.GpuModelName, Mode=OneWay}"
+                                                           FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.DisplayGpuMemory, Mode=OneWay}"
+                                                           FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.CurrentMetrics.DisplayGpuPercent, Mode=OneWay}"
+                                                       FontSize="24" FontWeight="Bold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                        </Grid>
+                                        <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.GpuUsagePercent, Mode=OneWay}" Maximum="100" Height="8" />
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- 4. LAN / Network Card -->
+                                <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                        CornerRadius="8" Padding="16">
+                                    <StackPanel Spacing="12">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Spacing="2">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <FontIcon Glyph="&#xE968;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                    <TextBlock Text="網路卡傳輸速率 (LAN / Wi-Fi)" FontWeight="SemiBold" FontSize="14" />
+                                                </StackPanel>
+                                                <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.NetAdapterName, Mode=OneWay}"
+                                                           FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.NetAdapterSpeedDisplay, Mode=OneWay}"
+                                                           FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <TextBlock Text="⬇️" FontSize="11" />
+                                                    <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.NetDownloadRateDisplay, Mode=OneWay}"
+                                                               FontSize="13" FontWeight="Bold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <TextBlock Text="⬆️" FontSize="11" />
+                                                    <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.NetUploadRateDisplay, Mode=OneWay}"
+                                                               FontSize="13" FontWeight="Bold" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Grid>
+                                        <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.NetDownloadSpeedBps, Mode=OneWay}" Maximum="125000000" Height="8" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <!-- 3. Physical Disk Auto-Detection & Task Manager Selector -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                                     CornerRadius="8" Padding="14">

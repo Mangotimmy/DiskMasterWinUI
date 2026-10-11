@@ -91,20 +91,23 @@ public partial class SystemPerformanceService
             catch { }
         }
 
-        // 2. Query Physical Disk hardware metadata (cached)
+        // 2. Query Physical Disk & GPU hardware metadata (cached)
         await EnsurePhysicalDiskCacheAsync();
+        await EnsureGpuHardwareCacheAsync();
+        snap.GpuModelName = _cachedGpuModelName;
+        snap.GpuMemoryTotalMb = _cachedGpuTotalVramMb;
 
-        // 3. CPU & Real-Time PhysicalDisk Metrics via typeperf sample (Auto-Detect All Disks)
+        // 3. CPU, Disk, and GPU Metrics via typeperf sample
         try
         {
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
-            const string typeperfCounters = @"""\Processor(_Total)\% Processor Time"" ""\PhysicalDisk(*)\% Disk Time"" ""\PhysicalDisk(*)\Avg. Disk sec/Read"" ""\PhysicalDisk(*)\Avg. Disk sec/Write"" ""\PhysicalDisk(*)\Disk Read Bytes/sec"" ""\PhysicalDisk(*)\Disk Write Bytes/sec"" -sc 1";
+            const string typeperfCounters = @"""\Processor(_Total)\% Processor Time"" ""\PhysicalDisk(*)\% Disk Time"" ""\PhysicalDisk(*)\Avg. Disk sec/Read"" ""\PhysicalDisk(*)\Avg. Disk sec/Write"" ""\PhysicalDisk(*)\Disk Read Bytes/sec"" ""\PhysicalDisk(*)\Disk Write Bytes/sec"" ""\GPU Engine(*engtype_3D)\Utilization Percentage"" ""\GPU Adapter Memory(*)\Dedicated Usage"" -sc 1";
             var (outStr, _, code) = await ProcessHelper.RunProcessAsync("typeperf.exe", typeperfCounters, cancellationToken: timeoutCts.Token);
             if (code == 0 && !string.IsNullOrWhiteSpace(outStr))
             {
                 var lines = outStr.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-                var headerLine = lines.FirstOrDefault(l => l.Contains("PhysicalDisk"));
+                var headerLine = lines.FirstOrDefault(l => l.Contains("PhysicalDisk") || l.Contains("Processor"));
                 var dataLine = lines.LastOrDefault(l => l.Contains(','));
 
                 if (headerLine != null && dataLine != null)
@@ -114,6 +117,8 @@ public partial class SystemPerformanceService
 
                     int count = Math.Min(headers.Length, values.Length);
                     var diskData = new Dictionary<string, Dictionary<string, double>>(StringComparer.OrdinalIgnoreCase);
+                    double gpuUsageSum = 0;
+                    double gpuMemBytesSum = 0;
 
                     for (int i = 0; i < count; i++)
                     {
@@ -131,6 +136,18 @@ public partial class SystemPerformanceService
                             continue;
                         }
 
+                        if (header.Contains("GPU Engine", StringComparison.OrdinalIgnoreCase) && header.Contains("Utilization Percentage", StringComparison.OrdinalIgnoreCase))
+                        {
+                            gpuUsageSum += val;
+                            continue;
+                        }
+
+                        if (header.Contains("GPU Adapter Memory", StringComparison.OrdinalIgnoreCase) && header.Contains("Dedicated Usage", StringComparison.OrdinalIgnoreCase))
+                        {
+                            gpuMemBytesSum += val;
+                            continue;
+                        }
+
                         var match = Regex.Match(header, @"PhysicalDisk\((?<inst>[^)]+)\)\\(?<counter>[^""]+)", RegexOptions.IgnoreCase);
                         if (match.Success)
                         {
@@ -144,6 +161,12 @@ public partial class SystemPerformanceService
                             }
                             counters[counter] = val;
                         }
+                    }
+
+                    snap.GpuUsagePercent = Math.Clamp(Math.Round(gpuUsageSum, 1), 0.0, 100.0);
+                    if (gpuMemBytesSum > 0)
+                    {
+                        snap.GpuMemoryUsedMb = (long)(gpuMemBytesSum / (1024 * 1024));
                     }
 
                     // Process each disk instance
@@ -232,6 +255,9 @@ public partial class SystemPerformanceService
         }
         catch { }
 
+        // 4. Sample Real-Time Network / LAN Adapter metrics (0ms latency, native Win32/C#)
+        SampleNetworkMetrics(snap);
+
         return snap;
     }
 
@@ -275,6 +301,121 @@ public partial class SystemPerformanceService
             }
             catch { }
         });
+    }
+
+    private string _cachedGpuModelName = "GPU";
+    private long _cachedGpuTotalVramMb = 0;
+    private DateTime _lastGpuCacheTime = DateTime.MinValue;
+
+    private async Task EnsureGpuHardwareCacheAsync()
+    {
+        if (DateTime.Now - _lastGpuCacheTime < TimeSpan.FromMinutes(5) && _cachedGpuTotalVramMb > 0) return;
+
+        await Task.Run(() =>
+        {
+            try
+            {
+                using var searcher = new System.Management.ManagementObjectSearcher("SELECT Name, AdapterRAM FROM Win32_VideoController");
+                foreach (var obj in searcher.Get())
+                {
+                    var name = obj["Name"]?.ToString()?.Trim() ?? "";
+                    if (!string.IsNullOrEmpty(name))
+                    {
+                        _cachedGpuModelName = name;
+                        if (obj["AdapterRAM"] != null && ulong.TryParse(obj["AdapterRAM"]?.ToString(), out ulong ramBytes) && ramBytes > 0)
+                        {
+                            _cachedGpuTotalVramMb = (long)(ramBytes / (1024 * 1024));
+                        }
+                        break;
+                    }
+                }
+                _lastGpuCacheTime = DateTime.Now;
+            }
+            catch { }
+        });
+    }
+
+    private DateTime _lastNetSampleTime = DateTime.MinValue;
+    private long _lastBytesReceived = 0;
+    private long _lastBytesSent = 0;
+
+    private void SampleNetworkMetrics(SystemMetricsSnapshot snap)
+    {
+        try
+        {
+            var now = DateTime.UtcNow;
+            long currentBytesRecv = 0;
+            long currentBytesSent = 0;
+            string bestAdapterName = "乙太網路 / Wi-Fi";
+            string bestAdapterSpeed = "連線中";
+            long maxSpeed = 0;
+
+            var interfaces = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces();
+            foreach (var ni in interfaces)
+            {
+                if (ni.OperationalStatus != System.Net.NetworkInformation.OperationalStatus.Up ||
+                    ni.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Loopback ||
+                    ni.Description.Contains("Tunnel", StringComparison.OrdinalIgnoreCase) ||
+                    ni.Description.Contains("Virtual", StringComparison.OrdinalIgnoreCase) ||
+                    ni.Description.Contains("Pseudo", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var stats = ni.GetIPStatistics();
+                    currentBytesRecv += stats.BytesReceived;
+                    currentBytesSent += stats.BytesSent;
+
+                    if (ni.Speed > maxSpeed)
+                    {
+                        maxSpeed = ni.Speed;
+                        bestAdapterName = string.IsNullOrWhiteSpace(ni.Description) ? ni.Name : ni.Description;
+                        bestAdapterSpeed = ni.Speed switch
+                        {
+                            >= 10_000_000_000 => "10 Gbps",
+                            >= 2_500_000_000 => "2.5 Gbps",
+                            >= 1_000_000_000 => "1.0 Gbps",
+                            >= 100_000_000 => "100 Mbps",
+                            > 0 => $"{ni.Speed / 1_000_000} Mbps",
+                            _ => "連線中"
+                        };
+                    }
+                }
+                catch { }
+            }
+
+            snap.NetAdapterName = bestAdapterName;
+            snap.NetAdapterSpeedDisplay = bestAdapterSpeed;
+
+            if (_lastNetSampleTime != DateTime.MinValue && now > _lastNetSampleTime)
+            {
+                var elapsedSec = (now - _lastNetSampleTime).TotalSeconds;
+                if (elapsedSec > 0.1)
+                {
+                    var deltaRecv = Math.Max(0, currentBytesRecv - _lastBytesReceived);
+                    var deltaSent = Math.Max(0, currentBytesSent - _lastBytesSent);
+
+                    snap.NetDownloadSpeedBps = deltaRecv / elapsedSec;
+                    snap.NetUploadSpeedBps = deltaSent / elapsedSec;
+                    snap.NetDownloadRateDisplay = FormatBytesPerSec(snap.NetDownloadSpeedBps);
+                    snap.NetUploadRateDisplay = FormatBytesPerSec(snap.NetUploadSpeedBps);
+                    snap.NetThroughputDisplay = $"⬇️ {snap.NetDownloadRateDisplay}  ⬆️ {snap.NetUploadRateDisplay}";
+                }
+            }
+            else
+            {
+                snap.NetDownloadRateDisplay = "0 KB/s";
+                snap.NetUploadRateDisplay = "0 KB/s";
+                snap.NetThroughputDisplay = "0 KB/s";
+            }
+
+            _lastNetSampleTime = now;
+            _lastBytesReceived = currentBytesRecv;
+            _lastBytesSent = currentBytesSent;
+        }
+        catch { }
     }
 
     private static string[] ParseCsvLine(string line)

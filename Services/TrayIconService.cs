@@ -240,6 +240,7 @@ public class TrayIconService : IDisposable
             AppendMenu(hMenu, MF_STRING, (UIntPtr)105, "💾 磁碟工具與救援 (Disk Tools)");
             AppendMenu(hMenu, MF_STRING, (UIntPtr)106, "🛠️ 系統修復 DISM/SFC (Health)");
             AppendMenu(hMenu, MF_STRING, (UIntPtr)107, "🧹 一鍵清理快取 (Clean Cache)");
+            AppendMenu(hMenu, MF_STRING, (UIntPtr)110, "🪟 切換效能懸浮窗 (FPS HUD)");
             AppendMenu(hMenu, MF_STRING, (UIntPtr)108, "⚙️ 偏好設定 (Settings)");
             AppendMenu(hMenu, MF_SEPARATOR, UIntPtr.Zero, string.Empty);
             AppendMenu(hMenu, MF_STRING, (UIntPtr)109, "❌ 結束程式 (Exit)");
@@ -278,6 +279,9 @@ public class TrayIconService : IDisposable
                     break;
                 case 107:
                     QuickActionRequested?.Invoke("CleanCache");
+                    break;
+                case 110:
+                    QuickActionRequested?.Invoke("ToggleOverlay");
                     break;
                 case 108:
                     RestoreFromTray();

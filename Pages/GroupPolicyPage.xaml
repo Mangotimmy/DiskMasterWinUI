@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="DiskMasterWinUI.Pages.GroupPolicyPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:DiskMasterWinUI.ViewModels"
+    mc:Ignorable="d">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="16" Margin="16,16,24,24">
+
+            <!-- Hero Status & Home Edition Enabler Card -->
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="16">
+                <StackPanel Spacing="14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Spacing="4">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE713;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                <TextBlock Text="Windows 本機群組原則編輯器 (Group Policy - gpedit.msc)" FontWeight="Bold" FontSize="16" />
+                            </StackPanel>
+                            <TextBlock Text="{x:Bind ViewModel.EditionName, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='目前系統版本: {0}'}"
+                                       Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Text="{x:Bind ViewModel.GpeditStatusText, Mode=OneWay}"
+                                       FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                        </StackPanel>
+
+                        <Button Grid.Column="1" Command="{x:Bind ViewModel.RunGpupdateCommand}" Margin="0,0,8,0" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE72C;" FontSize="13" />
+                                <TextBlock Text="🔄 強制更新 (gpupdate /force)" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Column="2" Command="{x:Bind ViewModel.OpenGpeditCommand}" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE8A7;" FontSize="13" />
+                                <TextBlock Text="📂 開啟群組原則 (gpedit.msc)" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+
+                    <!-- Windows Home Edition 1-Click Unlocker Banner -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12"
+                            Visibility="{x:Bind ViewModel.IsGpeditAvailable, Mode=OneWay, Converter={StaticResource InvertBoolToVisibilityConverter}}">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock Text="⚡ Windows 家用版原生未預裝 gpedit.msc 編輯器" FontWeight="Bold" FontSize="13" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
+                                <TextBlock Text="點擊右側按鈕，DiskMaster 將自動自微軟 servicing 封裝庫為本機安裝 ClientExtensions 與 ClientTools 套件，免重裝系統即可使用完整群組原則功能！"
+                                           FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                <TextBlock Text="{x:Bind ViewModel.InstallProgressMessage, Mode=OneWay}"
+                                           FontSize="11" Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                           Visibility="{x:Bind ViewModel.InstallProgressMessage, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Command="{x:Bind ViewModel.InstallGpeditCommand}" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center" Padding="14,8">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <ProgressRing IsActive="{x:Bind ViewModel.IsInstallingGpedit, Mode=OneWay}" Width="16" Height="16" />
+                                    <TextBlock Text="🚀 一鍵安裝群組原則 (Home Unlock)" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <!-- 8 Essential Visual Group Policies Grid -->
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="16">
+                <StackPanel Spacing="14">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE73E;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                        <TextBlock Text="⚙️ 常用關鍵群組原則視覺化管理 (Visual Policy Controls)" FontWeight="Bold" FontSize="14" />
+                    </StackPanel>
+                    <TextBlock Text="直接由系統登錄原則檔 (Policies) 管控，免去繁瑣的樹狀目錄搜尋，一鍵切換最常設定之高階原則："
+                               Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                    <Grid ColumnSpacing="12" RowSpacing="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Policy 1: Windows Update No Auto Reboot -->
+                        <Border Grid.Row="0" Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="🛑 徹底禁止 Windows Update 強制自動重新開機" FontWeight="SemiBold" FontSize="12" />
+                                    <TextBlock Text="防止更新完成後無預警重啟中斷遊戲與工作 (NoAutoRebootWithLoggedOnUsers)" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsDisableAutoReboot, Mode=OneWay}"
+                                              Toggled="DisableAutoReboot_Toggled" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Policy 2: Disable Telemetry -->
+                        <Border Grid.Row="0" Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="🛑 停用 Windows 遙測與診斷資料回傳" FontWeight="SemiBold" FontSize="12" />
+                                    <TextBlock Text="將 AllowTelemetry 政策鎖定為最低層級，停止背景自動上傳活動紀錄" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsDisableTelemetry, Mode=OneWay}"
+                                              Toggled="DisableTelemetry_Toggled" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Policy 3: Disable SearchBox Suggestions -->
+                        <Border Grid.Row="1" Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="🛑 關閉開始功能表 Bing 搜尋建議與 Web 搜尋" FontWeight="SemiBold" FontSize="12" />
+                                    <TextBlock Text="搜尋時僅檢視本機應用程式與檔案，避免輸入延遲 (DisableSearchBoxSuggestions)" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsDisableSearchBoxSuggestions, Mode=OneWay}"
+                                              Toggled="DisableSearchBox_Toggled" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Policy 4: Disable Consumer Features -->
+                        <Border Grid.Row="1" Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="🛑 停用微軟消費者體驗 (廣告與推薦安裝)" FontWeight="SemiBold" FontSize="12" />
+                                    <TextBlock Text="禁止 Windows 自動下載促銷應用與開始功能表推播 (DisableWindowsConsumerFeatures)" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsDisableConsumerFeatures, Mode=OneWay}"
+                                              Toggled="DisableConsumerFeatures_Toggled" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Policy 5: Disable Delivery Optimization -->
+                        <Border Grid.Row="2" Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="🛑 停用傳遞最佳化 P2P 背景頻寬上傳" FontWeight="SemiBold" FontSize="12" />
+                                    <TextBlock Text="將 DODownloadMode 設為 0，防止 Windows 擅自使用本機上傳頻寬協助他人更新" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsDisableDeliveryOptimization, Mode=OneWay}"
+                                              Toggled="DisableDeliveryOptimization_Toggled" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Policy 6: Disable UAC Secure Desktop -->
+                        <Border Grid.Row="2" Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="⚡ 關閉 UAC 暗屏桌面彈窗 (維持視窗提示)" FontWeight="SemiBold" FontSize="12" />
+                                    <TextBlock Text="提昇 UAC 彈出時的反應速度，不再短暫黑屏凍結 (PromptOnSecureDesktop = 0)" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsDisableUacSecureDesktop, Mode=OneWay}"
+                                              Toggled="DisableUacSecureDesktop_Toggled" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Policy 7: Disable Defender Sample Submission -->
+                        <Border Grid.Row="3" Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="🛡️ 停用 Defender 雲端自動上傳樣本" FontWeight="SemiBold" FontSize="12" />
+                                    <TextBlock Text="防止未知的敏感檔案或私人程式自動上傳至微軟伺服器 (SubmitSamplesConsent = 2)" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsDisableDefenderSampleSubmission, Mode=OneWay}"
+                                              Toggled="DisableDefenderSample_Toggled" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Policy 8: Force HAGS GPU Scheduling -->
+                        <Border Grid.Row="3" Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="🎮 強制開啟硬體加速 GPU 排程 (HAGS)" FontWeight="SemiBold" FontSize="12" />
+                                    <TextBlock Text="釋放顯卡調度延遲，支援 DLSS 3 影格生成技術 (HwSchMode = 2，需重新開機)" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsForceHags, Mode=OneWay}"
+                                              Toggled="ForceHags_Toggled" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Console Log -->
+            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="14">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="📜 原則套用紀錄與執行狀態" FontWeight="Bold" FontSize="13" />
+                    <TextBox Text="{x:Bind ViewModel.ConsoleLog, Mode=OneWay}"
+                             Height="110" AcceptsReturn="True" IsReadOnly="True"
+                             FontFamily="Consolas" FontSize="11"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

@@ -389,34 +389,43 @@
 
                 <!-- ════ Tab 4: Windows Hosts 檔案視覺化編輯器 ════ -->
                 <TabViewItem x:Name="TabHosts" Header="📝 Hosts 檔案編輯器" IsClosable="False">
-                    <Grid RowSpacing="12" Margin="0,10,0,10">
+                    <Grid RowSpacing="10" Margin="0,10,0,10">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <!-- Control Card -->
+                        <!-- Row 0: Top Action Card -->
                         <Border Grid.Row="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                                CornerRadius="8" Padding="16">
-                            <StackPanel Spacing="12">
-                                <Grid ColumnSpacing="12">
+                                CornerRadius="8" Padding="14">
+                            <StackPanel Spacing="10">
+                                <Grid ColumnSpacing="8">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="Windows 本機網域名稱解析 (C:\Windows\System32\drivers\etc\hosts)" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <FontIcon Glyph="&#xE70F;" FontSize="15" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        <TextBlock Text="Windows 本機網域名稱解析 (C:\Windows\System32\drivers\etc\hosts)" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    </StackPanel>
                                     <Button Grid.Column="1" Content="🔄 重新整理" Command="{x:Bind ViewModel.RefreshHostsCommand}" />
-                                    <Button Grid.Column="2" Content="🛡️ 還原官方預設" Command="{x:Bind ViewModel.RestoreDefaultHostsCommand}" />
-                                    <Button Grid.Column="3" Content="💾 儲存 Hosts" Command="{x:Bind ViewModel.SaveRawHostsCommand}" Style="{StaticResource AccentButtonStyle}" />
+                                    <Button Grid.Column="2" Content="🧠 智慧體檢" Command="{x:Bind ViewModel.RunHostsCheckCommand}" />
+                                    <Button Grid.Column="3" Content="📦 歷史備份" Command="{x:Bind ViewModel.ToggleBackupDrawerCommand}" />
+                                    <Button Grid.Column="4" Content="🛡️ 還原預設" Command="{x:Bind ViewModel.RestoreDefaultHostsCommand}" />
+                                    <Button Grid.Column="5" Content="💾 儲存 Hosts" Command="{x:Bind ViewModel.SaveRawHostsCommand}" Style="{StaticResource AccentButtonStyle}" />
                                 </Grid>
 
                                 <!-- Quick Add Form -->
                                 <Grid ColumnSpacing="8">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="160" />
+                                        <ColumnDefinition Width="150" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
@@ -429,18 +438,212 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Raw Editor Box with Always-Visible Vertical ScrollBar and Flexible Height -->
-                        <Border Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        <!-- Row 1: Expandable Panels (Smart Audit & Backups) -->
+                        <StackPanel Grid.Row="1" Spacing="8">
+                            <!-- Smart Audit Panel -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="8" Padding="12"
+                                    Visibility="{x:Bind ViewModel.ShowSmartAuditPanel, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <StackPanel Spacing="8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <TextBlock Text="🧠 Hosts 智慧診斷體檢報告：" FontWeight="Bold" FontSize="13" />
+                                            <TextBlock Text="{x:Bind ViewModel.HostsAnalysis.HealthBadge, Mode=OneWay}" FontWeight="SemiBold" FontSize="12" />
+                                            <TextBlock Text="{x:Bind ViewModel.HostsAnalysis.SummaryText, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="🧹 一鍵清除重複項目" Command="{x:Bind ViewModel.DeduplicateHostsCommand}" Margin="0,0,6,0" Padding="8,3" FontSize="11" />
+                                        <Button Grid.Column="2" Content="✕ 關閉" Command="{x:Bind ViewModel.RunHostsCheckCommand}" Padding="8,3" FontSize="11" />
+                                    </Grid>
+                                    <!-- Issue details if any -->
+                                    <StackPanel Spacing="4" Visibility="{x:Bind ViewModel.HostsAnalysis.HasIssues, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <TextBlock Text="⚠️ 檢測到的異常問題項目：" FontWeight="SemiBold" FontSize="11" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
+                                        <ListView ItemsSource="{x:Bind ViewModel.HostsAnalysis.DuplicateDomains, Mode=OneWay}" MaxHeight="80" SelectionMode="None">
+                                            <ListView.ItemTemplate>
+                                                <DataTemplate x:DataType="x:String">
+                                                    <TextBlock Text="{x:Bind Converter={StaticResource StringFormatConverter}, ConverterParameter='• 重複網域名稱: {0}'}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontFamily="Consolas" />
+                                                </DataTemplate>
+                                            </ListView.ItemTemplate>
+                                        </ListView>
+                                        <ListView ItemsSource="{x:Bind ViewModel.HostsAnalysis.ConflictingEntries, Mode=OneWay}" MaxHeight="80" SelectionMode="None">
+                                            <ListView.ItemTemplate>
+                                                <DataTemplate x:DataType="x:String">
+                                                    <TextBlock Text="{x:Bind Converter={StaticResource StringFormatConverter}, ConverterParameter='• 衝突對應: {0}'}" FontSize="11" Foreground="{ThemeResource SystemFillColorCautionBrush}" FontFamily="Consolas" />
+                                                </DataTemplate>
+                                            </ListView.ItemTemplate>
+                                        </ListView>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Backup Drawer Panel -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="8" Padding="12"
+                                    Visibility="{x:Bind ViewModel.ShowBackupDrawer, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <StackPanel Spacing="10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="📦 Hosts 多版本歷史快照與還原管理" FontWeight="Bold" FontSize="13" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Content="📂 開啟備份目錄" Click="OpenBackupsFolder_Click" Margin="0,0,6,0" Padding="8,3" FontSize="11" />
+                                        <Button Grid.Column="2" Content="✕ 關閉" Command="{x:Bind ViewModel.ToggleBackupDrawerCommand}" Padding="8,3" FontSize="11" />
+                                    </Grid>
+
+                                    <!-- Create manual backup row -->
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0" PlaceholderText="備份備註 (例如：更新遊戲加速前備份)" Text="{x:Bind ViewModel.NewBackupNote, Mode=TwoWay}" />
+                                        <Button Grid.Column="1" Content="📦 立即手動備份目前 Hosts" Command="{x:Bind ViewModel.CreateHostsBackupCommand}" />
+                                    </Grid>
+
+                                    <!-- Backups list -->
+                                    <ListView ItemsSource="{x:Bind ViewModel.HostsBackups, Mode=OneWay}" MaxHeight="140" SelectionMode="None">
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="models:HostsBackupItem">
+                                                <Grid Padding="4,4" ColumnSpacing="10" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="150" />
+                                                        <ColumnDefinition Width="100" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{x:Bind DisplayTime}" FontSize="11" FontFamily="Consolas" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="1" Text="{x:Bind DisplaySize}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="2" Text="{x:Bind Note}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6">
+                                                        <Button Content="⏪ 還原" Click="RestoreBackup_Click" Padding="6,2" FontSize="10" />
+                                                        <Button Content="🗑️ 刪除" Click="DeleteBackup_Click" Padding="6,2" FontSize="10" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- Row 2: Notepad Editor with ToolBar and Fast Inertia Scroll -->
+                        <Border Grid.Row="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                                CornerRadius="8" Padding="12">
-                            <TextBox Text="{x:Bind ViewModel.RawHostsText, Mode=TwoWay}"
-                                     AcceptsReturn="True" TextWrapping="NoWrap"
-                                     ScrollViewer.VerticalScrollBarVisibility="Visible"
-                                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                                     ScrollViewer.VerticalScrollMode="Enabled"
-                                     ScrollViewer.HorizontalScrollMode="Enabled"
-                                     FontFamily="Consolas" FontSize="13"
-                                     VerticalAlignment="Stretch" HorizontalAlignment="Stretch" MinHeight="320" />
+                                CornerRadius="8" Padding="0">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <!-- Notepad Toolbar -->
+                                <Border Grid.Row="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1"
+                                        Padding="8,6">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                            <Button Click="CopyAllHosts_Click" ToolTipService.ToolTip="複製全部內容" Padding="7,4">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <FontIcon Glyph="&#xE8C8;" FontSize="11" />
+                                                    <TextBlock Text="📋 複製全部" FontSize="11" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Command="{x:Bind ViewModel.FormatHostsCommand}" ToolTipService.ToolTip="自動排版與對齊欄位" Padding="7,4">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <FontIcon Glyph="&#xE8D2;" FontSize="11" />
+                                                    <TextBlock Text="📐 對齊格式化" FontSize="11" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Command="{x:Bind ViewModel.DeduplicateHostsCommand}" ToolTipService.ToolTip="去除重複的網域名稱" Padding="7,4">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <FontIcon Glyph="&#xE72B;" FontSize="11" />
+                                                    <TextBlock Text="🧹 清除重複" FontSize="11" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Click="ToggleWordWrap_Click" ToolTipService.ToolTip="切換自動換行" Padding="7,4">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <FontIcon Glyph="&#xE8BD;" FontSize="11" />
+                                                    <TextBlock Text="🔤 自動換行" FontSize="11" />
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                            <Button Command="{x:Bind ViewModel.ZoomOutCommand}" ToolTipService.ToolTip="縮小字型" Padding="6,3" Content="➖" FontSize="10" />
+                                            <Button Command="{x:Bind ViewModel.ResetZoomCommand}" ToolTipService.ToolTip="重設 100%" Padding="6,3" Content="100%" FontSize="10" />
+                                            <Button Command="{x:Bind ViewModel.ZoomInCommand}" ToolTipService.ToolTip="放大字型" Padding="6,3" Content="➕" FontSize="10" />
+                                            <Button Command="{x:Bind ViewModel.OpenInSystemNotepadCommand}" ToolTipService.ToolTip="在微軟記事本程式中開啟" Padding="8,4" Style="{StaticResource AccentButtonStyle}">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <FontIcon Glyph="&#xE70F;" FontSize="11" />
+                                                    <TextBlock Text="📝 在記事本開啟" FontSize="11" />
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Raw Editor Box with DirectManipulation Inertia and Ln/Col tracking -->
+                                <TextBox x:Name="HostsEditorTextBox" Grid.Row="1"
+                                         Text="{x:Bind ViewModel.RawHostsText, Mode=TwoWay}"
+                                         FontSize="{x:Bind ViewModel.EditorFontSize, Mode=OneWay}"
+                                         AcceptsReturn="True" TextWrapping="NoWrap"
+                                         ScrollViewer.VerticalScrollBarVisibility="Visible"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                         ScrollViewer.VerticalScrollMode="Enabled"
+                                         ScrollViewer.HorizontalScrollMode="Enabled"
+                                         ScrollViewer.IsScrollInertiaEnabled="True"
+                                         SelectionChanged="HostsTextBox_SelectionChanged"
+                                         TextChanged="HostsTextBox_TextChanged"
+                                         FontFamily="Consolas"
+                                         BorderThickness="0" Background="Transparent"
+                                         VerticalAlignment="Stretch" HorizontalAlignment="Stretch" MinHeight="300" Padding="12" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Row 3: Windows 11 Notepad Status Bar -->
+                        <Border Grid.Row="3" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="6" Padding="12,5">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                    <TextBlock Text="{x:Bind ViewModel.SaveStatusDisplay, Mode=OneWay}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <TextBlock Text="•" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Text="{x:Bind ViewModel.HostsAnalysis.HealthBadge, Mode=OneWay}" FontSize="11" VerticalAlignment="Center" />
+                                </StackPanel>
+
+                                <TextBlock Grid.Column="1" Margin="12,0" VerticalAlignment="Center" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                    <Run Text="第 " /><Run Text="{x:Bind ViewModel.CursorLine, Mode=OneWay}" /><Run Text=" 行，第 " /><Run Text="{x:Bind ViewModel.CursorColumn, Mode=OneWay}" /><Run Text=" 欄" />
+                                </TextBlock>
+
+                                <TextBlock Grid.Column="2" Margin="12,0" VerticalAlignment="Center" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                    <Run Text="{x:Bind ViewModel.TotalCharacters, Mode=OneWay}" /><Run Text=" 個字元，" /><Run Text="{x:Bind ViewModel.LineCount, Mode=OneWay}" /><Run Text=" 行" />
+                                </TextBlock>
+
+                                <TextBlock Grid.Column="3" Margin="12,0" VerticalAlignment="Center" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                    <Run Text="{x:Bind ViewModel.EditorZoomPercent, Mode=OneWay}" /><Run Text="%" />
+                                </TextBlock>
+
+                                <TextBlock Grid.Column="4" Text="Windows (CRLF)" Margin="12,0" VerticalAlignment="Center" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Grid.Column="5" Text="UTF-8" Margin="12,0" VerticalAlignment="Center" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </Grid>
                         </Border>
                     </Grid>
                 </TabViewItem>

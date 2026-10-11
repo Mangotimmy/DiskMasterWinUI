@@ -203,6 +203,21 @@ public sealed partial class SystemOptimizerPage : Page
             ViewModel.ToggleSystemResponsivenessCommand.Execute(null);
     }
 
+    private async void SetResponsiveness20_Click(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.SetSystemResponsivenessValueCommand.ExecuteAsync(20);
+    }
+
+    private async void SetResponsiveness10_Click(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.SetSystemResponsivenessValueCommand.ExecuteAsync(10);
+    }
+
+    private async void SetResponsiveness0_Click(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.SetSystemResponsivenessValueCommand.ExecuteAsync(0);
+    }
+
     private void NetworkThrottling_Toggled(object sender, RoutedEventArgs e)
     {
         if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically && ViewModel.ToggleNetworkThrottlingCommand.CanExecute(null))

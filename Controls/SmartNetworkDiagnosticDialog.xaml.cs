@@ -119,27 +119,59 @@ public sealed partial class SmartNetworkDiagnosticDialog : ContentDialog
         }
         AddStepToUi(s4);
 
-        // Step 5: Web HTTP/TLS
+        // Step 5: Web HTTP/TLS (Multi-endpoint fallback with SocketsHttpHandler)
         var s5 = new DiagStep { Title = "5. 網際網路 Web / TLS 握手" };
+        bool webOk = false;
+        string webDetail = "";
+        long webLatency = -1;
+
+        var testEndpoints = new[]
+        {
+            "https://1.1.1.1/cdn-cgi/trace",
+            "https://www.msftconnecttest.com/connecttest.txt",
+            "https://www.bing.com"
+        };
+
         try
         {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
-            var resp = await http.GetAsync("https://www.msftconnecttest.com/connecttest.txt");
-            if (resp.IsSuccessStatusCode)
+            using var handler = new SocketsHttpHandler
             {
-                s5.IsPass = true;
-                s5.Status = "🟢 Web 與 TLS 連線暢通";
-            }
-            else
+                UseProxy = true,
+                PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+                ConnectTimeout = TimeSpan.FromSeconds(5)
+            };
+            using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(6) };
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            foreach (var url in testEndpoints)
             {
-                s5.IsPass = false;
-                s5.Status = $"🔴 HTTP 錯誤碼: {(int)resp.StatusCode}";
+                try
+                {
+                    var resp = await http.GetAsync(url);
+                    if (resp.IsSuccessStatusCode)
+                    {
+                        sw.Stop();
+                        webLatency = sw.ElapsedMilliseconds;
+                        webOk = true;
+                        string host = new Uri(url).Host;
+                        webDetail = $"🟢 Web 與 TLS 握手暢通 ({host}, 延遲 {webLatency} ms)";
+                        break;
+                    }
+                }
+                catch { }
             }
         }
-        catch
+        catch { }
+
+        if (webOk)
+        {
+            s5.IsPass = true;
+            s5.Status = webDetail;
+        }
+        else
         {
             s5.IsPass = false;
-            s5.Status = "🔴 Web 連線失敗 (可能遭遇 Proxy 或網路中斷)";
+            s5.Status = "🔴 Web 連線失敗 (可能遭遇防火牆封鎖、Proxy 異常或線路中斷)";
         }
         AddStepToUi(s5);
 
@@ -249,7 +281,23 @@ public sealed partial class SmartNetworkDiagnosticDialog : ContentDialog
             await ProcessHelper.RunProcessAsync("netsh.exe", "int ip reset");
             await ProcessHelper.RunProcessAsync("netsh.exe", "winhttp reset proxy");
             await ProcessHelper.RunProcessAsync("ipconfig.exe", "/renew");
-            SummaryText.Text = "✅ 修復指令執行完成！正在重新驗證連線...";
+
+            SummaryText.Text = "⏳ 正在等待網卡重新建立 DHCP 路由連線 (約 3 秒)...";
+            for (int i = 0; i < 6; i++)
+            {
+                await Task.Delay(800);
+                var nic = NetworkDiagnosticService.GetPrimaryPhysicalInternetAdapter();
+                if (nic != null && nic.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up)
+                {
+                    var gw = nic.GetIPProperties().GatewayAddresses.FirstOrDefault();
+                    if (gw != null && !gw.Address.Equals(System.Net.IPAddress.Any) && !gw.Address.Equals(System.Net.IPAddress.None))
+                    {
+                        break;
+                    }
+                }
+            }
+
+            SummaryText.Text = "✅ 網路已就緒！正在重新驗證連線指標...";
             await RunDiagnosticPipelineAsync();
         }
         catch (Exception ex)

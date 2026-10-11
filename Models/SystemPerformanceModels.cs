@@ -35,11 +35,29 @@ public partial class SystemMetricsSnapshot : ObservableObject
     [ObservableProperty] private string _netThroughputDisplay = "0 KB/s";
     [ObservableProperty] private List<DiskPerformanceItem> _disks = new();
 
+    // Real-Time GPU Performance Metrics
+    [ObservableProperty] private double _gpuUsagePercent;
+    [ObservableProperty] private long _gpuMemoryUsedMb;
+    [ObservableProperty] private long _gpuMemoryTotalMb;
+    [ObservableProperty] private string _gpuModelName = "GPU";
+
+    // Real-Time LAN / Network Performance Metrics
+    [ObservableProperty] private double _netDownloadSpeedBps;
+    [ObservableProperty] private double _netUploadSpeedBps;
+    [ObservableProperty] private string _netAdapterName = "乙太網路 / Wi-Fi";
+    [ObservableProperty] private string _netAdapterSpeedDisplay = "連線中";
+    [ObservableProperty] private string _netDownloadRateDisplay = "0 KB/s";
+    [ObservableProperty] private string _netUploadRateDisplay = "0 KB/s";
+
     public string DisplayCpuPercent => $"{CpuUsagePercent:F1}%";
     public string DisplayRamPercent => $"{RamUsagePercent:F1}%";
     public string DisplayDiskUsagePercent => $"{DiskUsagePercent:F1}%";
     public string DisplayDiskReadLatency => DiskReadLatencyMs > 0 ? $"{DiskReadLatencyMs:F2} ms" : "0.00 ms";
     public string DisplayDiskWriteLatency => DiskWriteLatencyMs > 0 ? $"{DiskWriteLatencyMs:F2} ms" : "0.00 ms";
+
+    public string DisplayGpuPercent => $"{GpuUsagePercent:F1}%";
+    public string DisplayGpuMemory => GpuMemoryTotalMb > 0 ? $"已用: {GpuMemoryUsedMb:N0} MB / 總計: {GpuMemoryTotalMb:N0} MB" : "讀取中...";
+    public double GpuMemoryPercent => GpuMemoryTotalMb > 0 ? Math.Clamp((double)GpuMemoryUsedMb * 100.0 / GpuMemoryTotalMb, 0, 100) : 0;
 
     public long UsedRamMb => Math.Max(0, TotalRamMb - AvailableRamMb);
     public string DisplayRamDetail => TotalRamMb > 0 ? $"已用: {UsedRamMb:N0} MB / 總計: {TotalRamMb:N0} MB" : "讀取中...";
@@ -67,6 +85,17 @@ public partial class SystemMetricsSnapshot : ObservableObject
     }
     partial void OnAvailableRamMbChanged(long value) => OnPropertyChanged(nameof(DisplayRamDetail));
     partial void OnTotalRamMbChanged(long value) => OnPropertyChanged(nameof(DisplayRamDetail));
+    partial void OnGpuUsagePercentChanged(double value) => OnPropertyChanged(nameof(DisplayGpuPercent));
+    partial void OnGpuMemoryUsedMbChanged(long value)
+    {
+        OnPropertyChanged(nameof(DisplayGpuMemory));
+        OnPropertyChanged(nameof(GpuMemoryPercent));
+    }
+    partial void OnGpuMemoryTotalMbChanged(long value)
+    {
+        OnPropertyChanged(nameof(DisplayGpuMemory));
+        OnPropertyChanged(nameof(GpuMemoryPercent));
+    }
 }
 
 public partial class DiskPerformanceItem : ObservableObject

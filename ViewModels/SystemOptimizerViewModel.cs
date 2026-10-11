@@ -50,7 +50,12 @@ public partial class SystemOptimizerViewModel : ObservableObject
 
     // ── MMCSS & Network Latency ──
     [ObservableProperty] private bool _isSystemResponsivenessZero;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SystemResponsivenessDisplay))]
+    private int _systemResponsivenessValue = 20;
     [ObservableProperty] private bool _isNetworkThrottlingDisabled;
+
+    public string SystemResponsivenessDisplay => $"{SystemResponsivenessValue} (0x{SystemResponsivenessValue:X2})";
 
     // ── Gaming Tweaks: GameDVR, HAGS, Latency ──
     [ObservableProperty] private bool _isGameDvrDisabled;
@@ -170,7 +175,8 @@ public partial class SystemOptimizerViewModel : ObservableObject
                 _ => 5   // 0x2 or default
             };
             IsPowerThrottlingDisabled = _optimizer.GetPowerThrottlingDisabled();
-            IsSystemResponsivenessZero = _optimizer.GetSystemResponsiveness() == 0;
+            SystemResponsivenessValue = _optimizer.GetSystemResponsiveness();
+            IsSystemResponsivenessZero = SystemResponsivenessValue == 0;
             IsNetworkThrottlingDisabled = _optimizer.GetNetworkThrottlingDisabled();
             IsGameDvrDisabled = _optimizer.GetGameDvrDisabled();
             IsHagsEnabled = _optimizer.GetHagsStatus();
@@ -471,9 +477,24 @@ public partial class SystemOptimizerViewModel : ObservableObject
     public async Task ToggleSystemResponsivenessAsync()
     {
         await _optimizer.CreatePreTweakBackupAsync("Before_SystemResponsiveness");
-        IsSystemResponsivenessZero = !IsSystemResponsivenessZero;
-        _optimizer.SetSystemResponsiveness(IsSystemResponsivenessZero ? 0 : 20);
-        AppendLog($"[{DateTime.Now:HH:mm:ss}] 🚀 MMCSS 系統響應保留: {(IsSystemResponsivenessZero ? "0% (100% 前台獨享算力)" : "20% (預設保留)")}");
+        int target = IsSystemResponsivenessZero ? 20 : 0;
+        await SetSystemResponsivenessValueAsync(target);
+    }
+
+    [RelayCommand]
+    public async Task SetSystemResponsivenessValueAsync(int val)
+    {
+        await _optimizer.CreatePreTweakBackupAsync("Before_SystemResponsiveness");
+        _optimizer.SetSystemResponsiveness(val);
+        SystemResponsivenessValue = val;
+        IsSystemResponsivenessZero = (val == 0);
+        string modeName = val switch
+        {
+            0 => "極限電競 (0% 保留，100% 前台獨占)",
+            10 => "EvolveOpt 推薦 (10% 保留，防微卡頓最佳平衡)",
+            _ => $"官方預設 ({val}% 保留)"
+        };
+        AppendLog($"[{DateTime.Now:HH:mm:ss}] 🚀 MMCSS SystemResponsiveness 已設為: {val} [{modeName}]");
     }
 
     [RelayCommand]

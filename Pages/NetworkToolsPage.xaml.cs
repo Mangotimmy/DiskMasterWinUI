@@ -208,4 +208,84 @@ public sealed partial class NetworkToolsPage : Page
             await ViewModel.LogoffSessionCommand.ExecuteAsync(item);
         }
     }
+
+    private void HostsTextBox_SelectionChanged(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox tb)
+        {
+            int selStart = tb.SelectionStart;
+            string text = tb.Text ?? "";
+            if (selStart > text.Length) selStart = text.Length;
+            int line = 1;
+            int lastLineStart = 0;
+            for (int i = 0; i < selStart; i++)
+            {
+                if (text[i] == '\n')
+                {
+                    line++;
+                    lastLineStart = i + 1;
+                }
+            }
+            int col = selStart - lastLineStart + 1;
+            ViewModel.CursorLine = line;
+            ViewModel.CursorColumn = col;
+        }
+    }
+
+    private void HostsTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (sender is TextBox tb)
+        {
+            ViewModel.TotalCharacters = tb.Text.Length;
+            ViewModel.LineCount = tb.Text.Split('\n').Length;
+            ViewModel.IsModifiedUnsaved = true;
+            ViewModel.SaveStatusDisplay = "🟡 已修改未儲存";
+        }
+    }
+
+    private void ToggleWordWrap_Click(object sender, RoutedEventArgs e)
+    {
+        if (HostsEditorTextBox != null)
+        {
+            HostsEditorTextBox.TextWrapping = HostsEditorTextBox.TextWrapping == TextWrapping.Wrap ? TextWrapping.NoWrap : TextWrapping.Wrap;
+            ViewModel.IsWordWrapEnabled = HostsEditorTextBox.TextWrapping == TextWrapping.Wrap;
+        }
+    }
+
+    private void CopyAllHosts_Click(object sender, RoutedEventArgs e)
+    {
+        var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
+        dp.SetText(ViewModel.RawHostsText);
+        Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
+        ViewModel.StatusMessage = "已將全部 Hosts 內容複製到剪貼簿。";
+        AudioFeedbackService.PlaySuccess();
+    }
+
+    private async void RestoreBackup_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is HostsBackupItem item)
+        {
+            await ViewModel.RestoreHostsBackupCommand.ExecuteAsync(item);
+        }
+    }
+
+    private async void DeleteBackup_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is HostsBackupItem item)
+        {
+            await ViewModel.DeleteHostsBackupCommand.ExecuteAsync(item);
+        }
+    }
+
+    private void OpenBackupsFolder_Click(object sender, RoutedEventArgs e)
+    {
+        string path = System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            "DiskMaster", "HostsBackups");
+        if (!System.IO.Directory.Exists(path))
+        {
+            System.IO.Directory.CreateDirectory(path);
+        }
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", path) { UseShellExecute = true });
+    }
 }

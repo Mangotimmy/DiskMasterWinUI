@@ -237,6 +237,28 @@
                             </TabViewItem.ContextFlyout>
                         </TabViewItem>
 
+                        <TabViewItem x:Name="TabGroupPolicy" Header="群組原則" Tag="GroupPolicy" IsClosable="False"
+                                      ToolTipService.ToolTip="本機群組原則編輯器 (gpedit.msc) 與家用版一鍵解鎖 — 右鍵浮動視窗">
+                            <TabViewItem.IconSource>
+                                <FontIconSource Glyph="&#xE713;" />
+                            </TabViewItem.IconSource>
+                            <TabViewItem.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="🪟 獨立浮動視窗 [Ctrl+Shift+F]" Click="TabContext_Float_Click" />
+                                    <MenuFlyoutItem Text="◨ 停靠至視窗右側" Click="TabContext_DockRight_Click" />
+                                    <MenuFlyoutItem Text="⬓ 停靠至視窗底部" Click="TabContext_DockBottom_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="⬅️ 向左移動 [Alt+Left]" Click="TabContext_MoveLeft_Click" />
+                                    <MenuFlyoutItem Text="➡️ 向右移動 [Alt+Right]" Click="TabContext_MoveRight_Click" />
+                                    <MenuFlyoutItem Text="⏫ 移至最左側 [Alt+Home]" Click="TabContext_MoveFirst_Click" />
+                                    <MenuFlyoutItem Text="⏬ 移至最右側 [Alt+End]" Click="TabContext_MoveLast_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
+                                    <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                </MenuFlyout>
+                            </TabViewItem.ContextFlyout>
+                        </TabViewItem>
+
                         <TabViewItem x:Name="TabAdvancedMode" Header="進階腳本" Tag="AdvancedMode" IsClosable="False"
                                       ToolTipService.ToolTip="DiskPart 進階腳本與範本執行 — 快捷鍵: Ctrl+7 / 右鍵浮動視窗">
                             <TabViewItem.IconSource>

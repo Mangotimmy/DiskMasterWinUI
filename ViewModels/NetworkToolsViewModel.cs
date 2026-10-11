@@ -48,13 +48,32 @@ public partial class NetworkToolsViewModel : ObservableObject
     [ObservableProperty] private bool _isRunningDiagnostics;
     [ObservableProperty] private string _diagnosticSummary = "點擊「開始智慧診斷」全面探測閘道器、DNS、連線延遲與網卡健康。";
 
-    // ── 4. Hosts File Editor ──
+    // ── 4. Hosts File Editor & Smart Detector & Backups ──
     public ObservableCollection<HostsEntryItem> HostsEntries { get; } = new();
+    public ObservableCollection<HostsBackupItem> HostsBackups { get; } = new();
     [ObservableProperty] private string _rawHostsText = "";
     [ObservableProperty] private bool _isLoadingHosts;
     [ObservableProperty] private string _newHostIp = "127.0.0.1";
     [ObservableProperty] private string _newHostDomain = "";
     [ObservableProperty] private string _newHostComment = "";
+
+    // Notepad editor status properties
+    [ObservableProperty] private int _cursorLine = 1;
+    [ObservableProperty] private int _cursorColumn = 1;
+    [ObservableProperty] private int _totalCharacters;
+    [ObservableProperty] private int _lineCount = 1;
+    [ObservableProperty] private int _editorZoomPercent = 100;
+    [ObservableProperty] private double _editorFontSize = 13.0;
+    [ObservableProperty] private bool _isWordWrapEnabled = false;
+    [ObservableProperty] private bool _isModifiedUnsaved = false;
+    [ObservableProperty] private string _saveStatusDisplay = "🟢 已儲存";
+
+    // Smart Detector and Backups
+    [ObservableProperty] private HostsAnalysisReport _hostsAnalysis = new();
+    [ObservableProperty] private bool _showSmartAuditPanel;
+    [ObservableProperty] private bool _showBackupDrawer;
+    [ObservableProperty] private string _newBackupNote = "";
+    [ObservableProperty] private HostsBackupItem? _selectedBackup;
 
     // ── 5. NetShare & File Sharing Wizard ──
     private readonly NetShareService _netShareService = new();
@@ -533,7 +552,7 @@ public partial class NetworkToolsViewModel : ObservableObject
     }
 
     // ══════════════════════════════════════════════════════════
-    //  Hosts Commands
+    //  Hosts Commands & Notepad Functions & Backups
     // ══════════════════════════════════════════════════════════
 
     [RelayCommand]
@@ -543,11 +562,21 @@ public partial class NetworkToolsViewModel : ObservableObject
         {
             IsLoadingHosts = true;
             RawHostsText = await _hostsService.ReadRawHostsAsync();
+            IsModifiedUnsaved = false;
+            SaveStatusDisplay = "🟢 已儲存";
+            TotalCharacters = RawHostsText.Length;
+            LineCount = RawHostsText.Split('\n').Length;
+            HostsAnalysis = _hostsService.AnalyzeHosts(RawHostsText);
+
             var entries = await _hostsService.ReadHostsAsync();
+            var backups = await _hostsService.GetBackupHistoryAsync();
             DispatcherHelper.RunOnUIThread(() =>
             {
                 HostsEntries.Clear();
                 foreach (var e in entries) HostsEntries.Add(e);
+
+                HostsBackups.Clear();
+                foreach (var b in backups) HostsBackups.Add(b);
             });
         }
         catch { }
@@ -563,10 +592,18 @@ public partial class NetworkToolsViewModel : ObservableObject
         try
         {
             IsLoadingHosts = true;
-            var (ok, msg) = await _hostsService.SaveRawHostsAsync(RawHostsText);
+            var (ok, msg) = await _hostsService.SaveRawHostsAsync(RawHostsText, createBackup: true, backupNote: "手動儲存");
             StatusMessage = msg;
-            if (ok) AudioFeedbackService.PlaySuccess();
-            else AudioFeedbackService.PlayError();
+            if (ok)
+            {
+                IsModifiedUnsaved = false;
+                SaveStatusDisplay = "🟢 已儲存";
+                AudioFeedbackService.PlaySuccess();
+            }
+            else
+            {
+                AudioFeedbackService.PlayError();
+            }
             await RefreshHostsAsync();
         }
         catch (Exception ex)
@@ -578,6 +615,136 @@ public partial class NetworkToolsViewModel : ObservableObject
         {
             IsLoadingHosts = false;
         }
+    }
+
+    [RelayCommand]
+    public void RunHostsCheck()
+    {
+        HostsAnalysis = _hostsService.AnalyzeHosts(RawHostsText);
+        ShowSmartAuditPanel = !ShowSmartAuditPanel;
+        StatusMessage = HostsAnalysis.SummaryText;
+    }
+
+    [RelayCommand]
+    public void FormatHosts()
+    {
+        RawHostsText = _hostsService.FormatAndAlignHosts(RawHostsText);
+        IsModifiedUnsaved = true;
+        SaveStatusDisplay = "🟡 已修改未儲存";
+        TotalCharacters = RawHostsText.Length;
+        LineCount = RawHostsText.Split('\n').Length;
+        StatusMessage = "已將 Hosts 內容對齊格式化。";
+    }
+
+    [RelayCommand]
+    public void DeduplicateHosts()
+    {
+        RawHostsText = _hostsService.DeduplicateHosts(RawHostsText);
+        IsModifiedUnsaved = true;
+        SaveStatusDisplay = "🟡 已修改未儲存";
+        TotalCharacters = RawHostsText.Length;
+        LineCount = RawHostsText.Split('\n').Length;
+        HostsAnalysis = _hostsService.AnalyzeHosts(RawHostsText);
+        StatusMessage = "已清除重複之網域名稱對應。";
+    }
+
+    [RelayCommand]
+    public void OpenInSystemNotepad()
+    {
+        _hostsService.OpenInSystemNotepad();
+    }
+
+    [RelayCommand]
+    public void ToggleWordWrap()
+    {
+        IsWordWrapEnabled = !IsWordWrapEnabled;
+    }
+
+    [RelayCommand]
+    public void ZoomIn()
+    {
+        if (EditorZoomPercent < 250)
+        {
+            EditorZoomPercent += 25;
+            EditorFontSize = 13.0 * (EditorZoomPercent / 100.0);
+        }
+    }
+
+    [RelayCommand]
+    public void ZoomOut()
+    {
+        if (EditorZoomPercent > 50)
+        {
+            EditorZoomPercent -= 25;
+            EditorFontSize = 13.0 * (EditorZoomPercent / 100.0);
+        }
+    }
+
+    [RelayCommand]
+    public void ResetZoom()
+    {
+        EditorZoomPercent = 100;
+        EditorFontSize = 13.0;
+    }
+
+    [RelayCommand]
+    public void ToggleBackupDrawer()
+    {
+        ShowBackupDrawer = !ShowBackupDrawer;
+    }
+
+    [RelayCommand]
+    public async Task CreateHostsBackupAsync()
+    {
+        string note = string.IsNullOrWhiteSpace(NewBackupNote) ? "手動備份" : NewBackupNote.Trim();
+        var (ok, msg) = await _hostsService.CreateManualBackupAsync(note);
+        StatusMessage = msg;
+        if (ok)
+        {
+            NewBackupNote = "";
+            AudioFeedbackService.PlaySuccess();
+            var backups = await _hostsService.GetBackupHistoryAsync();
+            DispatcherHelper.RunOnUIThread(() =>
+            {
+                HostsBackups.Clear();
+                foreach (var b in backups) HostsBackups.Add(b);
+            });
+        }
+        else
+        {
+            AudioFeedbackService.PlayError();
+        }
+    }
+
+    [RelayCommand]
+    public async Task RestoreHostsBackupAsync(HostsBackupItem? item)
+    {
+        if (item == null) return;
+        var (ok, msg) = await _hostsService.RestoreBackupAsync(item.FilePath);
+        StatusMessage = msg;
+        if (ok)
+        {
+            AudioFeedbackService.PlaySuccess();
+            await RefreshHostsAsync();
+        }
+        else
+        {
+            AudioFeedbackService.PlayError();
+        }
+    }
+
+    [RelayCommand]
+    public async Task DeleteHostsBackupAsync(HostsBackupItem? item)
+    {
+        if (item == null) return;
+        _hostsService.DeleteBackup(item.FilePath);
+        var backups = await _hostsService.GetBackupHistoryAsync();
+        DispatcherHelper.RunOnUIThread(() =>
+        {
+            HostsBackups.Clear();
+            foreach (var b in backups) HostsBackups.Add(b);
+        });
+        StatusMessage = $"已刪除備份: {item.FileName}";
     }
 
     [RelayCommand]

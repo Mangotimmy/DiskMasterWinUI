@@ -22,6 +22,7 @@ public sealed partial class MainWindow : Window
     private DiskToolsPage? _diskToolsPage;
     private SystemHealthPage? _systemHealthPage;
     private NtfsPermissionsPage? _ntfsPermissionsPage;
+    private GroupPolicyPage? _groupPolicyPage;
     private AdvancedModePage? _advancedModePage;
     private SystemOptimizerPage? _systemOptimizerPage;
     private NetworkToolsPage? _networkToolsPage;
@@ -57,9 +58,9 @@ public sealed partial class MainWindow : Window
 
     private static readonly Dictionary<string, string[]> WorkspaceTabTags = new()
     {
-        ["Master"] = ["Starter", "EasyMode", "WimDeploy", "BootManager", "DiskTools", "SystemHealth", "NtfsPermissions", "AdvancedMode", "SystemOptimizer", "NetworkTools", "SystemPerformance", "Settings"],
+        ["Master"] = ["Starter", "EasyMode", "WimDeploy", "BootManager", "DiskTools", "SystemHealth", "NtfsPermissions", "GroupPolicy", "AdvancedMode", "SystemOptimizer", "NetworkTools", "SystemPerformance", "Settings"],
         ["Deploy"] = ["Starter", "WimDeploy", "BootManager", "EasyMode", "DiskTools", "Settings"],
-        ["Repair"] = ["Starter", "SystemHealth", "BootManager", "DiskTools", "NtfsPermissions", "SystemPerformance", "EasyMode", "Settings"],
+        ["Repair"] = ["Starter", "SystemHealth", "BootManager", "DiskTools", "NtfsPermissions", "GroupPolicy", "SystemPerformance", "EasyMode", "Settings"],
         ["Gaming"] = ["Starter", "SystemOptimizer", "NetworkTools", "SystemPerformance", "DiskTools", "SystemHealth", "Settings"],
         ["Lite"] = ["Starter", "EasyMode", "NetworkTools", "SystemPerformance", "Settings"]
     };
@@ -99,6 +100,7 @@ public sealed partial class MainWindow : Window
             TabDiskTools,
             TabSystemHealth,
             TabNtfsPermissions,
+            TabGroupPolicy,
             TabAdvancedMode,
             TabOptimizer,
             TabNetworkTools,
@@ -286,6 +288,9 @@ public sealed partial class MainWindow : Window
                 {
                     _ = _systemHealthPage.ViewModel.CleanSelectedTempCategoriesCommand.ExecuteAsync(null);
                 }
+                break;
+            case "ToggleOverlay":
+                DiskMasterWinUI.Controls.PerformanceOverlayWindow.Toggle();
                 break;
             case "Settings":
                 NavigateToTag("Settings");
@@ -620,6 +625,7 @@ public sealed partial class MainWindow : Window
         "DiskTools" => _diskToolsPage ??= new DiskToolsPage(),
         "SystemHealth" => _systemHealthPage ??= new SystemHealthPage(),
         "NtfsPermissions" => _ntfsPermissionsPage ??= new NtfsPermissionsPage(),
+        "GroupPolicy" => _groupPolicyPage ??= new GroupPolicyPage(),
         "AdvancedMode" => _advancedModePage ??= new AdvancedModePage(),
         "SystemOptimizer" => _systemOptimizerPage ??= new SystemOptimizerPage(),
         "NetworkTools" => _networkToolsPage ??= new NetworkToolsPage(),
@@ -1186,6 +1192,9 @@ public sealed partial class MainWindow : Window
                 {
                     await _diskToolsPage.ViewModel.RefreshAllCommand.ExecuteAsync(null);
                 }
+                break;
+            case "GroupPolicy":
+                _groupPolicyPage?.ViewModel.RefreshStatus();
                 break;
             case "AdvancedMode":
                 if (_advancedModePage != null)

@@ -222,18 +222,56 @@
                                                       Toggled="PowerThrottling_Toggled" />
                                     </Grid>
 
-                                    <Grid Padding="4,2">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" Spacing="2">
-                                            <TextBlock x:Name="SystemResponsivenessLabel" Text="100% 前台 CPU 算力分配 (SystemResponsiveness = 0)" FontWeight="SemiBold" />
-                                            <TextBlock x:Name="SystemResponsivenessDesc" Text="釋放 Windows 原生預留給系統背景服務的 20% CPU 保留份額，全數交由前台遊戲享用。" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12,10" Margin="0,4">
+                                        <StackPanel Spacing="8">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" Spacing="2">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <FontIcon Glyph="&#xE768;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                        <TextBlock x:Name="SystemResponsivenessLabel" Text="MMCSS 系統響應與 CPU 算力分配 (SystemResponsiveness)" FontWeight="SemiBold" />
+                                                    </StackPanel>
+                                                    <TextBlock x:Name="SystemResponsivenessDesc" Text="控制 Windows Multimedia 預留給背景服務的 CPU 份額。可依遊戲與日常需求自由切換官方預設 (20%)、EvolveOpt 推薦 (10%) 或極限電競 (0%)。" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                    <TextBlock Text="當前登錄檔: " FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="4" Padding="6,2">
+                                                        <TextBlock Text="{x:Bind ViewModel.SystemResponsivenessDisplay, Mode=OneWay}" FontFamily="Consolas" FontWeight="Bold" FontSize="11" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                    </Border>
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <!-- 3 Presets Buttons -->
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Button Grid.Column="0" Click="SetResponsiveness20_Click" HorizontalAlignment="Stretch" Padding="8,6">
+                                                    <StackPanel Spacing="2">
+                                                        <TextBlock Text="🛡️ 官方預設 (20%)" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Center" />
+                                                        <TextBlock Text="保留 20% 給系統背景服務" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Grid.Column="1" Click="SetResponsiveness10_Click" HorizontalAlignment="Stretch" Padding="8,6" Style="{StaticResource AccentButtonStyle}">
+                                                    <StackPanel Spacing="2">
+                                                        <TextBlock Text="🚀 EvolveOpt 推薦 (10%)" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Center" />
+                                                        <TextBlock Text="保留 10%，防延遲且穩定防卡頓" FontSize="10" HorizontalAlignment="Center" />
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button Grid.Column="2" Click="SetResponsiveness0_Click" HorizontalAlignment="Stretch" Padding="8,6">
+                                                    <StackPanel Spacing="2">
+                                                        <TextBlock Text="⚡ 極限電競 (0%)" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Center" />
+                                                        <TextBlock Text="100% 前台 CPU 獨占全開" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </Grid>
                                         </StackPanel>
-                                        <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsSystemResponsivenessZero, Mode=OneWay}"
-                                                      Toggled="SystemResponsiveness_Toggled" />
-                                    </Grid>
+                                    </Border>
 
                                     <Grid Padding="4,2">
                                         <Grid.ColumnDefinitions>
