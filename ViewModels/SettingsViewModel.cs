@@ -578,6 +578,17 @@ public partial class SettingsViewModel : ObservableObject
         try
         {
             var result = await UpdateService.Instance.CheckForUpdatesAsync();
+            if (!result.IsSuccess)
+            {
+                HasAvailableUpdate = false;
+                UpdateStatusText = $"❌ " + string.Format(LocalizationService.T(
+                    "檢查更新失敗: {0}",
+                    "检查更新失败: {0}",
+                    "Update check failed: {0}",
+                    "アップデートの確認に失敗しました: {0}"), result.ErrorMessage ?? "網路連線異常");
+                return;
+            }
+
             HasAvailableUpdate = result.HasUpdate;
             LatestReleaseUrl = result.ReleaseUrl;
             MatchedAssetName = result.MatchingAssetName ?? "";
@@ -589,11 +600,13 @@ public partial class SettingsViewModel : ObservableObject
             if (result.HasUpdate)
             {
                 var assetNote = !string.IsNullOrEmpty(MatchedAssetName) ? $" [{MatchedAssetName}]" : "";
-                UpdateStatusText = string.Format(LocalizationService.T("🎉 發現新版本 {0}{1}！點擊下方按鈕自動下載更新", "🎉 发现新版本 {0}{1}！点击下方按钮自动下载更新", "🎉 New version {0}{1} available! Click below to download update", "🎉 新バージョン {0}{1} が利用可能です！"), result.LatestVersion, assetNote);
+                var channelNote = !string.IsNullOrEmpty(result.SourceChannel) ? $" ({result.SourceChannel})" : "";
+                UpdateStatusText = string.Format(LocalizationService.T("🎉 發現新版本 {0}{1}！點擊下方按鈕自動下載更新{2}", "🎉 发现新版本 {0}{1}！点击下方按钮自动下载更新{2}", "🎉 New version {0}{1} available! Click below to download update{2}", "🎉 新バージョン {0}{1} が利用可能です！{2}"), result.LatestVersion, assetNote, channelNote);
             }
             else
             {
-                UpdateStatusText = string.Format(LocalizationService.T("✅ 目前已是最新版本 ({0})", "✅ 当前已是最新版本 ({0})", "✅ You are running the latest version ({0})", "✅ 最新バージョンを実行中です ({0})"), UpdateService.CurrentVersion);
+                var channelNote = !string.IsNullOrEmpty(result.SourceChannel) ? $" ({result.SourceChannel})" : "";
+                UpdateStatusText = string.Format(LocalizationService.T("✅ 目前已是最新版本 ({0}){1}", "✅ 当前已是最新版本 ({0}){1}", "✅ You are running the latest version ({0}){1}", "✅ 最新バージョンを実行中です ({0}){1}"), UpdateService.CurrentVersion, channelNote);
             }
         }
         catch (Exception ex)

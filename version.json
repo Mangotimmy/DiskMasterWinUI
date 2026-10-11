@@ -1,0 +1,19 @@
+{
+  "version": "1.5.2",
+  "tag_name": "v1.5.2",
+  "name": "DiskMaster Pro v1.5.2 Flagship",
+  "published_at": "2026-10-11T13:45:00Z",
+  "release_notes": "1. 升級至 v1.5.2 旗艦版架構。\n2. 全新多層更新管道，完美解決 VPN、Cloudflare One (WARP) 與 GitHub API 403 限流問題。\n3. 安裝完成後自動請求管理員身分提權啟動 (shellexec UAC 模式)。\n4. 完善桌面與開始功能表應用程式圖示 (AppIcon.ico)。\n5. 優化多螢幕高 DPI 浮動視窗位置計算與標籤拖拽分離 (Chrome Tab Tear-Out)。",
+  "assets": [
+    {
+      "name": "DiskMaster_Setup.exe",
+      "browser_download_url": "https://github.com/Mangotimmy/DiskMasterWinUI/releases/download/v1.5.1/DiskMaster_Setup.exe",
+      "size": 94121984
+    },
+    {
+      "name": "DiskMaster_x64.zip",
+      "browser_download_url": "https://github.com/Mangotimmy/DiskMasterWinUI/releases/download/v1.5.1/DiskMaster_x64.zip",
+      "size": 75497472
+    }
+  ]
+}
