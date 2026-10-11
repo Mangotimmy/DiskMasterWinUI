@@ -923,26 +923,42 @@ public sealed partial class MainWindow : Window
 
     private void DockContainerGrid_DragOver(object sender, DragEventArgs e)
     {
+        DockDropOverlay_DragOver(sender, e);
+    }
+
+    private void DockContainerGrid_DragLeave(object sender, DragEventArgs e)
+    {
+        DockDropOverlay_DragLeave(sender, e);
+    }
+
+    private void DockContainerGrid_Drop(object sender, DragEventArgs e)
+    {
+        DockDropOverlay_Drop(sender, e);
+    }
+
+    private void DockDropOverlay_DragOver(object sender, DragEventArgs e)
+    {
         e.AcceptedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.Move;
         e.DragUIOverride.IsCaptionVisible = false;
         e.DragUIOverride.IsGlyphVisible = false;
 
         ShowDockDropOverlay(true);
 
-        var pos = e.GetPosition(DockContainerGrid);
-        var w = DockContainerGrid.ActualWidth;
-        var h = DockContainerGrid.ActualHeight;
+        var pos = e.GetPosition(DockDropOverlay);
+        var w = DockDropOverlay.ActualWidth;
+        var h = DockDropOverlay.ActualHeight;
 
         UpdateDockDropHighlight(pos, w, h);
     }
 
-    private void DockContainerGrid_DragLeave(object sender, DragEventArgs e)
+    private void DockDropOverlay_DragLeave(object sender, DragEventArgs e)
     {
         ResetDockDropHighlights();
     }
 
-    private void DockContainerGrid_Drop(object sender, DragEventArgs e)
+    private void DockDropOverlay_Drop(object sender, DragEventArgs e)
     {
+        e.AcceptedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.Move;
         var tab = _draggedTabItem ?? (MainTabs.SelectedItem as TabViewItem);
         _draggedTabItem = null;
         ShowDockDropOverlay(false);
@@ -951,9 +967,9 @@ public sealed partial class MainWindow : Window
         var tag = tab.Tag?.ToString();
         if (string.IsNullOrEmpty(tag)) return;
 
-        var pos = e.GetPosition(DockContainerGrid);
-        var w = DockContainerGrid.ActualWidth;
-        var h = DockContainerGrid.ActualHeight;
+        var pos = e.GetPosition(DockDropOverlay);
+        var w = DockDropOverlay.ActualWidth;
+        var h = DockDropOverlay.ActualHeight;
 
         if (pos.X > w - 280)
         {
@@ -970,10 +986,17 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void DockDropOverlay_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        _draggedTabItem = null;
+        ShowDockDropOverlay(false);
+    }
+
     private void ShowDockDropOverlay(bool visible)
     {
         if (DockDropOverlay == null) return;
         DockDropOverlay.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        DockDropOverlay.IsHitTestVisible = visible;
         if (!visible)
         {
             ResetDockDropHighlights();

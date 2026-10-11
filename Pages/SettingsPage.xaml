@@ -132,11 +132,25 @@
 
                     <!-- Tab Items Reordering & Toggle List -->
                     <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="6">
-                        <ListView ItemsSource="{x:Bind ViewModel.TabOrderItems, Mode=OneWay}" SelectionMode="None">
+                        <ListView x:Name="TabOrderListView"
+                                  ItemsSource="{x:Bind ViewModel.TabOrderItems, Mode=OneWay}"
+                                  CanReorderItems="True"
+                                  CanDragItems="True"
+                                  AllowDrop="True"
+                                  SelectionMode="Single"
+                                  DragItemsCompleted="TabOrderListView_DragItemsCompleted">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="Padding" Value="4,2" />
+                                    <Setter Property="Margin" Value="0,1" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
                             <ListView.ItemTemplate>
                                 <DataTemplate x:DataType="models:TabOrderItem">
                                     <Grid Padding="8,6" ColumnSpacing="12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
                                         <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="28" />
                                             <ColumnDefinition Width="40" />
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
@@ -144,27 +158,32 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
 
+                                        <!-- Drag Handle Grip -->
+                                        <FontIcon Grid.Column="0" Glyph="&#xE700;" FontSize="13" Opacity="0.55"
+                                                  VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                  ToolTipService.ToolTip="按住此處滑鼠拖曳調整順序 (Drag to reorder)" />
+
                                         <!-- Badge Order -->
-                                        <Border Grid.Column="0" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Border Grid.Column="1" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Center">
                                             <TextBlock Text="{x:Bind DisplayOrderText, Mode=OneWay}" FontSize="11" FontWeight="Bold" Foreground="White" />
                                         </Border>
 
                                         <!-- Icon Glyph -->
-                                        <FontIcon Grid.Column="1" Glyph="{x:Bind IconGlyph}" FontSize="16" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                        <FontIcon Grid.Column="2" Glyph="{x:Bind IconGlyph}" FontSize="16" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
 
                                         <!-- Header & Description -->
-                                        <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                                        <StackPanel Grid.Column="3" Spacing="2" VerticalAlignment="Center">
                                             <TextBlock Text="{x:Bind Header}" FontWeight="SemiBold" FontSize="13" />
                                             <TextBlock Text="{x:Bind Description}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                         </StackPanel>
 
                                         <!-- Enable / Disable Switch -->
-                                        <ToggleSwitch Grid.Column="3" IsOn="{x:Bind IsEnabled, Mode=TwoWay}"
+                                        <ToggleSwitch Grid.Column="4" IsOn="{x:Bind IsEnabled, Mode=TwoWay}"
                                                       OnContent="已啟用" OffContent="已隱藏"
                                                       VerticalAlignment="Center" Margin="0,0,12,0" />
 
                                         <!-- Reorder Action Buttons: ⬆️ ⬇️ ⏫ ⏬ -->
-                                        <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                        <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                                             <Button ToolTipService.ToolTip="移至最頂部 [⏫]" Padding="6,4" Click="MoveTabToTop_Click">
                                                 <FontIcon Glyph="&#xE74A;" FontSize="11" />
                                             </Button>

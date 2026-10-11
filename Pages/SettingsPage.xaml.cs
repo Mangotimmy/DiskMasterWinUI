@@ -311,4 +311,10 @@ public sealed partial class SettingsPage : Page
             ViewModel.MoveTabToBottom(item);
         }
     }
+
+    private void TabOrderListView_DragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs args)
+    {
+        ViewModel.SaveAndApplyTabOrder();
+        Services.AudioFeedbackService.PlaySuccess();
+    }
 }

@@ -417,6 +417,9 @@
 
                         <!-- Central Main Viewport -->
                         <ScrollViewer x:Name="ContentScrollViewer" Grid.Column="0"
+                                      AllowDrop="True"
+                                      DragOver="DockDropOverlay_DragOver"
+                                      Drop="DockDropOverlay_Drop"
                                       HorizontalScrollBarVisibility="Disabled"
                                       VerticalScrollBarVisibility="Auto"
                                       SizeChanged="ContentScrollViewer_SizeChanged">
@@ -540,8 +543,15 @@
                     </Border>
 
                     <!-- Drag & Drop Visual Docking Overlay Guide -->
-                    <Grid x:Name="DockDropOverlay" Grid.RowSpan="3" IsHitTestVisible="False" Visibility="Collapsed">
-                        <Border Background="{ThemeResource LayerFillColorDefaultBrush}" Opacity="0.85" />
+                    <Grid x:Name="DockDropOverlay" Grid.RowSpan="3"
+                          AllowDrop="True"
+                          Background="{ThemeResource LayerFillColorDefaultBrush}"
+                          Opacity="0.92"
+                          Visibility="Collapsed"
+                          DragOver="DockDropOverlay_DragOver"
+                          DragLeave="DockDropOverlay_DragLeave"
+                          Drop="DockDropOverlay_Drop"
+                          PointerPressed="DockDropOverlay_PointerPressed">
                         <Grid Margin="32">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
