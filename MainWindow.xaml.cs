@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.System;
+using Windows.ApplicationModel.DataTransfer;
 using DiskMasterWinUI.Controls;
 using DiskMasterWinUI.Helpers;
 using DiskMasterWinUI.Pages;
@@ -405,6 +406,10 @@ public sealed partial class MainWindow : Window
         {
             CompanionControl.TrackPointer(e.GetCurrentPoint(NormalView).Position);
         }
+    }
+
+    private void NormalView_PointerReleased(object sender, PointerRoutedEventArgs e)
+    {
     }
 
     public void ApplyCustomFont()
@@ -849,6 +854,7 @@ public sealed partial class MainWindow : Window
 
     public void FloatTab(TabViewItem tabItem, Windows.Graphics.PointInt32? mousePos = null)
     {
+        if (tabItem == null) return;
         var tag = tabItem.Tag?.ToString();
         if (string.IsNullOrEmpty(tag) || _floatingWindows.ContainsKey(tag)) return;
         if (MainTabs.TabItems.Count <= 1) return;
@@ -864,7 +870,12 @@ public sealed partial class MainWindow : Window
         MainTabs.TabItems.Remove(tabItem);
         if (MainTabs.TabItems.Count > 0)
         {
-            MainTabs.SelectedIndex = Math.Clamp(MainTabs.SelectedIndex, 0, MainTabs.TabItems.Count - 1);
+            var nextIndex = Math.Clamp(MainTabs.SelectedIndex, 0, MainTabs.TabItems.Count - 1);
+            MainTabs.SelectedIndex = nextIndex;
+            if (MainTabs.SelectedItem is TabViewItem nextItem)
+            {
+                NavigateToTag(nextItem.Tag?.ToString());
+            }
         }
 
         CreateFloatingWindow(tag, header, page, mousePos);
@@ -873,6 +884,20 @@ public sealed partial class MainWindow : Window
     public void CreateFloatingWindow(string tag, string header, Page page, Windows.Graphics.PointInt32? mousePos = null)
     {
         if (_floatingWindows.ContainsKey(tag)) return;
+
+        // Ensure page is detached from MainWindow frames before hosting in FloatingTabWindow
+        if (ReferenceEquals(ContentFrame.Content, page))
+        {
+            ContentFrame.Content = null;
+        }
+        if (ReferenceEquals(RightDockFrame.Content, page))
+        {
+            RightDockFrame.Content = null;
+        }
+        if (ReferenceEquals(BottomDockFrame.Content, page))
+        {
+            BottomDockFrame.Content = null;
+        }
 
         var win = new FloatingTabWindow(tag, header, page, mousePos);
         win.DockRequested += OnFloatingTabDockRequested;
@@ -897,180 +922,40 @@ public sealed partial class MainWindow : Window
     private void MainTabs_TabDragStarting(TabView sender, TabViewTabDragStartingEventArgs args)
     {
         _draggedTabItem = args.Tab;
-        args.Data.RequestedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.Move;
-        args.Data.SetText(args.Tab.Tag?.ToString() ?? "tab");
-        ShowDockDropOverlay(true);
-    }
-
-    private void MainTabs_TabDroppedOutside(TabView sender, TabViewTabDroppedOutsideEventArgs args)
-    {
-        ShowDockDropOverlay(false);
-        var tab = args.Tab ?? _draggedTabItem;
-        _draggedTabItem = null;
-        if (tab != null)
-        {
-            var cursor = DisplayHelper.GetCurrentCursorPosition();
-            FloatTab(tab, cursor);
-        }
     }
 
     private void MainTabs_TabDragCompleted(TabView sender, TabViewTabDragCompletedEventArgs args)
     {
         _draggedTabItem = null;
-        ShowDockDropOverlay(false);
-        SaveCustomTabOrder();
     }
 
-    private void DockContainerGrid_DragOver(object sender, DragEventArgs e)
+    private void MainTabs_TabDroppedOutside(TabView sender, TabViewTabDroppedOutsideEventArgs args)
     {
-        DockDropOverlay_DragOver(sender, e);
-    }
-
-    private void DockContainerGrid_DragLeave(object sender, DragEventArgs e)
-    {
-        DockDropOverlay_DragLeave(sender, e);
-    }
-
-    private void DockContainerGrid_Drop(object sender, DragEventArgs e)
-    {
-        DockDropOverlay_Drop(sender, e);
-    }
-
-    private void DockDropOverlay_DragOver(object sender, DragEventArgs e)
-    {
-        e.AcceptedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.Move;
-        e.DragUIOverride.IsCaptionVisible = false;
-        e.DragUIOverride.IsGlyphVisible = false;
-
-        ShowDockDropOverlay(true);
-
-        var pos = e.GetPosition(DockDropOverlay);
-        var w = DockDropOverlay.ActualWidth;
-        var h = DockDropOverlay.ActualHeight;
-
-        UpdateDockDropHighlight(pos, w, h);
-    }
-
-    private void DockDropOverlay_DragLeave(object sender, DragEventArgs e)
-    {
-        ResetDockDropHighlights();
-    }
-
-    private void DockDropOverlay_Drop(object sender, DragEventArgs e)
-    {
-        e.AcceptedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.Move;
-        var tab = _draggedTabItem ?? (MainTabs.SelectedItem as TabViewItem);
-        _draggedTabItem = null;
-        ShowDockDropOverlay(false);
-
-        if (tab == null) return;
-        var tag = tab.Tag?.ToString();
-        if (string.IsNullOrEmpty(tag)) return;
-
-        var pos = e.GetPosition(DockDropOverlay);
-        var w = DockDropOverlay.ActualWidth;
-        var h = DockDropOverlay.ActualHeight;
-
-        if (pos.X > w - 280)
-        {
-            DockToRight(tag);
-        }
-        else if (pos.Y > h - 190)
-        {
-            DockToBottom(tag);
-        }
-        else
+        var tab = args.Tab ?? _draggedTabItem;
+        if (tab != null)
         {
             var cursor = DisplayHelper.GetCurrentCursorPosition();
             FloatTab(tab, cursor);
         }
-    }
-
-    private void DockDropOverlay_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
-    {
         _draggedTabItem = null;
-        ShowDockDropOverlay(false);
     }
 
-    private void ShowDockDropOverlay(bool visible)
+    private void DockContainerGrid_DragOver(object sender, DragEventArgs e)
     {
-        if (DockDropOverlay == null) return;
-        DockDropOverlay.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
-        DockDropOverlay.IsHitTestVisible = visible;
-        if (!visible)
+        if (_draggedTabItem != null)
         {
-            ResetDockDropHighlights();
+            e.AcceptedOperation = DataPackageOperation.Move;
         }
     }
 
-    private void UpdateDockDropHighlight(Windows.Foundation.Point pos, double width, double height)
+    private void DockContainerGrid_Drop(object sender, DragEventArgs e)
     {
-        if (DropZoneCenter == null || DropZoneRight == null || DropZoneBottom == null) return;
-
-        if (Application.Current.Resources.TryGetValue("AccentFillColorDefaultBrush", out var accentObj) && accentObj is Brush accentBrush &&
-            Application.Current.Resources.TryGetValue("CardStrokeColorDefaultBrush", out var defaultObj) && defaultObj is Brush defaultStroke)
+        if (_draggedTabItem != null)
         {
-            if (pos.X > width - 280)
-            {
-                DropZoneRight.BorderBrush = accentBrush;
-                DropZoneRight.BorderThickness = new Thickness(3);
-                DropZoneRight.Opacity = 1.0;
-
-                DropZoneBottom.BorderBrush = defaultStroke;
-                DropZoneBottom.BorderThickness = new Thickness(2);
-                DropZoneBottom.Opacity = 0.6;
-
-                DropZoneCenter.BorderBrush = defaultStroke;
-                DropZoneCenter.BorderThickness = new Thickness(2);
-                DropZoneCenter.Opacity = 0.6;
-            }
-            else if (pos.Y > height - 190)
-            {
-                DropZoneBottom.BorderBrush = accentBrush;
-                DropZoneBottom.BorderThickness = new Thickness(3);
-                DropZoneBottom.Opacity = 1.0;
-
-                DropZoneRight.BorderBrush = defaultStroke;
-                DropZoneRight.BorderThickness = new Thickness(2);
-                DropZoneRight.Opacity = 0.6;
-
-                DropZoneCenter.BorderBrush = defaultStroke;
-                DropZoneCenter.BorderThickness = new Thickness(2);
-                DropZoneCenter.Opacity = 0.6;
-            }
-            else
-            {
-                DropZoneCenter.BorderBrush = accentBrush;
-                DropZoneCenter.BorderThickness = new Thickness(3);
-                DropZoneCenter.Opacity = 1.0;
-
-                DropZoneRight.BorderBrush = defaultStroke;
-                DropZoneRight.BorderThickness = new Thickness(2);
-                DropZoneRight.Opacity = 0.6;
-
-                DropZoneBottom.BorderBrush = defaultStroke;
-                DropZoneBottom.BorderThickness = new Thickness(2);
-                DropZoneBottom.Opacity = 0.6;
-            }
-        }
-    }
-
-    private void ResetDockDropHighlights()
-    {
-        if (DropZoneCenter == null || DropZoneRight == null || DropZoneBottom == null) return;
-        if (Application.Current.Resources.TryGetValue("CardStrokeColorDefaultBrush", out var defaultObj) && defaultObj is Brush defaultStroke)
-        {
-            DropZoneCenter.BorderBrush = defaultStroke;
-            DropZoneCenter.BorderThickness = new Thickness(2);
-            DropZoneCenter.Opacity = 0.6;
-
-            DropZoneRight.BorderBrush = defaultStroke;
-            DropZoneRight.BorderThickness = new Thickness(2);
-            DropZoneRight.Opacity = 0.6;
-
-            DropZoneBottom.BorderBrush = defaultStroke;
-            DropZoneBottom.BorderThickness = new Thickness(2);
-            DropZoneBottom.Opacity = 0.6;
+            var tab = _draggedTabItem;
+            _draggedTabItem = null;
+            var cursor = DisplayHelper.GetCurrentCursorPosition();
+            FloatTab(tab, cursor);
         }
     }
 

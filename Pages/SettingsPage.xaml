@@ -134,10 +134,13 @@
                     <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="6">
                         <ListView x:Name="TabOrderListView"
                                   ItemsSource="{x:Bind ViewModel.TabOrderItems, Mode=OneWay}"
-                                  CanReorderItems="True"
                                   CanDragItems="True"
                                   AllowDrop="True"
-                                  SelectionMode="Single"
+                                  CanReorderItems="False"
+                                  SelectionMode="None"
+                                  DragItemsStarting="TabOrderListView_DragItemsStarting"
+                                  DragOver="TabOrderListView_DragOver"
+                                  Drop="TabOrderListView_Drop"
                                   DragItemsCompleted="TabOrderListView_DragItemsCompleted">
                             <ListView.ItemContainerStyle>
                                 <Style TargetType="ListViewItem">
@@ -148,7 +151,7 @@
                             </ListView.ItemContainerStyle>
                             <ListView.ItemTemplate>
                                 <DataTemplate x:DataType="models:TabOrderItem">
-                                    <Grid Padding="8,6" ColumnSpacing="12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
+                                    <Grid Background="Transparent" Padding="8,6" ColumnSpacing="12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="28" />
                                             <ColumnDefinition Width="40" />
@@ -159,9 +162,11 @@
                                         </Grid.ColumnDefinitions>
 
                                         <!-- Drag Handle Grip -->
-                                        <FontIcon Grid.Column="0" Glyph="&#xE700;" FontSize="13" Opacity="0.55"
-                                                  VerticalAlignment="Center" HorizontalAlignment="Center"
-                                                  ToolTipService.ToolTip="按住此處滑鼠拖曳調整順序 (Drag to reorder)" />
+                                        <Border Grid.Column="0" Background="Transparent" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
+                                                ToolTipService.ToolTip="按住此處滑鼠拖曳調整順序 (Drag to reorder)">
+                                            <FontIcon Glyph="&#xE700;" FontSize="13" Opacity="0.65"
+                                                      VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                        </Border>
 
                                         <!-- Badge Order -->
                                         <Border Grid.Column="1" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Center" VerticalAlignment="Center">

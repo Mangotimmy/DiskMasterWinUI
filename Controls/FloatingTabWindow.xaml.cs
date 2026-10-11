@@ -48,24 +48,14 @@ public sealed partial class FloatingTabWindow : Window
         LocalizationService.Instance.LanguageChanged += ApplyLanguage;
         SettingsService.Instance.SettingsChanged += ApplyFont;
 
-        // Window size & position
+        // Window size & position with robust multi-monitor DPI & resolution calculation
         try
         {
-            var (pos, size) = DisplayHelper.GetOptimalWindowBounds(WindowNative.GetWindowHandle(this));
-            var newWidth = Math.Max(700, size.Width - 120);
-            var newHeight = Math.Max(500, size.Height - 120);
-            AppWindow.Resize(new Windows.Graphics.SizeInt32(newWidth, newHeight));
-
-            if (initialPosition.HasValue)
-            {
-                int posX = Math.Max(0, initialPosition.Value.X - 180);
-                int posY = Math.Max(0, initialPosition.Value.Y - 24);
-                AppWindow.Move(new Windows.Graphics.PointInt32(posX, posY));
-            }
-            else
-            {
-                AppWindow.Move(pos);
-            }
+            var parentHwnd = MainWindow.CurrentInstance != null
+                ? WindowNative.GetWindowHandle(MainWindow.CurrentInstance)
+                : IntPtr.Zero;
+            var bounds = DisplayHelper.CalculateFloatingWindowBounds(initialPosition, parentHwnd);
+            AppWindow.MoveAndResize(bounds);
         }
         catch { }
 

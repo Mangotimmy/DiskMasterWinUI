@@ -37,7 +37,7 @@
                    Opacity="0.25"
                    Visibility="Collapsed" />
 
-            <Grid x:Name="NormalView" PointerMoved="NormalView_PointerMoved" KeyboardAcceleratorPlacementMode="Hidden">
+            <Grid x:Name="NormalView" PointerMoved="NormalView_PointerMoved" PointerReleased="NormalView_PointerReleased" KeyboardAcceleratorPlacementMode="Hidden">
                 <Grid.Resources>
                     <SolidColorBrush x:Name="DynamicCardBrush" x:Key="CardBackgroundFillColorDefaultBrush" Color="#B0202020" />
                     <SolidColorBrush x:Name="DynamicCardSecBrush" x:Key="CardBackgroundFillColorSecondaryBrush" Color="#80282828" />
@@ -75,13 +75,13 @@
                 <!-- ═══ Movable Top TabView (All tabs can drag & reorder & right-click) ═══ -->
                 <TabView x:Name="MainTabs" Grid.Row="1"
                          TabWidthMode="SizeToContent"
-                         CanReorderTabs="True"
                          CanDragTabs="True"
+                         CanReorderTabs="True"
                          IsAddTabButtonVisible="False"
                          SelectionChanged="MainTabs_SelectionChanged"
                          TabDragStarting="MainTabs_TabDragStarting"
-                         TabDroppedOutside="MainTabs_TabDroppedOutside"
-                         TabDragCompleted="MainTabs_TabDragCompleted">
+                         TabDragCompleted="MainTabs_TabDragCompleted"
+                         TabDroppedOutside="MainTabs_TabDroppedOutside">
                     <TabView.TabItems>
                         <TabViewItem x:Name="TabStarter" Header="入門精靈" Tag="Starter" IsClosable="False"
                                       ToolTipService.ToolTip="新手入門體檢與一鍵快速維護 — 右鍵浮動視窗">
@@ -399,7 +399,6 @@
                 <Grid Grid.Row="2" x:Name="DockContainerGrid"
                       AllowDrop="True"
                       DragOver="DockContainerGrid_DragOver"
-                      DragLeave="DockContainerGrid_DragLeave"
                       Drop="DockContainerGrid_Drop">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*" />
@@ -417,9 +416,6 @@
 
                         <!-- Central Main Viewport -->
                         <ScrollViewer x:Name="ContentScrollViewer" Grid.Column="0"
-                                      AllowDrop="True"
-                                      DragOver="DockDropOverlay_DragOver"
-                                      Drop="DockDropOverlay_Drop"
                                       HorizontalScrollBarVisibility="Disabled"
                                       VerticalScrollBarVisibility="Auto"
                                       SizeChanged="ContentScrollViewer_SizeChanged">
@@ -541,65 +537,6 @@
                             </ScrollViewer>
                         </Grid>
                     </Border>
-
-                    <!-- Drag & Drop Visual Docking Overlay Guide -->
-                    <Grid x:Name="DockDropOverlay" Grid.RowSpan="3"
-                          AllowDrop="True"
-                          Background="{ThemeResource LayerFillColorDefaultBrush}"
-                          Opacity="0.92"
-                          Visibility="Collapsed"
-                          DragOver="DockDropOverlay_DragOver"
-                          DragLeave="DockDropOverlay_DragLeave"
-                          Drop="DockDropOverlay_Drop"
-                          PointerPressed="DockDropOverlay_PointerPressed">
-                        <Grid Margin="32">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="260" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="*" />
-                                <RowDefinition Height="180" />
-                            </Grid.RowDefinitions>
-
-                            <!-- Center: Float Window Zone -->
-                            <Border x:Name="DropZoneCenter" Grid.Row="0" Grid.Column="0" Margin="16"
-                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                    BorderThickness="2" CornerRadius="12" Padding="28,24"
-                                    HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
-                                    <FontIcon Glyph="&#xE8A7;" FontSize="36" Foreground="{ThemeResource AccentFillColorDefaultBrush}" HorizontalAlignment="Center" />
-                                    <TextBlock Text="🪟 釋放以獨立浮動視窗 (Float Window)" FontWeight="SemiBold" FontSize="15" HorizontalAlignment="Center" />
-                                    <TextBlock Text="可在任意螢幕移動、縮放與獨立多工作業" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Right: Dock to Right Zone -->
-                            <Border x:Name="DropZoneRight" Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Margin="8"
-                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                    BorderThickness="2" CornerRadius="12" Padding="16">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
-                                    <FontIcon Glyph="&#xE765;" FontSize="32" Foreground="{ThemeResource AccentFillColorDefaultBrush}" HorizontalAlignment="Center" />
-                                    <TextBlock Text="◨ 釋放以側邊分屏" FontWeight="SemiBold" FontSize="14" HorizontalAlignment="Center" />
-                                    <TextBlock Text="雙欄並列高效工作" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Bottom: Dock to Bottom Zone -->
-                            <Border x:Name="DropZoneBottom" Grid.Row="1" Grid.Column="0" Margin="8"
-                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                                    BorderThickness="2" CornerRadius="12" Padding="16">
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
-                                    <FontIcon Glyph="&#xE765;" FontSize="28" Foreground="{ThemeResource AccentFillColorDefaultBrush}" HorizontalAlignment="Center" />
-                                    <TextBlock Text="⬓ 釋放以底部分屏" FontWeight="SemiBold" FontSize="14" HorizontalAlignment="Center" />
-                                    <TextBlock Text="上下水平雙分割檢視" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-                    </Grid>
                 </Grid>
 
                 <!-- Unified Bottom Status Bar with % and ETA -->

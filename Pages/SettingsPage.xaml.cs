@@ -1,6 +1,9 @@
+using System.Linq;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
+using Windows.ApplicationModel.DataTransfer;
 using DiskMasterWinUI.ViewModels;
 using DiskMasterWinUI.Services;
 
@@ -312,9 +315,69 @@ public sealed partial class SettingsPage : Page
         }
     }
 
+    private Models.TabOrderItem? _draggedTabItem;
+
+    private void TabOrderListView_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
+    {
+        _draggedTabItem = e.Items.FirstOrDefault() as Models.TabOrderItem;
+        if (_draggedTabItem != null)
+        {
+            e.Data.RequestedOperation = DataPackageOperation.Move;
+            e.Data.SetText(_draggedTabItem.Tag);
+        }
+    }
+
+    private void TabOrderListView_DragOver(object sender, DragEventArgs e)
+    {
+        if (_draggedTabItem != null)
+        {
+            e.AcceptedOperation = DataPackageOperation.Move;
+            e.DragUIOverride.IsCaptionVisible = false;
+            e.DragUIOverride.IsGlyphVisible = false;
+        }
+    }
+
+    private void TabOrderListView_Drop(object sender, DragEventArgs e)
+    {
+        if (_draggedTabItem == null || ViewModel?.TabOrderItems == null || ViewModel.TabOrderItems.Count == 0) return;
+
+        var dropPos = e.GetPosition(TabOrderListView);
+        int targetIndex = -1;
+
+        for (int i = 0; i < ViewModel.TabOrderItems.Count; i++)
+        {
+            if (TabOrderListView.ContainerFromIndex(i) is ListViewItem item)
+            {
+                var transform = item.TransformToVisual(TabOrderListView);
+                var bounds = transform.TransformBounds(new Windows.Foundation.Rect(0, 0, item.ActualWidth, item.ActualHeight));
+                if (dropPos.Y < bounds.Y + bounds.Height / 2)
+                {
+                    targetIndex = i;
+                    break;
+                }
+            }
+        }
+
+        if (targetIndex < 0)
+        {
+            targetIndex = ViewModel.TabOrderItems.Count - 1;
+        }
+
+        targetIndex = Math.Clamp(targetIndex, 0, ViewModel.TabOrderItems.Count - 1);
+
+        int oldIndex = ViewModel.TabOrderItems.IndexOf(_draggedTabItem);
+        if (oldIndex >= 0 && targetIndex >= 0 && oldIndex != targetIndex)
+        {
+            ViewModel.TabOrderItems.Move(oldIndex, targetIndex);
+            ViewModel.SaveAndApplyTabOrder();
+            Services.AudioFeedbackService.PlaySuccess();
+        }
+
+        _draggedTabItem = null;
+    }
+
     private void TabOrderListView_DragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs args)
     {
-        ViewModel.SaveAndApplyTabOrder();
-        Services.AudioFeedbackService.PlaySuccess();
+        _draggedTabItem = null;
     }
 }
