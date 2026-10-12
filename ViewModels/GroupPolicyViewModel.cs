@@ -9,6 +9,15 @@ public partial class GroupPolicyViewModel : ObservableObject
 {
     private readonly GroupPolicyService _service = new();
 
+    /// <summary>
+    /// True while this ViewModel is the one writing the policy toggle flags (page load or
+    /// refresh). The ToggleSwitch controls are bound to those flags, so such a write also
+    /// raises their Toggled event; the page ignores the event until this is false again,
+    /// otherwise the toggle command and the binding would keep flipping each other until
+    /// the UI thread stack is exhausted.
+    /// </summary>
+    [ObservableProperty] private bool _isUpdatingProgrammatically;
+
     [ObservableProperty] private string _editionName = "";
     [ObservableProperty] private string _editionId = "";
     [ObservableProperty] private bool _isHomeEdition;
@@ -39,23 +48,31 @@ public partial class GroupPolicyViewModel : ObservableObject
     [RelayCommand]
     public void RefreshStatus()
     {
-        var (id, name, isHome) = _service.GetWindowsEdition();
-        EditionId = id;
-        EditionName = name;
-        IsHomeEdition = isHome;
-        IsGpeditAvailable = _service.IsGpeditAvailable();
+        IsUpdatingProgrammatically = true;
+        try
+        {
+            var (id, name, isHome) = _service.GetWindowsEdition();
+            EditionId = id;
+            EditionName = name;
+            IsHomeEdition = isHome;
+            IsGpeditAvailable = _service.IsGpeditAvailable();
 
-        IsDisableAutoReboot = _service.GetDisableAutoRebootPolicy();
-        IsDisableTelemetry = _service.GetDisableTelemetryPolicy();
-        IsDisableSearchBoxSuggestions = _service.GetDisableSearchBoxSuggestionsPolicy();
-        IsDisableConsumerFeatures = _service.GetDisableConsumerFeaturesPolicy();
-        IsDisableDeliveryOptimization = _service.GetDisableDeliveryOptimizationPolicy();
-        IsDisableUacSecureDesktop = _service.GetDisableUacSecureDesktopPolicy();
-        IsDisableDefenderSampleSubmission = _service.GetDisableDefenderSampleSubmissionPolicy();
-        IsForceHags = _service.GetForceHagsPolicy();
+            IsDisableAutoReboot = _service.GetDisableAutoRebootPolicy();
+            IsDisableTelemetry = _service.GetDisableTelemetryPolicy();
+            IsDisableSearchBoxSuggestions = _service.GetDisableSearchBoxSuggestionsPolicy();
+            IsDisableConsumerFeatures = _service.GetDisableConsumerFeaturesPolicy();
+            IsDisableDeliveryOptimization = _service.GetDisableDeliveryOptimizationPolicy();
+            IsDisableUacSecureDesktop = _service.GetDisableUacSecureDesktopPolicy();
+            IsDisableDefenderSampleSubmission = _service.GetDisableDefenderSampleSubmissionPolicy();
+            IsForceHags = _service.GetForceHagsPolicy();
 
-        OnPropertyChanged(nameof(GpeditStatusText));
-        OnPropertyChanged(nameof(GpeditStatusBadge));
+            OnPropertyChanged(nameof(GpeditStatusText));
+            OnPropertyChanged(nameof(GpeditStatusBadge));
+        }
+        finally
+        {
+            IsUpdatingProgrammatically = false;
+        }
     }
 
     [RelayCommand]
@@ -110,64 +127,136 @@ public partial class GroupPolicyViewModel : ObservableObject
     [RelayCommand]
     public void ToggleDisableAutoReboot()
     {
-        IsDisableAutoReboot = !IsDisableAutoReboot;
-        _service.SetDisableAutoRebootPolicy(IsDisableAutoReboot);
+        IsUpdatingProgrammatically = true;
+        try
+        {
+            IsDisableAutoReboot = !IsDisableAutoReboot;
+            _service.SetDisableAutoRebootPolicy(IsDisableAutoReboot);
+        }
+        finally
+        {
+            IsUpdatingProgrammatically = false;
+        }
+
         AppendLog($"[{DateTime.Now:HH:mm:ss}] 🛑 禁止 Windows Update 自動重啟: {(IsDisableAutoReboot ? "已啟用" : "已關閉")}");
     }
 
     [RelayCommand]
     public void ToggleDisableTelemetry()
     {
-        IsDisableTelemetry = !IsDisableTelemetry;
-        _service.SetDisableTelemetryPolicy(IsDisableTelemetry);
+        IsUpdatingProgrammatically = true;
+        try
+        {
+            IsDisableTelemetry = !IsDisableTelemetry;
+            _service.SetDisableTelemetryPolicy(IsDisableTelemetry);
+        }
+        finally
+        {
+            IsUpdatingProgrammatically = false;
+        }
+
         AppendLog($"[{DateTime.Now:HH:mm:ss}] 🛑 停用 Windows 診斷與遙測收集: {(IsDisableTelemetry ? "已停用" : "已開啟")}");
     }
 
     [RelayCommand]
     public void ToggleDisableSearchBoxSuggestions()
     {
-        IsDisableSearchBoxSuggestions = !IsDisableSearchBoxSuggestions;
-        _service.SetDisableSearchBoxSuggestionsPolicy(IsDisableSearchBoxSuggestions);
+        IsUpdatingProgrammatically = true;
+        try
+        {
+            IsDisableSearchBoxSuggestions = !IsDisableSearchBoxSuggestions;
+            _service.SetDisableSearchBoxSuggestionsPolicy(IsDisableSearchBoxSuggestions);
+        }
+        finally
+        {
+            IsUpdatingProgrammatically = false;
+        }
+
         AppendLog($"[{DateTime.Now:HH:mm:ss}] 🛑 關閉開始功能表 Bing 搜尋建議: {(IsDisableSearchBoxSuggestions ? "已關閉" : "已開啟")}");
     }
 
     [RelayCommand]
     public void ToggleDisableConsumerFeatures()
     {
-        IsDisableConsumerFeatures = !IsDisableConsumerFeatures;
-        _service.SetDisableConsumerFeaturesPolicy(IsDisableConsumerFeatures);
+        IsUpdatingProgrammatically = true;
+        try
+        {
+            IsDisableConsumerFeatures = !IsDisableConsumerFeatures;
+            _service.SetDisableConsumerFeaturesPolicy(IsDisableConsumerFeatures);
+        }
+        finally
+        {
+            IsUpdatingProgrammatically = false;
+        }
+
         AppendLog($"[{DateTime.Now:HH:mm:ss}] 🛑 停用微軟消費者體驗 (廣告與推薦APP): {(IsDisableConsumerFeatures ? "已停用" : "已開啟")}");
     }
 
     [RelayCommand]
     public void ToggleDisableDeliveryOptimization()
     {
-        IsDisableDeliveryOptimization = !IsDisableDeliveryOptimization;
-        _service.SetDisableDeliveryOptimizationPolicy(IsDisableDeliveryOptimization);
+        IsUpdatingProgrammatically = true;
+        try
+        {
+            IsDisableDeliveryOptimization = !IsDisableDeliveryOptimization;
+            _service.SetDisableDeliveryOptimizationPolicy(IsDisableDeliveryOptimization);
+        }
+        finally
+        {
+            IsUpdatingProgrammatically = false;
+        }
+
         AppendLog($"[{DateTime.Now:HH:mm:ss}] 🛑 停用傳遞最佳化 P2P 頻寬佔用: {(IsDisableDeliveryOptimization ? "已停用" : "已開啟")}");
     }
 
     [RelayCommand]
     public void ToggleDisableUacSecureDesktop()
     {
-        IsDisableUacSecureDesktop = !IsDisableUacSecureDesktop;
-        _service.SetDisableUacSecureDesktopPolicy(IsDisableUacSecureDesktop);
+        IsUpdatingProgrammatically = true;
+        try
+        {
+            IsDisableUacSecureDesktop = !IsDisableUacSecureDesktop;
+            _service.SetDisableUacSecureDesktopPolicy(IsDisableUacSecureDesktop);
+        }
+        finally
+        {
+            IsUpdatingProgrammatically = false;
+        }
+
         AppendLog($"[{DateTime.Now:HH:mm:ss}] ⚡ 關閉 UAC 暗屏桌面彈窗: {(IsDisableUacSecureDesktop ? "已關閉暗屏" : "原生暗屏")}");
     }
 
     [RelayCommand]
     public void ToggleDisableDefenderSampleSubmission()
     {
-        IsDisableDefenderSampleSubmission = !IsDisableDefenderSampleSubmission;
-        _service.SetDisableDefenderSampleSubmissionPolicy(IsDisableDefenderSampleSubmission);
+        IsUpdatingProgrammatically = true;
+        try
+        {
+            IsDisableDefenderSampleSubmission = !IsDisableDefenderSampleSubmission;
+            _service.SetDisableDefenderSampleSubmissionPolicy(IsDisableDefenderSampleSubmission);
+        }
+        finally
+        {
+            IsUpdatingProgrammatically = false;
+        }
+
         AppendLog($"[{DateTime.Now:HH:mm:ss}] 🛡️ 停用 Defender 雲端自動上傳樣本: {(IsDisableDefenderSampleSubmission ? "已停用" : "已開啟")}");
     }
 
     [RelayCommand]
     public void ToggleForceHags()
     {
-        IsForceHags = !IsForceHags;
-        _service.SetForceHagsPolicy(IsForceHags);
+        IsUpdatingProgrammatically = true;
+        try
+        {
+            IsForceHags = !IsForceHags;
+            _service.SetForceHagsPolicy(IsForceHags);
+        }
+        finally
+        {
+            IsUpdatingProgrammatically = false;
+        }
+
         AppendLog($"[{DateTime.Now:HH:mm:ss}] 🎮 強制開啟硬體加速 GPU 排程 (HAGS): {(IsForceHags ? "已啟用 (需重啟)" : "已關閉")}");
     }
 
