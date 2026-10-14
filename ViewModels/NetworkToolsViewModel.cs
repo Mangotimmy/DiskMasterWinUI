@@ -75,6 +75,111 @@ public partial class NetworkToolsViewModel : ObservableObject
     [ObservableProperty] private string _newBackupNote = "";
     [ObservableProperty] private HostsBackupItem? _selectedBackup;
 
+    // ── Notepad-grade editor plumbing (never touched from the per-keystroke path) ──
+    // While the user types, the editor TextBox is the single source of truth and the document is
+    // never bound back into it. Commands that genuinely need the live text pull it exactly once
+    // through this provider (see SyncHostsEditorText); the editor calls ApplyEditorSnapshotAsync
+    // from a debounce timer only, after typing has paused.
+    public Func<string>? HostsEditorTextProvider { get; set; }
+
+    // First-character offset of every line of the last applied snapshot. Maps the caret to a
+    // line/column with a binary search instead of a full-document character scan.
+    private int[] _editorLineStarts = new[] { 0 };
+    private int _editorSnapshotLength;
+    private int _editorSnapshotGeneration;
+
+    /// <summary>
+    /// Copies the live editor text into <see cref="RawHostsText"/> once, for explicit actions
+    /// (save / format / audit). Must not be called from a per-keystroke path.
+    /// </summary>
+    public void SyncHostsEditorText()
+    {
+        var provider = HostsEditorTextProvider;
+        if (provider == null) return;
+        try
+        {
+            var live = provider();
+            if (live != null && !ReferenceEquals(live, RawHostsText)) RawHostsText = live;
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Applies a debounced snapshot of the editor text: character/line counts and the structural
+    /// health report are computed on a background thread and then marshalled to the UI thread.
+    /// </summary>
+    public Task ApplyEditorSnapshotAsync(string snapshot)
+    {
+        snapshot ??= "";
+        int generation = ++_editorSnapshotGeneration;
+        return Task.Run(() =>
+        {
+            try
+            {
+                int[] lineStarts = BuildLineIndex(snapshot, out int lineCount);
+                HostsAnalysisReport report = _hostsService.AnalyzeHosts(snapshot);
+                DispatcherHelper.RunOnUIThread(() =>
+                {
+                    if (generation != _editorSnapshotGeneration) return; // a newer snapshot already won
+                    _editorLineStarts = lineStarts;
+                    _editorSnapshotLength = snapshot.Length;
+                    TotalCharacters = snapshot.Length;
+                    LineCount = lineCount;
+                    HostsAnalysis = report;
+                });
+            }
+            catch (Exception ex)
+            {
+                DebugLogService.Instance.Error("Hosts editor debounced analysis failed", ex, "NetworkTools");
+            }
+        });
+    }
+
+    /// <summary>
+    /// Maps a caret offset onto line/column using the cached line index (O(log n) binary search).
+    /// Deliberately allocation-free: it never reads the document text out of the control.
+    /// </summary>
+    public void UpdateCursorPosition(int selectionStart)
+    {
+        var lineStarts = _editorLineStarts;
+        if (lineStarts == null || lineStarts.Length == 0) return;
+
+        int offset = selectionStart < 0 ? 0 : selectionStart;
+        int searchOffset = offset > _editorSnapshotLength ? _editorSnapshotLength : offset;
+
+        int index = Array.BinarySearch(lineStarts, searchOffset);
+        if (index < 0) index = ~index - 1;
+        if (index < 0) index = 0;
+        if (index >= lineStarts.Length) index = lineStarts.Length - 1;
+
+        int column = offset - lineStarts[index] + 1;
+        CursorLine = index + 1;
+        CursorColumn = column < 1 ? 1 : column;
+    }
+
+    /// <summary>
+    /// Records the first-character offset of every line with two flat passes and no per-line
+    /// string allocations (unlike <c>text.Split('\n')</c>, which allocates one string per line).
+    /// </summary>
+    private static int[] BuildLineIndex(string text, out int lineCount)
+    {
+        int capacity = 1;
+        for (int i = 0; i < text.Length; i++)
+        {
+            if (text[i] == '\n') capacity++;
+        }
+
+        var lineStarts = new int[capacity];
+        int count = 1;
+        for (int i = 0; i < text.Length; i++)
+        {
+            if (text[i] == '\n') lineStarts[count++] = i + 1;
+        }
+
+        lineCount = count;
+        return lineStarts;
+    }
+
     // ── 5. NetShare & File Sharing Wizard ──
     private readonly NetShareService _netShareService = new();
     public ObservableCollection<NetShareItem> NetShares { get; } = new();
@@ -589,6 +694,7 @@ public partial class NetworkToolsViewModel : ObservableObject
     [RelayCommand]
     public async Task SaveRawHostsAsync()
     {
+        SyncHostsEditorText(); // persist exactly what is on screen, including unsaved edits
         try
         {
             IsLoadingHosts = true;
@@ -620,6 +726,7 @@ public partial class NetworkToolsViewModel : ObservableObject
     [RelayCommand]
     public void RunHostsCheck()
     {
+        SyncHostsEditorText();
         HostsAnalysis = _hostsService.AnalyzeHosts(RawHostsText);
         ShowSmartAuditPanel = !ShowSmartAuditPanel;
         StatusMessage = HostsAnalysis.SummaryText;
@@ -628,6 +735,7 @@ public partial class NetworkToolsViewModel : ObservableObject
     [RelayCommand]
     public void FormatHosts()
     {
+        SyncHostsEditorText();
         RawHostsText = _hostsService.FormatAndAlignHosts(RawHostsText);
         IsModifiedUnsaved = true;
         SaveStatusDisplay = "🟡 已修改未儲存";
@@ -639,6 +747,7 @@ public partial class NetworkToolsViewModel : ObservableObject
     [RelayCommand]
     public void DeduplicateHosts()
     {
+        SyncHostsEditorText();
         RawHostsText = _hostsService.DeduplicateHosts(RawHostsText);
         IsModifiedUnsaved = true;
         SaveStatusDisplay = "🟡 已修改未儲存";

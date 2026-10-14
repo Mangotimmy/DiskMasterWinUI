@@ -193,6 +193,28 @@
                             </TabViewItem.ContextFlyout>
                         </TabViewItem>
 
+                        <TabViewItem x:Name="TabRecovery" Header="檔案復原" Tag="Recovery" IsClosable="False"
+                                      ToolTipService.ToolTip="誤刪檔案復原與 Explorer 右鍵整合 — 右鍵浮動視窗">
+                            <TabViewItem.IconSource>
+                                <FontIconSource Glyph="&#xE777;" />
+                            </TabViewItem.IconSource>
+                            <TabViewItem.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="🪟 獨立浮動視窗 [Ctrl+Shift+F]" Click="TabContext_Float_Click" />
+                                    <MenuFlyoutItem Text="◨ 停靠至視窗右側" Click="TabContext_DockRight_Click" />
+                                    <MenuFlyoutItem Text="⬓ 停靠至視窗底部" Click="TabContext_DockBottom_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="⬅️ 向左移動 [Alt+Left]" Click="TabContext_MoveLeft_Click" />
+                                    <MenuFlyoutItem Text="➡️ 向右移動 [Alt+Right]" Click="TabContext_MoveRight_Click" />
+                                    <MenuFlyoutItem Text="⏫ 移至最左側 [Alt+Home]" Click="TabContext_MoveFirst_Click" />
+                                    <MenuFlyoutItem Text="⏬ 移至最右側 [Alt+End]" Click="TabContext_MoveLast_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
+                                    <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                </MenuFlyout>
+                            </TabViewItem.ContextFlyout>
+                        </TabViewItem>
+
                         <TabViewItem x:Name="TabSystemHealth" Header="系統修復" Tag="SystemHealth" IsClosable="False"
                                       ToolTipService.ToolTip="Windows 系統修復 — 快捷鍵: Ctrl+5 / 右鍵浮動視窗">
                             <TabViewItem.IconSource>

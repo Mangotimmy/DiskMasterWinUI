@@ -415,11 +415,38 @@
                                         <FontIcon Glyph="&#xE70F;" FontSize="15" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
                                         <TextBlock Text="Windows 本機網域名稱解析 (C:\Windows\System32\drivers\etc\hosts)" FontWeight="SemiBold" VerticalAlignment="Center" />
                                     </StackPanel>
-                                    <Button Grid.Column="1" Content="🔄 重新整理" Command="{x:Bind ViewModel.RefreshHostsCommand}" />
-                                    <Button Grid.Column="2" Content="🧠 智慧體檢" Command="{x:Bind ViewModel.RunHostsCheckCommand}" />
-                                    <Button Grid.Column="3" Content="📦 歷史備份" Command="{x:Bind ViewModel.ToggleBackupDrawerCommand}" />
-                                    <Button Grid.Column="4" Content="🛡️ 還原預設" Command="{x:Bind ViewModel.RestoreDefaultHostsCommand}" />
-                                    <Button Grid.Column="5" Content="💾 儲存 Hosts" Command="{x:Bind ViewModel.SaveRawHostsCommand}" Style="{StaticResource AccentButtonStyle}" />
+                                    <!-- Icon-only actions (Notepad/Explorer style): glyph + tooltip + accessible name -->
+                                    <Button Grid.Column="1" Command="{x:Bind ViewModel.RefreshHostsCommand}"
+                                            MinWidth="0" Padding="10,7"
+                                            ToolTipService.ToolTip="重新整理 (從磁碟重新載入 Hosts 檔案)"
+                                            AutomationProperties.Name="重新整理 Hosts 檔案">
+                                        <FontIcon Glyph="&#xE72C;" FontSize="15" AutomationProperties.AccessibilityView="Raw" />
+                                    </Button>
+                                    <Button Grid.Column="2" Command="{x:Bind ViewModel.RunHostsCheckCommand}"
+                                            MinWidth="0" Padding="10,7"
+                                            ToolTipService.ToolTip="智慧體檢 (分析語法、重複與高風險項目)"
+                                            AutomationProperties.Name="Hosts 智慧體檢">
+                                        <FontIcon Glyph="&#xE9D9;" FontSize="15" AutomationProperties.AccessibilityView="Raw" />
+                                    </Button>
+                                    <Button Grid.Column="3" Command="{x:Bind ViewModel.ToggleBackupDrawerCommand}"
+                                            MinWidth="0" Padding="10,7"
+                                            ToolTipService.ToolTip="歷史備份 (多版本快照與還原)"
+                                            AutomationProperties.Name="Hosts 歷史備份">
+                                        <FontIcon Glyph="&#xE81C;" FontSize="15" AutomationProperties.AccessibilityView="Raw" />
+                                    </Button>
+                                    <Button Grid.Column="4" Command="{x:Bind ViewModel.RestoreDefaultHostsCommand}"
+                                            MinWidth="0" Padding="10,7"
+                                            ToolTipService.ToolTip="還原預設 (回復 Windows 官方 Hosts 內容)"
+                                            AutomationProperties.Name="還原預設 Hosts">
+                                        <FontIcon Glyph="&#xE7A7;" FontSize="15" AutomationProperties.AccessibilityView="Raw" />
+                                    </Button>
+                                    <Button Grid.Column="5" Command="{x:Bind ViewModel.SaveRawHostsCommand}"
+                                            Style="{StaticResource AccentButtonStyle}"
+                                            MinWidth="0" Padding="10,7"
+                                            ToolTipService.ToolTip="儲存 Hosts (寫入 C:\Windows\System32\drivers\etc\hosts)"
+                                            AutomationProperties.Name="儲存 Hosts 檔案">
+                                        <FontIcon Glyph="&#xE74E;" FontSize="15" AutomationProperties.AccessibilityView="Raw" />
+                                    </Button>
                                 </Grid>
 
                                 <!-- Quick Add Form -->
@@ -455,8 +482,14 @@
                                             <TextBlock Text="{x:Bind ViewModel.HostsAnalysis.HealthBadge, Mode=OneWay}" FontWeight="SemiBold" FontSize="12" />
                                             <TextBlock Text="{x:Bind ViewModel.HostsAnalysis.SummaryText, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
                                         </StackPanel>
-                                        <Button Grid.Column="1" Content="🧹 一鍵清除重複項目" Command="{x:Bind ViewModel.DeduplicateHostsCommand}" Margin="0,0,6,0" Padding="8,3" FontSize="11" />
-                                        <Button Grid.Column="2" Content="✕ 關閉" Command="{x:Bind ViewModel.RunHostsCheckCommand}" Padding="8,3" FontSize="11" />
+                                        <Button Grid.Column="1" Command="{x:Bind ViewModel.DeduplicateHostsCommand}" Margin="0,0,6,0" MinWidth="0" Padding="8,4"
+                                                ToolTipService.ToolTip="一鍵清除重複項目" AutomationProperties.Name="一鍵清除重複項目">
+                                            <FontIcon Glyph="&#xE74D;" FontSize="12" AutomationProperties.AccessibilityView="Raw" />
+                                        </Button>
+                                        <Button Grid.Column="2" Command="{x:Bind ViewModel.RunHostsCheckCommand}" MinWidth="0" Padding="8,4"
+                                                ToolTipService.ToolTip="關閉體檢報告" AutomationProperties.Name="關閉體檢報告">
+                                            <FontIcon Glyph="&#xE711;" FontSize="12" AutomationProperties.AccessibilityView="Raw" />
+                                        </Button>
                                     </Grid>
                                     <!-- Issue details if any -->
                                     <StackPanel Spacing="4" Visibility="{x:Bind ViewModel.HostsAnalysis.HasIssues, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -490,8 +523,14 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="📦 Hosts 多版本歷史快照與還原管理" FontWeight="Bold" FontSize="13" VerticalAlignment="Center" />
-                                        <Button Grid.Column="1" Content="📂 開啟備份目錄" Click="OpenBackupsFolder_Click" Margin="0,0,6,0" Padding="8,3" FontSize="11" />
-                                        <Button Grid.Column="2" Content="✕ 關閉" Command="{x:Bind ViewModel.ToggleBackupDrawerCommand}" Padding="8,3" FontSize="11" />
+                                        <Button Grid.Column="1" Click="OpenBackupsFolder_Click" Margin="0,0,6,0" MinWidth="0" Padding="8,4"
+                                                ToolTipService.ToolTip="開啟備份目錄" AutomationProperties.Name="開啟備份目錄">
+                                            <FontIcon Glyph="&#xE8B7;" FontSize="12" AutomationProperties.AccessibilityView="Raw" />
+                                        </Button>
+                                        <Button Grid.Column="2" Command="{x:Bind ViewModel.ToggleBackupDrawerCommand}" MinWidth="0" Padding="8,4"
+                                                ToolTipService.ToolTip="關閉備份管理" AutomationProperties.Name="關閉備份管理">
+                                            <FontIcon Glyph="&#xE711;" FontSize="12" AutomationProperties.AccessibilityView="Raw" />
+                                        </Button>
                                     </Grid>
 
                                     <!-- Create manual backup row -->
@@ -501,7 +540,10 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBox Grid.Column="0" PlaceholderText="備份備註 (例如：更新遊戲加速前備份)" Text="{x:Bind ViewModel.NewBackupNote, Mode=TwoWay}" />
-                                        <Button Grid.Column="1" Content="📦 立即手動備份目前 Hosts" Command="{x:Bind ViewModel.CreateHostsBackupCommand}" />
+                                        <Button Grid.Column="1" Command="{x:Bind ViewModel.CreateHostsBackupCommand}" MinWidth="0" Padding="9,6"
+                                                ToolTipService.ToolTip="立即手動備份目前 Hosts" AutomationProperties.Name="立即手動備份目前 Hosts">
+                                            <FontIcon Glyph="&#xE74E;" FontSize="14" AutomationProperties.AccessibilityView="Raw" />
+                                        </Button>
                                     </Grid>
 
                                     <!-- Backups list -->
@@ -519,8 +561,14 @@
                                                     <TextBlock Grid.Column="1" Text="{x:Bind DisplaySize}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
                                                     <TextBlock Grid.Column="2" Text="{x:Bind Note}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
                                                     <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6">
-                                                        <Button Content="⏪ 還原" Click="RestoreBackup_Click" Padding="6,2" FontSize="10" />
-                                                        <Button Content="🗑️ 刪除" Click="DeleteBackup_Click" Padding="6,2" FontSize="10" />
+                                                        <Button Click="RestoreBackup_Click" MinWidth="0" Padding="7,4"
+                                                                ToolTipService.ToolTip="還原此備份" AutomationProperties.Name="還原此備份">
+                                                            <FontIcon Glyph="&#xE7A7;" FontSize="12" AutomationProperties.AccessibilityView="Raw" />
+                                                        </Button>
+                                                        <Button Click="DeleteBackup_Click" MinWidth="0" Padding="7,4"
+                                                                ToolTipService.ToolTip="刪除此備份" AutomationProperties.Name="刪除此備份">
+                                                            <FontIcon Glyph="&#xE74D;" FontSize="12" AutomationProperties.AccessibilityView="Raw" />
+                                                        </Button>
                                                     </StackPanel>
                                                 </Grid>
                                             </DataTemplate>
@@ -550,52 +598,72 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
 
-                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                            <Button Click="CopyAllHosts_Click" ToolTipService.ToolTip="複製全部內容" Padding="7,4">
-                                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                                    <FontIcon Glyph="&#xE8C8;" FontSize="11" />
-                                                    <TextBlock Text="📋 複製全部" FontSize="11" />
-                                                </StackPanel>
+                                        <!-- Icon-only toolbar: every action is a FontIcon glyph with a tooltip and an accessible name -->
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                            <Button Click="CopyAllHosts_Click" MinWidth="0" Padding="9,6"
+                                                    ToolTipService.ToolTip="複製全部內容" AutomationProperties.Name="複製全部內容">
+                                                <FontIcon Glyph="&#xE8C8;" FontSize="14" AutomationProperties.AccessibilityView="Raw" />
                                             </Button>
-                                            <Button Command="{x:Bind ViewModel.FormatHostsCommand}" ToolTipService.ToolTip="自動排版與對齊欄位" Padding="7,4">
-                                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                                    <FontIcon Glyph="&#xE8D2;" FontSize="11" />
-                                                    <TextBlock Text="📐 對齊格式化" FontSize="11" />
-                                                </StackPanel>
+                                            <Button Command="{x:Bind ViewModel.FormatHostsCommand}" MinWidth="0" Padding="9,6"
+                                                    ToolTipService.ToolTip="自動排版與對齊欄位" AutomationProperties.Name="自動排版與對齊欄位">
+                                                <FontIcon Glyph="&#xE8D2;" FontSize="14" AutomationProperties.AccessibilityView="Raw" />
                                             </Button>
-                                            <Button Command="{x:Bind ViewModel.DeduplicateHostsCommand}" ToolTipService.ToolTip="去除重複的網域名稱" Padding="7,4">
-                                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                                    <FontIcon Glyph="&#xE72B;" FontSize="11" />
-                                                    <TextBlock Text="🧹 清除重複" FontSize="11" />
-                                                </StackPanel>
+                                            <Button Command="{x:Bind ViewModel.DeduplicateHostsCommand}" MinWidth="0" Padding="9,6"
+                                                    ToolTipService.ToolTip="去除重複的網域名稱" AutomationProperties.Name="去除重複的網域名稱">
+                                                <FontIcon Glyph="&#xE74D;" FontSize="14" AutomationProperties.AccessibilityView="Raw" />
                                             </Button>
-                                            <Button Click="ToggleWordWrap_Click" ToolTipService.ToolTip="切換自動換行" Padding="7,4">
-                                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                                    <FontIcon Glyph="&#xE8BD;" FontSize="11" />
-                                                    <TextBlock Text="🔤 自動換行" FontSize="11" />
-                                                </StackPanel>
+                                            <Button Click="ToggleWordWrap_Click" MinWidth="0" Padding="9,6"
+                                                    ToolTipService.ToolTip="切換自動換行" AutomationProperties.Name="切換自動換行">
+                                                <FontIcon Glyph="&#xE8BD;" FontSize="14" AutomationProperties.AccessibilityView="Raw" />
                                             </Button>
                                         </StackPanel>
 
-                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                            <Button Command="{x:Bind ViewModel.ZoomOutCommand}" ToolTipService.ToolTip="縮小字型" Padding="6,3" Content="➖" FontSize="10" />
-                                            <Button Command="{x:Bind ViewModel.ResetZoomCommand}" ToolTipService.ToolTip="重設 100%" Padding="6,3" Content="100%" FontSize="10" />
-                                            <Button Command="{x:Bind ViewModel.ZoomInCommand}" ToolTipService.ToolTip="放大字型" Padding="6,3" Content="➕" FontSize="10" />
-                                            <Button Command="{x:Bind ViewModel.OpenInSystemNotepadCommand}" ToolTipService.ToolTip="在微軟記事本程式中開啟" Padding="8,4" Style="{StaticResource AccentButtonStyle}">
-                                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                                    <FontIcon Glyph="&#xE70F;" FontSize="11" />
-                                                    <TextBlock Text="📝 在記事本開啟" FontSize="11" />
-                                                </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                            <Button Command="{x:Bind ViewModel.ZoomOutCommand}" MinWidth="0" Padding="9,6"
+                                                    ToolTipService.ToolTip="縮小字型" AutomationProperties.Name="縮小字型">
+                                                <FontIcon Glyph="&#xE71F;" FontSize="14" AutomationProperties.AccessibilityView="Raw" />
+                                            </Button>
+                                            <Button Command="{x:Bind ViewModel.ResetZoomCommand}" MinWidth="0" Padding="9,6"
+                                                    ToolTipService.ToolTip="重設縮放為 100%" AutomationProperties.Name="重設縮放為 100%">
+                                                <FontIcon Glyph="&#xE71E;" FontSize="14" AutomationProperties.AccessibilityView="Raw" />
+                                            </Button>
+                                            <Button Command="{x:Bind ViewModel.ZoomInCommand}" MinWidth="0" Padding="9,6"
+                                                    ToolTipService.ToolTip="放大字型" AutomationProperties.Name="放大字型">
+                                                <FontIcon Glyph="&#xE8A3;" FontSize="14" AutomationProperties.AccessibilityView="Raw" />
+                                            </Button>
+                                            <Button Command="{x:Bind ViewModel.OpenInSystemNotepadCommand}" Style="{StaticResource AccentButtonStyle}"
+                                                    MinWidth="0" Padding="9,6"
+                                                    ToolTipService.ToolTip="在微軟記事本程式中開啟" AutomationProperties.Name="在微軟記事本程式中開啟">
+                                                <FontIcon Glyph="&#xE70F;" FontSize="14" AutomationProperties.AccessibilityView="Raw" />
                                             </Button>
                                         </StackPanel>
                                     </Grid>
                                 </Border>
 
-                                <!-- Raw Editor Box with DirectManipulation Inertia and Ln/Col tracking -->
+                                <!--
+                                    ══ Rendering decision for this editor (editable multi-line text) ══
+                                    Win2D (Microsoft.Graphics.Win2D): a custom-draw canvas. Rendering an editable document
+                                      with it means re-implementing caret, selection, mouse hit-testing, IME composition,
+                                      clipboard, undo and accessibility (UIA) by hand; also the package is not present in this
+                                      machine's offline NuGet cache, so it must not become a dependency.
+                                    SwapChainPanel: meant for 3D / custom-shader swap chains. It provides no text layout,
+                                      no caret and no accessibility at all.
+                                    Microsoft.UI.Composition: in-box API (no package). Correct only for overlays and
+                                      decorations that do not own the text, e.g. a line-number gutter, minimap or animated
+                                      scroll indicator, because their animation runs on the compositor thread.
+                                    Decision here: keep the in-box TextBox as the single editable control (WinUI's text stack
+                                      already provides caret, selection, IME, clipboard, undo and UIA) and make the XAML path
+                                      cheap instead: no per-keystroke document read, no re-parse, no round-trip of the whole
+                                      document back into the control, NoWrap + monospace + spell-check off so the layout engine
+                                      never reflows a line. Parsing, line counting and the health audit are debounced and run on
+                                      a background thread. A future gutter/minimap should be a sibling overlay driven by the
+                                      debounced line index, not a replacement for the TextBox.
+                                -->
                                 <TextBox x:Name="HostsEditorTextBox" Grid.Row="1"
-                                         Text="{x:Bind ViewModel.RawHostsText, Mode=TwoWay}"
                                          FontSize="{x:Bind ViewModel.EditorFontSize, Mode=OneWay}"
                                          AcceptsReturn="True" TextWrapping="NoWrap"
+                                         IsSpellCheckEnabled="False"
+                                         IsTextPredictionEnabled="False"
                                          ScrollViewer.VerticalScrollBarVisibility="Visible"
                                          ScrollViewer.HorizontalScrollBarVisibility="Auto"
                                          ScrollViewer.VerticalScrollMode="Enabled"
@@ -605,6 +673,7 @@
                                          TextChanged="HostsTextBox_TextChanged"
                                          FontFamily="Consolas"
                                          BorderThickness="0" Background="Transparent"
+                                         AutomationProperties.Name="Hosts 檔案內容編輯器"
                                          VerticalAlignment="Stretch" HorizontalAlignment="Stretch" MinHeight="300" Padding="12" />
                             </Grid>
                         </Border>

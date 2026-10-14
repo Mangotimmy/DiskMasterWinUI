@@ -31,6 +31,10 @@ public partial class SystemPerformanceViewModel : ObservableObject
 
     private bool _isInitialized;
 
+    // C1: PID-keyed row cache (reuse ProcessHunterItem instead of rebuilding) + filter bookkeeping.
+    private readonly Dictionary<int, ProcessHunterItem> _processIndex = new();
+    private readonly HashSet<int> _filteredIndex = new();
+
     public SystemPerformanceViewModel()
     {
         _refreshTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
@@ -71,7 +75,7 @@ public partial class SystemPerformanceViewModel : ObservableObject
             // Execute metrics, process hunter, and system profile concurrently
             await Task.WhenAll(
                 RefreshMetricsAsync(),
-                RefreshProcessesAsync(),
+                RefreshProcessesCoreAsync(forceWmicRefresh: true),
                 RefreshSystemInfoAsync()
             );
         }
@@ -190,13 +194,20 @@ public partial class SystemPerformanceViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public async Task RefreshProcessesAsync()
+    public Task RefreshProcessesAsync() => RefreshProcessesCoreAsync(forceWmicRefresh: false);
+
+    /// <summary>
+    /// C1: refreshes the process rows in place. Rows are keyed by PID - the existing
+    /// <see cref="ProcessHunterItem"/> is reused and only fields that actually changed are written,
+    /// so a tick with no real change raises zero CollectionChanged events (previously every tick did
+    /// Clear() + ~300 Add() and allocated ~300 new items).
+    /// </summary>
+    public async Task RefreshProcessesCoreAsync(bool forceWmicRefresh)
     {
         try
         {
-            var procs = await _perfService.GetRunningProcessesDeepAsync();
-            AllProcesses.Clear();
-            foreach (var p in procs) AllProcesses.Add(p);
+            var procs = await _perfService.GetRunningProcessesDeepAsync(forceWmicRefresh: forceWmicRefresh);
+            MergeProcesses(procs);
             ApplyProcessFilter();
             StatusMessage = $"Processes updated: {AllProcesses.Count} active (Orphans: {AllProcesses.Count(p => p.IsOrphan)})";
         }
@@ -204,6 +215,75 @@ public partial class SystemPerformanceViewModel : ObservableObject
         {
             StatusMessage = $"Failed to fetch processes: {ex.Message}";
         }
+    }
+
+    private void MergeProcesses(List<ProcessHunterItem> incoming)
+    {
+        var livePids = new HashSet<int>();
+        foreach (var p in incoming)
+        {
+            livePids.Add(p.Pid);
+            if (_processIndex.TryGetValue(p.Pid, out var existing))
+            {
+                if (existing.ParentPid != p.ParentPid)
+                {
+                    // PID reuse (identity change): HierarchyDisplay is computed from Pid/ParentPid and the
+                    // model exposes no change hook for it, so swap the row - a rare event - instead of
+                    // silently showing a stale parent chain.
+                    ReplaceProcessItem(existing, p);
+                    _processIndex[p.Pid] = p;
+                }
+                else
+                {
+                    CopyChangedFields(existing, p);
+                }
+            }
+            else
+            {
+                _processIndex[p.Pid] = p;
+                AllProcesses.Add(p);
+            }
+        }
+
+        if (_processIndex.Count == livePids.Count) return;
+
+        foreach (var stalePid in _processIndex.Keys.Where(pid => !livePids.Contains(pid)).ToList())
+        {
+            if (_processIndex.Remove(stalePid, out var gone))
+            {
+                AllProcesses.Remove(gone);
+                if (_filteredIndex.Remove(stalePid))
+                {
+                    FilteredProcesses.Remove(gone);
+                }
+            }
+        }
+    }
+
+    /// <summary>Replaces a reused PID's row in place (observable Replace, index preserved).</summary>
+    private void ReplaceProcessItem(ProcessHunterItem oldItem, ProcessHunterItem newItem)
+    {
+        var allIndex = AllProcesses.IndexOf(oldItem);
+        if (allIndex >= 0) AllProcesses[allIndex] = newItem;
+
+        var filteredIndex = FilteredProcesses.IndexOf(oldItem);
+        if (filteredIndex >= 0) FilteredProcesses[filteredIndex] = newItem;
+    }
+
+    /// <summary>Copies only the fields whose values differ, avoiding needless PropertyChanged storms.</summary>
+    private static void CopyChangedFields(ProcessHunterItem target, ProcessHunterItem source)
+    {
+        if (target.ProcessName != source.ProcessName) target.ProcessName = source.ProcessName;
+        if (target.ExecutablePath != source.ExecutablePath) target.ExecutablePath = source.ExecutablePath;
+        if (target.CommandLine != source.CommandLine) target.CommandLine = source.CommandLine;
+        if (target.MemoryBytes != source.MemoryBytes) target.MemoryBytes = source.MemoryBytes;
+        if (target.DisplayMemory != source.DisplayMemory) target.DisplayMemory = source.DisplayMemory;
+        if (target.IsResponding != source.IsResponding) target.IsResponding = source.IsResponding;
+        if (target.IsOrphan != source.IsOrphan) target.IsOrphan = source.IsOrphan;
+        if (target.IsSystemProtected != source.IsSystemProtected) target.IsSystemProtected = source.IsSystemProtected;
+        if (target.StatusBadge != source.StatusBadge) target.StatusBadge = source.StatusBadge;
+        // ParentPid is intentionally absent: a changed parent is handled by ReplaceProcessItem so the
+        // computed HierarchyDisplay re-evaluates.
     }
 
     [RelayCommand]
@@ -222,19 +302,65 @@ public partial class SystemPerformanceViewModel : ObservableObject
         ApplyProcessFilter();
     }
 
+    /// <summary>
+    /// C1: incremental filter. The previous implementation cleared and re-added the whole filtered
+    /// collection on every keystroke; this version diffs against the current list and only emits the
+    /// Insert/Remove/Move events that the new result actually requires (identical final ordering).
+    /// </summary>
     private void ApplyProcessFilter()
     {
-        FilteredProcesses.Clear();
         var query = ProcessSearchQuery.Trim();
-        var matches = string.IsNullOrEmpty(query)
-            ? AllProcesses
-            : AllProcesses.Where(p =>
-                p.ProcessName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                p.Pid.ToString().Contains(query) ||
-                p.CommandLine.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                p.ExecutablePath.Contains(query, StringComparison.OrdinalIgnoreCase));
 
-        foreach (var m in matches) FilteredProcesses.Add(m);
+        bool Matches(ProcessHunterItem p) =>
+            string.IsNullOrEmpty(query) ||
+            p.ProcessName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+            p.Pid.ToString().Contains(query) ||
+            p.CommandLine.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+            p.ExecutablePath.Contains(query, StringComparison.OrdinalIgnoreCase);
+
+        var desiredCount = 0;
+        for (int i = 0; i < AllProcesses.Count; i++)
+        {
+            var item = AllProcesses[i];
+            if (!Matches(item))
+            {
+                if (_filteredIndex.Remove(item.Pid))
+                {
+                    FilteredProcesses.Remove(item);
+                }
+                continue;
+            }
+
+            if (desiredCount < FilteredProcesses.Count && ReferenceEquals(FilteredProcesses[desiredCount], item))
+            {
+                desiredCount++;
+                continue;
+            }
+
+            int existingIndex = -1;
+            for (int j = desiredCount; j < FilteredProcesses.Count; j++)
+            {
+                if (ReferenceEquals(FilteredProcesses[j], item)) { existingIndex = j; break; }
+            }
+
+            if (existingIndex >= 0)
+            {
+                FilteredProcesses.Move(existingIndex, desiredCount);
+            }
+            else
+            {
+                FilteredProcesses.Insert(desiredCount, item);
+                _filteredIndex.Add(item.Pid);
+            }
+            desiredCount++;
+        }
+
+        while (FilteredProcesses.Count > desiredCount)
+        {
+            var tail = FilteredProcesses[FilteredProcesses.Count - 1];
+            FilteredProcesses.RemoveAt(FilteredProcesses.Count - 1);
+            _filteredIndex.Remove(tail.Pid);
+        }
     }
 
     [RelayCommand]
@@ -252,7 +378,7 @@ public partial class SystemPerformanceViewModel : ObservableObject
         StatusMessage = $"Terminating PID {item.Pid} ({item.ProcessName}) and child tree...";
         var (ok, msg) = await _perfService.KillProcessTreeAsync(item.Pid);
         StatusMessage = msg;
-        await RefreshProcessesAsync();
+        await RefreshProcessesCoreAsync(forceWmicRefresh: true);
     }
 
     [RelayCommand]
@@ -261,6 +387,6 @@ public partial class SystemPerformanceViewModel : ObservableObject
         StatusMessage = "Terminating all unresponsive processes...";
         var (ok, msg) = await _perfService.KillAllNotRespondingAsync();
         StatusMessage = msg;
-        await RefreshProcessesAsync();
+        await RefreshProcessesCoreAsync(forceWmicRefresh: true);
     }
 }

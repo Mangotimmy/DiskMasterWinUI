@@ -1,6 +1,8 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
+using Microsoft.UI.Dispatching;
+using System.ComponentModel;
 using DiskMasterWinUI.Models;
 using DiskMasterWinUI.Services;
 using DiskMasterWinUI.ViewModels;
@@ -11,6 +13,11 @@ public sealed partial class NetworkToolsPage : Page
 {
     public NetworkToolsViewModel ViewModel { get; } = new();
 
+    // Hosts editor: typing only restarts this debounce timer; the document is parsed after the
+    // user pauses so no per-keystroke work ever runs on the UI thread.
+    private DispatcherQueueTimer? _hostsEditorDebounce;
+    private bool _isPushingHostsText;
+
     public NetworkToolsPage()
     {
         InitializeComponent();
@@ -19,6 +26,11 @@ public sealed partial class NetworkToolsPage : Page
         DiskMasterWinUI.Helpers.TabReorderHelper.Attach(NetTabView);
         ApplyLanguage();
         LocalizationService.Instance.LanguageChanged += ApplyLanguage;
+
+        // The editor text is exchanged through these two hooks instead of a two-way binding on
+        // TextBox.Text, so a keystroke never round-trips the whole document through the ViewModel.
+        ViewModel.HostsEditorTextProvider = () => HostsEditorTextBox.Text;
+        ViewModel.PropertyChanged += OnViewModelPropertyChanged;
     }
 
     public void ApplyLanguage()
@@ -93,7 +105,23 @@ public sealed partial class NetworkToolsPage : Page
     private void Page_Loaded(object sender, RoutedEventArgs e)
     {
         ApplyLanguage();
-        _ = ViewModel.InitializeAsync();
+        RunObserved(ViewModel.InitializeAsync(), "NetworkToolsPage.InitializeAsync");
+    }
+
+    /// <summary>
+    /// Fire-and-forget with an explicit fault report: background work started from a UI event must
+    /// never fail silently, so every fault goes to the global exception handler.
+    /// </summary>
+    private static async void RunObserved(Task task, string context)
+    {
+        try
+        {
+            await task;
+        }
+        catch (Exception ex)
+        {
+            DiskMasterWinUI.Helpers.GlobalExceptionHandler.ReportException(ex, context);
+        }
     }
 
     private void PresetMinecraft_Click(object sender, RoutedEventArgs e)
@@ -209,38 +237,91 @@ public sealed partial class NetworkToolsPage : Page
         }
     }
 
+    // ══════════════════════════════════════════════════════════
+    //  Hosts editor: Notepad-smooth plumbing
+    // ══════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Loads a document pushed by the ViewModel (initial load / refresh / format / deduplicate /
+    /// restore). Explicit user actions only — never part of a keystroke.
+    /// </summary>
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(NetworkToolsViewModel.RawHostsText)) return;
+        if (HostsEditorTextBox == null) return;
+
+        string text = ViewModel.RawHostsText ?? "";
+        // One full copy of the document is created by this comparison; acceptable for an explicit
+        // action, which is exactly why it is not on the typing path.
+        if (HostsEditorTextBox.Text == text) return;
+
+        _isPushingHostsText = true;
+        try
+        {
+            HostsEditorTextBox.Text = text;
+            HostsEditorTextBox.SelectionStart = 0;
+        }
+        finally
+        {
+            _isPushingHostsText = false;
+        }
+
+        ScheduleHostsEditorRefresh();
+    }
+
+    /// <summary>
+    /// Per-keystroke path: O(1) and allocation-free. TextBox.Text is deliberately NOT read here
+    /// (every read marshals a full managed copy of the document out of the control), the document
+    /// is never split or scanned, and the ViewModel is notified only when its state actually flips.
+    /// </summary>
+    private void HostsTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (!_isPushingHostsText && !ViewModel.IsModifiedUnsaved)
+        {
+            ViewModel.IsModifiedUnsaved = true;
+            ViewModel.SaveStatusDisplay = "🟡 已修改未儲存";
+        }
+
+        ScheduleHostsEditorRefresh();
+    }
+
+    /// <summary>
+    /// O(log n) caret mapping against the cached line index — the previous implementation walked
+    /// every character from index 0 to the caret on every caret move and every keystroke.
+    /// </summary>
     private void HostsTextBox_SelectionChanged(object sender, RoutedEventArgs e)
     {
         if (sender is TextBox tb)
         {
-            int selStart = tb.SelectionStart;
-            string text = tb.Text ?? "";
-            if (selStart > text.Length) selStart = text.Length;
-            int line = 1;
-            int lastLineStart = 0;
-            for (int i = 0; i < selStart; i++)
-            {
-                if (text[i] == '\n')
-                {
-                    line++;
-                    lastLineStart = i + 1;
-                }
-            }
-            int col = selStart - lastLineStart + 1;
-            ViewModel.CursorLine = line;
-            ViewModel.CursorColumn = col;
+            ViewModel.UpdateCursorPosition(tb.SelectionStart);
         }
     }
 
-    private void HostsTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    /// <summary>Restarts the debounce timer. The parse/highlight work only runs once typing pauses.</summary>
+    private void ScheduleHostsEditorRefresh()
     {
-        if (sender is TextBox tb)
+        var timer = _hostsEditorDebounce;
+        if (timer == null)
         {
-            ViewModel.TotalCharacters = tb.Text.Length;
-            ViewModel.LineCount = tb.Text.Split('\n').Length;
-            ViewModel.IsModifiedUnsaved = true;
-            ViewModel.SaveStatusDisplay = "🟡 已修改未儲存";
+            var queue = DiskMasterWinUI.Helpers.DispatcherHelper.UIDispatcher ?? DispatcherQueue.GetForCurrentThread();
+            if (queue == null) return;
+
+            timer = queue.CreateTimer();
+            timer.Interval = TimeSpan.FromMilliseconds(200);
+            timer.IsRepeating = false;
+            timer.Tick += HostsEditorDebounce_Tick;
+            _hostsEditorDebounce = timer;
         }
+
+        timer.Stop();
+        timer.Start();
+    }
+
+    private void HostsEditorDebounce_Tick(DispatcherQueueTimer sender, object args)
+    {
+        sender.Stop();
+        string snapshot = HostsEditorTextBox.Text; // one copy, only after the user stopped typing
+        RunObserved(ViewModel.ApplyEditorSnapshotAsync(snapshot), "NetworkToolsPage.HostsEditorDebounce");
     }
 
     private void ToggleWordWrap_Click(object sender, RoutedEventArgs e)
@@ -255,7 +336,7 @@ public sealed partial class NetworkToolsPage : Page
     private void CopyAllHosts_Click(object sender, RoutedEventArgs e)
     {
         var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
-        dp.SetText(ViewModel.RawHostsText);
+        dp.SetText(HostsEditorTextBox.Text);
         Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
         ViewModel.StatusMessage = "已將全部 Hosts 內容複製到剪貼簿。";
         AudioFeedbackService.PlaySuccess();

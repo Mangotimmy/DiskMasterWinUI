@@ -186,7 +186,9 @@ public class HostsService
                     }
                 }
 
-                File.WriteAllText(HostsPath, rawContent, new UTF8Encoding(false));
+                // Atomic swap: the live hosts file is never truncated in place, so a crash, disk-full
+                // or power loss mid-write cannot leave an empty or partial hosts file behind.
+                WriteHostsAtomically(rawContent);
 
                 // Flush DNS cache
                 FlushDnsCache();
@@ -202,6 +204,49 @@ public class HostsService
                 return (false, $"儲存 Hosts 檔案時發生錯誤: {ex.Message}");
             }
         });
+    }
+
+    /// <summary>
+    /// Writes the hosts file through a temp file in the same directory followed by an atomic
+    /// replace. <c>File.WriteAllText</c> truncates the destination first, so an interrupted write
+    /// could leave the machine without name resolution; this path never touches the live file
+    /// until the complete content is on disk.
+    /// </summary>
+    private static void WriteHostsAtomically(string rawContent)
+    {
+        string directory = Path.GetDirectoryName(HostsPath) ?? HostsPath;
+        string tempPath = Path.Combine(directory, $"hosts.dsh-{Guid.NewGuid():N}.tmp");
+        var encoding = new UTF8Encoding(false);
+
+        try
+        {
+            File.WriteAllText(tempPath, rawContent, encoding);
+
+            if (File.Exists(HostsPath))
+            {
+                try
+                {
+                    // ReplaceFile keeps the original untouched unless the swap itself succeeds.
+                    File.Replace(tempPath, HostsPath, destinationBackupFileName: null, ignoreMetadataErrors: true);
+                }
+                catch (Exception ex) when (ex is IOException or PlatformNotSupportedException or UnauthorizedAccessException)
+                {
+                    File.Move(tempPath, HostsPath, overwrite: true);
+                }
+            }
+            else
+            {
+                File.Move(tempPath, HostsPath);
+            }
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempPath)) File.Delete(tempPath);
+            }
+            catch { }
+        }
     }
 
     /// <summary>

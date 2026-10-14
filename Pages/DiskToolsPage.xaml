@@ -1125,6 +1125,232 @@
                 </ScrollViewer>
             </TabViewItem>
 
+            <!-- ── Tab 5: 磁碟複製與格式化 (Raw Block Clone / VHDX Image / ReFS Format) ── -->
+            <TabViewItem x:Name="TabCloneFormat" Header="🧬 複製與格式化 (Clone &amp; Format)" IsClosable="False">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                    <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
+
+                        <!-- Card 1: Raw block level clone + VHDX image mode -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE8C8;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                    <TextBlock Text="🧬 磁碟 / 磁碟區區塊級複製與 VHDX 映像" FontWeight="SemiBold" FontSize="16" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Text="兩種模式：(1) 原始區塊複製 — 直接以 \\.\PhysicalDriveN / \\.\X: 原始裝置控制代碼逐磁區複製，磁區大小由裝置讀取（不假設 512B），寫入前先驗證容量與幾何。(2) VHDX 映像 — 將磁碟或磁碟區製作成 .vhdx 映像，並可還原回實體裝置，映像可再次掛載使用。"
+                                           Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                                <!-- Safety notice -->
+                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10">
+                                    <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                               Text="⚠️ 安全限制：需要系統管理員權限；系統磁碟 / 開機磁碟區與來源本身會被拒絕；容量驗證在任何寫入之前完成；所有破壞性動作都需要勾選確認對話框，取消時目標可能停留在「部分複製」狀態並會明確回報。" />
+                                </Border>
+
+                                <!-- Mode selection -->
+                                <ComboBox Header="複製模式 (Clone Mode)" HorizontalAlignment="Stretch"
+                                          ItemsSource="{x:Bind ViewModel.CloneModeOptions}"
+                                          SelectedItem="{x:Bind ViewModel.CloneMode, Mode=TwoWay}" />
+
+                                <!-- Inventory -->
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="🔄 重新整理裝置清單 (diskpart list disk/volume)"
+                                            Command="{x:Bind ViewModel.RefreshCloneInventoryCommand}" />
+                                    <Button Content="📁 瀏覽映像輸出資料夾"
+                                            Command="{x:Bind ViewModel.BrowseCloneImageCommand}" />
+                                    <Button Content="📂 選擇既有 .vhdx 映像"
+                                            Command="{x:Bind ViewModel.BrowseCloneImageSourceCommand}" />
+                                </StackPanel>
+
+                                <!-- Source / target -->
+                                <Grid ColumnSpacing="12" RowSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox Grid.Column="0" Header="來源裝置 (Source)" HorizontalAlignment="Stretch"
+                                              ItemsSource="{x:Bind ViewModel.CloneDevices, Mode=OneWay}"
+                                              DisplayMemberPath="DisplayName"
+                                              SelectedItem="{x:Bind ViewModel.CloneSourceDevice, Mode=TwoWay}" />
+                                    <ComboBox Grid.Column="1" Header="目標裝置 (Target)" HorizontalAlignment="Stretch"
+                                              ItemsSource="{x:Bind ViewModel.CloneDevices, Mode=OneWay}"
+                                              DisplayMemberPath="DisplayName"
+                                              SelectedItem="{x:Bind ViewModel.CloneTargetDevice, Mode=TwoWay}" />
+                                </Grid>
+
+                                <TextBox Header="VHDX 映像路徑 (建立映像輸出 / 還原來源)"
+                                         Text="{x:Bind ViewModel.CloneImagePath, Mode=TwoWay}"
+                                         PlaceholderText="D:\Images\DiskImage_20250101_120000.vhdx" />
+
+                                <!-- Options -->
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <ToggleSwitch Grid.Column="0" Header="寫入後讀回驗證 (逐磁區比對)"
+                                                  OffContent="不驗證（較快）" OnContent="寫入完成後重新讀取並比對"
+                                                  IsOn="{x:Bind ViewModel.CloneVerifyAfterWrite, Mode=TwoWay}" />
+                                    <ToggleSwitch Grid.Column="1" Header="目標整顆磁碟先離線 (diskpart offline disk)"
+                                                  OffContent="維持上線" OnContent="先離線以避免檔案系統干擾"
+                                                  IsOn="{x:Bind ViewModel.CloneOfflineTargetFirst, Mode=TwoWay}" />
+                                </Grid>
+
+                                <!-- Geometry -->
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="🔍 讀取裝置幾何與計畫檢查"
+                                            Command="{x:Bind ViewModel.LoadCloneGeometryCommand}"
+                                            Style="{StaticResource AccentButtonStyle}" />
+                                </StackPanel>
+                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10">
+                                    <TextBlock Text="{x:Bind ViewModel.CloneGeometryText, Mode=OneWay}"
+                                               FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                                </Border>
+
+                                <!-- Progress -->
+                                <ProgressBar Value="{x:Bind ViewModel.CloneProgress, Mode=OneWay}" Maximum="100" Height="8" />
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Bind ViewModel.CloneStageText, Mode=OneWay}" FontWeight="SemiBold" />
+                                    <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.CloneProgressText, Mode=OneWay}" />
+                                </Grid>
+                                <StackPanel Orientation="Horizontal" Spacing="18">
+                                    <TextBlock Text="{x:Bind ViewModel.CloneThroughputText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" />
+                                    <TextBlock Text="{x:Bind ViewModel.CloneEtaText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" />
+                                </StackPanel>
+
+                                <!-- Actions -->
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Content="▶️ 開始複製 / 建立映像 / 還原"
+                                            Click="StartClone_Click"
+                                            Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch"
+                                            IsEnabled="{x:Bind ViewModel.IsCloning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}" />
+                                    <Button Grid.Column="1" Content="⏹️ 取消目前作業"
+                                            Command="{x:Bind ViewModel.CancelCloneCommand}"
+                                            HorizontalAlignment="Stretch" />
+                                </Grid>
+
+                                <ProgressRing IsActive="{x:Bind ViewModel.IsCloning, Mode=OneWay}" Width="20" Height="20" HorizontalAlignment="Left" />
+
+                                <!-- Log -->
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="複製日誌 (Clone Log)" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" Content="Clear" Command="{x:Bind ViewModel.ClearCloneLogCommand}"
+                                            Padding="8,2" FontSize="11" HorizontalAlignment="Left" />
+                                </Grid>
+                                <ScrollViewer MaxHeight="220" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                              CornerRadius="6" Padding="10">
+                                    <TextBlock Text="{x:Bind ViewModel.CloneLog, Mode=OneWay}"
+                                               FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                                </ScrollViewer>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Card 2: Volume format (NTFS / FAT32 / exFAT / ReFS) -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE8B7;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                    <TextBlock Text="🧩 磁碟區格式化 (NTFS / FAT32 / exFAT / ReFS)" FontWeight="SemiBold" FontSize="16" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Text="與既有 NTFS 路徑一致：可設定標籤、快速格式化與叢集大小。新增 ReFS 選項並在執行前先檢查支援狀態，不支援時直接給出明確原因，而不是顯示原始 diskpart 錯誤。"
+                                           Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10">
+                                    <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               Text="ℹ️ ReFS 限制：需要 Windows Pro for Workstations / Enterprise / Server（Home、Pro 用戶端不支援）；不可用於可卸除媒體（USB / 讀卡機）；不可格式化開機 / 系統磁碟區；用戶端叢集大小僅允許 4096 或 65536 bytes。" />
+                                </Border>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Content="🛡️ 檢查 ReFS 支援狀態" Command="{x:Bind ViewModel.CheckReFsSupportCommand}" />
+                                    <Button Content="🔄 重新整理磁碟區清單" Command="{x:Bind ViewModel.RefreshFormatVolumesCommand}" />
+                                </StackPanel>
+                                <TextBlock Text="{x:Bind ViewModel.ReFsSupportText, Mode=OneWay}" TextWrapping="Wrap"
+                                           Style="{StaticResource CaptionTextBlockStyle}" FontWeight="SemiBold" />
+
+                                <ComboBox Header="目標磁碟區 (Target Volume)" HorizontalAlignment="Stretch"
+                                          ItemsSource="{x:Bind ViewModel.FormatVolumes, Mode=OneWay}"
+                                          DisplayMemberPath="Summary"
+                                          SelectedItem="{x:Bind ViewModel.FormatSelectedVolume, Mode=TwoWay}" />
+
+                                <Grid ColumnSpacing="12" RowSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox Grid.Column="0" Header="檔案系統" HorizontalAlignment="Stretch"
+                                              ItemsSource="{x:Bind ViewModel.FormatFileSystemOptions}"
+                                              SelectedItem="{x:Bind ViewModel.FormatFileSystem, Mode=TwoWay}" />
+                                    <TextBox Grid.Column="1" Header="磁碟區標籤 (Label)"
+                                             Text="{x:Bind ViewModel.FormatLabel, Mode=TwoWay}"
+                                             PlaceholderText="DATA" />
+                                    <ComboBox Grid.Column="2" Header="叢集大小 (bytes)" HorizontalAlignment="Stretch"
+                                              ItemsSource="{x:Bind ViewModel.FormatClusterSizeOptions}"
+                                              SelectedItem="{x:Bind ViewModel.FormatClusterSize, Mode=TwoWay}" />
+                                </Grid>
+
+                                <ToggleSwitch Header="快速格式化 (Quick Format)"
+                                              OffContent="完整格式化（抹除整個磁碟區，可能耗時數小時）"
+                                              OnContent="快速格式化（僅重建檔案系統中繼資料）"
+                                              IsOn="{x:Bind ViewModel.FormatQuick, Mode=TwoWay}" />
+
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Content="✅ 執行格式化 (需要確認對話框)"
+                                            Click="StartFormat_Click"
+                                            Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch"
+                                            IsEnabled="{x:Bind ViewModel.IsFormatting, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}" />
+                                    <Button Grid.Column="1" Content="⏹️ 取消格式化 (中止 diskpart 並釋放鎖定)"
+                                            Command="{x:Bind ViewModel.CancelFormatCommand}"
+                                            HorizontalAlignment="Stretch" />
+                                    <ProgressRing Grid.Column="2" IsActive="{x:Bind ViewModel.IsFormatting, Mode=OneWay}" Width="20" Height="20" />
+                                </Grid>
+
+                                <TextBlock Text="{x:Bind ViewModel.FormatStatusText, Mode=OneWay}" FontWeight="SemiBold"
+                                           Foreground="{ThemeResource AccentFillColorDefaultBrush}" TextWrapping="Wrap" />
+
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="格式化日誌 (Format Log)" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" Content="Clear" Command="{x:Bind ViewModel.ClearFormatLogCommand}"
+                                            Padding="8,2" FontSize="11" HorizontalAlignment="Left" />
+                                </Grid>
+                                <ScrollViewer MaxHeight="200" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                              CornerRadius="6" Padding="10">
+                                    <TextBlock Text="{x:Bind ViewModel.FormatLog, Mode=OneWay}"
+                                               FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                                </ScrollViewer>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabViewItem>
+
             <!-- ── Tab 7: 磁碟目錄空間與功能指南 (Storage Directory Encyclopedia) ── -->
             <TabViewItem x:Name="TabDirectoryAnalyzer" Header="📁 目錄空間指南 (Storage Directory Guide)" IsClosable="False">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">

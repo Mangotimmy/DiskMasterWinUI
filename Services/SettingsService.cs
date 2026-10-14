@@ -97,6 +97,7 @@ public class SettingsService
     public static SettingsService Instance => _instance.Value;
 
     private readonly string _settingsFilePath;
+    private readonly object _saveLock = new();
     public AppSettings Current { get; private set; } = new();
 
     public event Action? SettingsChanged;
@@ -130,8 +131,32 @@ public class SettingsService
     {
         try
         {
-            var json = JsonSerializer.Serialize(Current, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(_settingsFilePath, json);
+            lock (_saveLock)
+            {
+                var json = JsonSerializer.Serialize(Current, new JsonSerializerOptions { WriteIndented = true });
+
+                // Atomic swap: File.WriteAllText truncates first, and a torn/partial write makes
+                // Load() silently fall back to defaults for every setting in the file.
+                var tempPath = _settingsFilePath + ".tmp";
+                File.WriteAllText(tempPath, json);
+                try
+                {
+                    if (File.Exists(_settingsFilePath))
+                    {
+                        File.Replace(tempPath, _settingsFilePath, null);
+                    }
+                    else
+                    {
+                        File.Move(tempPath, _settingsFilePath);
+                    }
+                }
+                catch (IOException)
+                {
+                    // File.Replace can fail while another reader holds the file briefly.
+                    File.Move(tempPath, _settingsFilePath, overwrite: true);
+                }
+            }
+
             SettingsChanged?.Invoke();
         }
         catch { }

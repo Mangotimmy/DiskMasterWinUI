@@ -251,6 +251,7 @@ public class WindowsDownloadService
 
             var (sha256, sha1) = await ComputeHashesAsync(tempPartFile, cancellationToken);
             onLog?.Invoke($"[HASH RESULT] 計算 SHA-256: {sha256}");
+            bool hashKnown = !string.IsNullOrEmpty(item.Sha256Hash) || !string.IsNullOrEmpty(item.Sha1Hash);
             var isVerified = false;
 
             if (!string.IsNullOrEmpty(item.Sha256Hash))
@@ -263,16 +264,28 @@ public class WindowsDownloadService
                 onLog?.Invoke($"[HASH RESULT] 官方 SHA-1: {item.Sha1Hash}");
                 isVerified = string.Equals(sha1, item.Sha1Hash, StringComparison.OrdinalIgnoreCase);
             }
-            else
+
+            if (hashKnown && !isVerified)
             {
-                isVerified = true;
+                // A mismatch means these are not the bytes we asked for (bad mirror, truncated
+                // transfer, tampering). Never publish that to the deploy path: the target file is
+                // pre-allocated, so chunks that failed leave silently zero-filled holes.
+                string actual = sha256.Length >= 12 ? sha256[..12] : sha256;
+                item.DownloadStatus = $"❌ 雜湊校驗失敗: 計算值 {actual}... 與官方不符，映像未發佈。";
+                item.IsDownloaded = false;
+                item.LocalFilePath = string.Empty;
+                onStatus(item.DownloadStatus);
+                onLog?.Invoke("[HASH FAIL] ❌ 完整性校驗失敗，已中止發佈: 不下載、不部署未經驗證的映像。");
+                onLog?.Invoke($"[HASH FAIL] 失敗的暫存檔保留於: {tempPartFile} (可重新下載或改用其他來源)");
+                return false;
             }
 
-            if (!isVerified)
+            if (!hashKnown)
             {
-                item.DownloadStatus = $"⚠️ 雜湊校驗警告: 計算值 {sha256[..12]}... 與官方不符！";
+                // No official hash in the catalog: usable, but never claim it was verified.
+                item.DownloadStatus = "⚠️ 已下載（目錄未提供官方雜湊，無法驗證完整性）";
                 onStatus(item.DownloadStatus);
-                onLog?.Invoke($"[HASH WARNING] ⚠️ 雜湊校驗警告: 計算值與微軟官方發行版本不同！");
+                onLog?.Invoke("[HASH SKIP] ⚠️ 目錄未提供官方 SHA-256/SHA-1，已跳過校驗（狀態: 未驗證）。");
             }
             else
             {
@@ -345,6 +358,13 @@ public class WindowsDownloadService
         long totalDownloadedBytes = 0;
 
         var stopwatch = Stopwatch.StartNew();
+
+        // Every chunk thread shares one progress reporter. Without this lock each thread did its own
+        // read-modify-write of these three values, so the displayed speed/ETA could be computed from
+        // another thread's baseline (wrong, sometimes negative). Under the lock a sample is always the
+        // true global delta since the previous report, whichever thread takes it; the callbacks are
+        // invoked outside the lock.
+        var progressLock = new object();
         long lastBytes = 0;
         var lastTime = stopwatch.Elapsed;
         var lastLogTime = stopwatch.Elapsed;
@@ -390,27 +410,43 @@ public class WindowsDownloadService
                             Interlocked.Add(ref totalDownloadedBytes, read);
 
                             var elapsed = stopwatch.Elapsed;
-                            if ((elapsed - lastTime).TotalMilliseconds >= 400)
+                            double reportPercent = -1;
+                            string reportSpeed = "";
+                            string reportEta = "";
+                            long reportTotal = 0;
+                            bool logNow = false;
+
+                            lock (progressLock)
                             {
-                                lastTime = elapsed;
-                                var currentTotal = Interlocked.Read(ref totalDownloadedBytes);
-                                var deltaBytes = currentTotal - lastBytes;
-                                lastBytes = currentTotal;
-
-                                var speedMBs = deltaBytes / (1024.0 * 1024.0 * 0.4);
-                                double percent = totalBytes > 0 ? (double)currentTotal / totalBytes * 100.0 : 0;
-                                var remaining = totalBytes - currentTotal;
-                                var speedBytesPerSec = speedMBs * 1024.0 * 1024.0;
-                                var etaSec = speedBytesPerSec > 0 && remaining > 0 ? remaining / speedBytesPerSec : 0;
-                                var etaSpan = TimeSpan.FromSeconds(etaSec);
-                                var etaStr = etaSpan.Hours > 0 ? $"{etaSpan.Hours:D2}:{etaSpan.Minutes:D2}:{etaSpan.Seconds:D2}" : $"{etaSpan.Minutes:D2}:{etaSpan.Seconds:D2}";
-
-                                onProgress(percent, $"{speedMBs:F2} MB/s", $"剩餘: {etaStr}");
-
-                                if ((elapsed - lastLogTime).TotalMilliseconds >= 2000)
+                                if ((elapsed - lastTime).TotalMilliseconds >= 400)
                                 {
-                                    lastLogTime = elapsed;
-                                    onLog?.Invoke($"[PROGRESS] 下載進度: {currentTotal / (1024.0 * 1024.0 * 1024.0):F2} GB / {totalBytes / (1024.0 * 1024.0 * 1024.0):F2} GB ({percent:F1}%) @ {speedMBs:F2} MB/s | 剩餘: {etaStr}");
+                                    lastTime = elapsed;
+                                    var currentTotal = Interlocked.Read(ref totalDownloadedBytes);
+                                    var deltaBytes = currentTotal - lastBytes;
+                                    lastBytes = currentTotal;
+
+                                    var speedMBs = deltaBytes / (1024.0 * 1024.0 * 0.4);
+                                    reportPercent = totalBytes > 0 ? (double)currentTotal / totalBytes * 100.0 : 0;
+                                    var remaining = totalBytes - currentTotal;
+                                    var speedBytesPerSec = speedMBs * 1024.0 * 1024.0;
+                                    var etaSec = speedBytesPerSec > 0 && remaining > 0 ? remaining / speedBytesPerSec : 0;
+                                    var etaSpan = TimeSpan.FromSeconds(etaSec);
+
+                                    reportEta = etaSpan.Hours > 0 ? $"{etaSpan.Hours:D2}:{etaSpan.Minutes:D2}:{etaSpan.Seconds:D2}" : $"{etaSpan.Minutes:D2}:{etaSpan.Seconds:D2}";
+                                    reportSpeed = $"{speedMBs:F2} MB/s";
+                                    reportTotal = currentTotal;
+                                    logNow = (elapsed - lastLogTime).TotalMilliseconds >= 2000;
+                                    if (logNow) lastLogTime = elapsed;
+                                }
+                            }
+
+                            if (reportPercent >= 0)
+                            {
+                                onProgress(reportPercent, reportSpeed, $"剩餘: {reportEta}");
+
+                                if (logNow)
+                                {
+                                    onLog?.Invoke($"[PROGRESS] 下載進度: {reportTotal / (1024.0 * 1024.0 * 1024.0):F2} GB / {totalBytes / (1024.0 * 1024.0 * 1024.0):F2} GB ({reportPercent:F1}%) @ {reportSpeed} | 剩餘: {reportEta}");
                                 }
                             }
                         }

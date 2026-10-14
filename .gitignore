@@ -56,3 +56,9 @@ Generated\ Files/
 .gemini/
 .agents/
 *.DMP
+
+# Agent build staging (scripts/logs kept outside obj/ so `clean` cannot delete them)
+.dsh-rebuild/
+
+# Locally installed .NET SDK (only when the machine has no machine-wide SDK)
+dotnet-sdk/

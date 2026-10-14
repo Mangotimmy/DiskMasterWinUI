@@ -35,7 +35,7 @@ if (-not (Test-Path $outputDir)) {
 }
 
 # 1. Ensure publish directory is fresh
-Write-Host "`n[1/5] Publishing main WinUI 3 project ($Architecture)..." -ForegroundColor Yellow
+Write-Host "`n[1/6] Publishing main WinUI 3 project ($Architecture)..." -ForegroundColor Yellow
 dotnet publish "$projectDir\DiskMasterWinUI.csproj" -c Release -r $Architecture --self-contained true -o $publishDir
 Copy-Item -Recurse -Force "$projectDir\Scripts" "$publishDir\"
 
@@ -46,11 +46,36 @@ Get-ChildItem -Path $publishDir -Directory | Where-Object {
     $n -match '^[a-z]{2,3}(-[a-z0-9]+)*$' -and -not ($supportedLangs -contains $n)
 } | Remove-Item -Recurse -Force
 
+# 1.1 Ensure the Explorer "Recover with DiskMaster" shell launcher is in the payload.
+# ShellIntegrationService.Install() looks for DiskMasterShellHost.exe next to the app exe and
+# refuses to register the context menu when it is missing, so it must ship or the feature is dead.
+$shellHostProj = "$projectDir\tools\DiskMasterShellHost\DiskMasterShellHost.csproj"
+if (Test-Path $shellHostProj) {
+    Write-Host "`n[1.1/6] Publishing Explorer shell launcher ($Architecture)..." -ForegroundColor Yellow
+    $shellHostTempOut = "$projectDir\tools\DiskMasterShellHost\bin\temp_shellout_$(Get-Random)"
+    if (Test-Path $shellHostTempOut) { Remove-Item $shellHostTempOut -Recurse -Force -ErrorAction SilentlyContinue }
+    # Self-contained + single file: the launcher must run from a bare install directory with no
+    # companion .dll / .runtimeconfig.json next to it (ShellIntegrationService launches it directly).
+    dotnet publish $shellHostProj `
+        -c Release `
+        -r $Architecture `
+        --self-contained true `
+        -p:PublishSingleFile=true `
+        -p:IncludeNativeLibrariesForSelfExtract=true `
+        -p:EnableCompressionInSingleFile=true `
+        -o $shellHostTempOut
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to publish Explorer shell launcher (exit code $LASTEXITCODE)"
+    }
+    Copy-Item "$shellHostTempOut\DiskMasterShellHost.exe" "$publishDir\DiskMasterShellHost.exe" -Force
+    Remove-Item $shellHostTempOut -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # 2. Sign core internal binaries prior to compression
 if (Test-Path $signScript) {
-    Write-Host "`n[2/5] Signing core payload binaries with Authenticode..." -ForegroundColor Yellow
+    Write-Host "`n[3/6] Signing core payload binaries with Authenticode..." -ForegroundColor Yellow
     $signArgs = @{
-        TargetPath = @("$publishDir\DiskMasterWinUI.exe")
+        TargetPath = @("$publishDir\DiskMasterWinUI.exe", "$publishDir\DiskMasterShellHost.exe")
     }
     if ($CertThumbprint) { $signArgs["CertThumbprint"] = $CertThumbprint }
     if ($PfxPath) { $signArgs["PfxPath"] = $PfxPath }
@@ -66,7 +91,7 @@ if (Test-Path $signScript) {
 }
 
 # 3. Compress publish directory into payload.zip
-Write-Host "`n[3/5] Compacting payload archive (payload.zip)..." -ForegroundColor Yellow
+Write-Host "`n[4/6] Compacting payload archive (payload.zip)..." -ForegroundColor Yellow
 if (Test-Path $payloadZip) { Remove-Item $payloadZip -Force }
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -76,7 +101,7 @@ $zipSizeMb = [math]::Round((Get-Item $payloadZip).Length / 1MB, 2)
 Write-Host "[OK] Compressed payload size: $zipSizeMb MB" -ForegroundColor Green
 
 # 4. Compile Launcher into single-file executable
-Write-Host "`n[4/5] Compiling Single-File Native Launcher ($Architecture)..." -ForegroundColor Yellow
+Write-Host "`n[5/6] Compiling Single-File Native Launcher ($Architecture)..." -ForegroundColor Yellow
 $tempOut = "$projectDir\tools\DiskMasterPortableLauncher\bin\temp_out_$(Get-Random)"
 if (Test-Path $tempOut) { Remove-Item $tempOut -Recurse -Force -ErrorAction SilentlyContinue }
 
@@ -106,7 +131,7 @@ Remove-Item $tempOut -Recurse -Force -ErrorAction SilentlyContinue
 
 # 6. Sign final standalone portable binary
 if (Test-Path $signScript) {
-    Write-Host "`n[5/5] Signing standalone portable binary with Authenticode..." -ForegroundColor Yellow
+    Write-Host "`n[6/6] Signing standalone portable binary with Authenticode..." -ForegroundColor Yellow
     $signArgs = @{
         TargetPath = @($finalExePath)
     }

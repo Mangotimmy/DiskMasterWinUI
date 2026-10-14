@@ -322,7 +322,7 @@ public partial class SystemOptimizerViewModel : ObservableObject
                 _ => "正在套用電競遊戲極致模式 (FPSHeaven 0x26)..."
             };
 
-            var log = await _optimizer.ApplyGamingProfileAsync(38); // 0x26 default
+            var (profileApplied, log) = await _optimizer.ApplyGamingProfileWithResultAsync(38); // 0x26 default
             AppendLog(log);
 
             // Also unlock and activate Ultimate Performance
@@ -338,6 +338,11 @@ public partial class SystemOptimizerViewModel : ObservableObject
             AppendLog($"[{DateTime.Now:HH:mm:ss}] {msg}");
 
             await RefreshAllAsync();
+            if (!profileApplied)
+            {
+                ReportTuningNotApplied("電競遊戲極致模式");
+                return;
+            }
             StatusMessage = lang switch
             {
                 "zh-CN" => "电竞模式已启用！建议重启系统以获得最佳效能。",
@@ -398,7 +403,7 @@ public partial class SystemOptimizerViewModel : ObservableObject
                 _ => "正在還原 Windows 官方原生設定..."
             };
 
-            var log = await _optimizer.RestoreWindowsDefaultsAsync();
+            var (defaultsRestored, log) = await _optimizer.RestoreWindowsDefaultsWithResultAsync();
             AppendLog(log);
 
             // Switch to balanced power plan if available
@@ -417,6 +422,11 @@ public partial class SystemOptimizerViewModel : ObservableObject
             }
 
             await RefreshAllAsync();
+            if (!defaultsRestored)
+            {
+                ReportTuningNotApplied("還原 Windows 官方出廠預設值");
+                return;
+            }
             StatusMessage = lang switch
             {
                 "zh-CN" => "已还原为 Windows 官方出厂原生设置。",
@@ -442,6 +452,46 @@ public partial class SystemOptimizerViewModel : ObservableObject
     }
 
     // ══════════════════════════════════════════════════════════
+    //  Registry write outcome handling (audit B1)
+    // ══════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Restores a bound switch to its previous value without re-invoking the toggle command: every
+    /// Toggled handler on the page ignores changes while IsUpdatingProgrammatically is set.
+    /// </summary>
+    private void RevertSwitch(Action revert)
+    {
+        bool wasUpdating = IsUpdatingProgrammatically;
+        IsUpdatingProgrammatically = true;
+        try
+        {
+            revert();
+        }
+        finally
+        {
+            IsUpdatingProgrammatically = wasUpdating;
+        }
+    }
+
+    /// <summary>
+    /// Reports a refused registry write. Callers revert the bound switch first and then return
+    /// without appending a success line, so the UI never claims a tuning that was not applied.
+    /// </summary>
+    private void ReportTuningNotApplied(string itemName)
+    {
+        var lang = LocalizationService.Instance.CurrentLanguage;
+        StatusMessage = lang switch
+        {
+            "zh-CN" => $"❌ {itemName}：此項目需要系統管理員權限，設定未套用。",
+            "en-US" => $"❌ {itemName}: administrator rights are required, the setting was NOT applied.",
+            "ja-JP" => $"❌ {itemName}：管理者権限が必要です。設定は適用されませんでした。",
+            _ => $"❌ {itemName}：此項目需要系統管理員權限，設定未套用。"
+        };
+        AppendLog($"[{DateTime.Now:HH:mm:ss}] ❌ {itemName}: 登錄檔寫入失敗，需要系統管理員權限，設定未套用。");
+        AudioFeedbackService.PlayError();
+    }
+
+    // ══════════════════════════════════════════════════════════
     //  CPU Scheduling Commands
     // ══════════════════════════════════════════════════════════
 
@@ -459,7 +509,11 @@ public partial class SystemOptimizerViewModel : ObservableObject
         };
 
         await _optimizer.CreatePreTweakBackupAsync("Before_CpuPreset");
-        _optimizer.SetWin32PrioritySeparation(val);
+        if (!_optimizer.SetWin32PrioritySeparation(val))
+        {
+            ReportTuningNotApplied($"Win32PrioritySeparation = 0x{val:X}");
+            return;
+        }
         AppendLog($"[{DateTime.Now:HH:mm:ss}] ⚡ CPU 排程量子已套用: 0x{val:X} ({val})");
         StatusMessage = $"已設定 Win32PrioritySeparation = 0x{val:X}";
     }
@@ -468,9 +522,15 @@ public partial class SystemOptimizerViewModel : ObservableObject
     public async Task TogglePowerThrottlingAsync()
     {
         await _optimizer.CreatePreTweakBackupAsync("Before_PowerThrottling");
-        IsPowerThrottlingDisabled = !IsPowerThrottlingDisabled;
-        _optimizer.SetPowerThrottlingDisabled(IsPowerThrottlingDisabled);
-        AppendLog($"[{DateTime.Now:HH:mm:ss}] ⚡ CPU 能源節流狀態: {(IsPowerThrottlingDisabled ? "已停用 (全速無降頻)" : "已啟用 (節能)")}");
+        bool targetPowerThrottling = !IsPowerThrottlingDisabled;
+        if (!_optimizer.SetPowerThrottlingDisabled(targetPowerThrottling))
+        {
+            RevertSwitch(() => IsPowerThrottlingDisabled = !targetPowerThrottling);
+            ReportTuningNotApplied("CPU 能源節流 (PowerThrottling)");
+            return;
+        }
+        IsPowerThrottlingDisabled = targetPowerThrottling;
+        AppendLog($"[{DateTime.Now:HH:mm:ss}] ⚡ CPU 能源節流狀態: {(targetPowerThrottling ? "已停用 (全速無降頻)" : "已啟用 (節能)")}");
     }
 
     [RelayCommand]
@@ -485,7 +545,17 @@ public partial class SystemOptimizerViewModel : ObservableObject
     public async Task SetSystemResponsivenessValueAsync(int val)
     {
         await _optimizer.CreatePreTweakBackupAsync("Before_SystemResponsiveness");
-        _optimizer.SetSystemResponsiveness(val);
+        int previousResponsiveness = SystemResponsivenessValue;
+        if (!_optimizer.SetSystemResponsiveness(val))
+        {
+            RevertSwitch(() =>
+            {
+                SystemResponsivenessValue = previousResponsiveness;
+                IsSystemResponsivenessZero = previousResponsiveness == 0;
+            });
+            ReportTuningNotApplied($"MMCSS SystemResponsiveness = {val}%");
+            return;
+        }
         SystemResponsivenessValue = val;
         IsSystemResponsivenessZero = (val == 0);
         string modeName = val switch
@@ -501,36 +571,60 @@ public partial class SystemOptimizerViewModel : ObservableObject
     public async Task ToggleNetworkThrottlingAsync()
     {
         await _optimizer.CreatePreTweakBackupAsync("Before_NetworkThrottling");
-        IsNetworkThrottlingDisabled = !IsNetworkThrottlingDisabled;
-        _optimizer.SetNetworkThrottlingDisabled(IsNetworkThrottlingDisabled);
-        AppendLog($"[{DateTime.Now:HH:mm:ss}] 🌐 網路封包節流佇列: {(IsNetworkThrottlingDisabled ? "已停用 (防 Ping 突增/丟包)" : "已啟用 (預設)")}");
+        bool targetNetworkThrottling = !IsNetworkThrottlingDisabled;
+        if (!_optimizer.SetNetworkThrottlingDisabled(targetNetworkThrottling))
+        {
+            RevertSwitch(() => IsNetworkThrottlingDisabled = !targetNetworkThrottling);
+            ReportTuningNotApplied("網路封包節流佇列 (NetworkThrottlingIndex)");
+            return;
+        }
+        IsNetworkThrottlingDisabled = targetNetworkThrottling;
+        AppendLog($"[{DateTime.Now:HH:mm:ss}] 🌐 網路封包節流佇列: {(targetNetworkThrottling ? "已停用 (防 Ping 突增/丟包)" : "已啟用 (預設)")}");
     }
 
     [RelayCommand]
     public async Task ToggleGameDvrAsync()
     {
         await _optimizer.CreatePreTweakBackupAsync("Before_GameDVR");
-        IsGameDvrDisabled = !IsGameDvrDisabled;
-        _optimizer.SetGameDvrDisabled(IsGameDvrDisabled);
-        AppendLog($"[{DateTime.Now:HH:mm:ss}] 🛡️ Game DVR 背景開銷: {(IsGameDvrDisabled ? "已關閉 (釋放顯卡與CPU)" : "已啟用 (預設)")}");
+        bool targetGameDvr = !IsGameDvrDisabled;
+        if (!_optimizer.SetGameDvrDisabled(targetGameDvr))
+        {
+            RevertSwitch(() => IsGameDvrDisabled = !targetGameDvr);
+            ReportTuningNotApplied("Game DVR / Game Bar 背景錄影");
+            return;
+        }
+        IsGameDvrDisabled = targetGameDvr;
+        AppendLog($"[{DateTime.Now:HH:mm:ss}] 🛡️ Game DVR 背景開銷: {(targetGameDvr ? "已關閉 (釋放顯卡與CPU)" : "已啟用 (預設)")}");
     }
 
     [RelayCommand]
     public async Task ToggleHagsAsync()
     {
         await _optimizer.CreatePreTweakBackupAsync("Before_HAGS");
-        IsHagsEnabled = !IsHagsEnabled;
-        _optimizer.SetHagsStatus(IsHagsEnabled);
-        AppendLog($"[{DateTime.Now:HH:mm:ss}] 🖥️ 硬體加速 GPU 排程 (HAGS): {(IsHagsEnabled ? "已開啟 (需重新開機生效)" : "已關閉")}");
+        bool targetHags = !IsHagsEnabled;
+        if (!_optimizer.SetHagsStatus(targetHags))
+        {
+            RevertSwitch(() => IsHagsEnabled = !targetHags);
+            ReportTuningNotApplied("硬體加速 GPU 排程 (HAGS)");
+            return;
+        }
+        IsHagsEnabled = targetHags;
+        AppendLog($"[{DateTime.Now:HH:mm:ss}] 🖥️ 硬體加速 GPU 排程 (HAGS): {(targetHags ? "已開啟 (需重新開機生效)" : "已關閉")}");
     }
 
     [RelayCommand]
     public async Task ToggleInputLatencyAsync()
     {
         await _optimizer.CreatePreTweakBackupAsync("Before_InputLatency");
-        IsLowInputLatencyEnabled = !IsLowInputLatencyEnabled;
-        _optimizer.ConfigureInputLatency(IsLowInputLatencyEnabled);
-        AppendLog($"[{DateTime.Now:HH:mm:ss}] 🖱️ 滑鼠 1:1 感應器追蹤與按鍵零延遲: {(IsLowInputLatencyEnabled ? "已優化" : "已還原預設")}");
+        bool targetInputLatency = !IsLowInputLatencyEnabled;
+        if (!_optimizer.ConfigureInputLatency(targetInputLatency))
+        {
+            RevertSwitch(() => IsLowInputLatencyEnabled = !targetInputLatency);
+            ReportTuningNotApplied("滑鼠 1:1 感應器追蹤與按鍵零延遲");
+            return;
+        }
+        IsLowInputLatencyEnabled = targetInputLatency;
+        AppendLog($"[{DateTime.Now:HH:mm:ss}] 🖱️ 滑鼠 1:1 感應器追蹤與按鍵零延遲: {(targetInputLatency ? "已優化" : "已還原預設")}");
     }
 
     // ══════════════════════════════════════════════════════════
@@ -585,9 +679,18 @@ public partial class SystemOptimizerViewModel : ObservableObject
     {
         try
         {
-            IsCoreUnparked = !IsCoreUnparked;
-            var res = await _powerService.ConfigureCoreUnparkingAsync(IsCoreUnparked);
-            AppendLog($"[{DateTime.Now:HH:mm:ss}] ⚡ CPU 核心防停泊 (Core Unparking): {(IsCoreUnparked ? "已開啟 (隨時全核待命)" : "已關閉")}");
+            bool targetUnpark = !IsCoreUnparked;
+            var res = await _powerService.ConfigureCoreUnparkingAsync(targetUnpark);
+            if (!string.Equals(res, "Success", StringComparison.OrdinalIgnoreCase))
+            {
+                RevertSwitch(() => IsCoreUnparked = !targetUnpark);
+                StatusMessage = $"❌ CPU 核心防停泊設定未套用: {res}";
+                AppendLog($"[{DateTime.Now:HH:mm:ss}] ❌ CPU 核心防停泊設定失敗: {res}");
+                AudioFeedbackService.PlayError();
+                return;
+            }
+            IsCoreUnparked = targetUnpark;
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] ⚡ CPU 核心防停泊 (Core Unparking): {(targetUnpark ? "已開啟 (隨時全核待命)" : "已關閉")}");
         }
         catch (Exception ex) { AppendLog($"[ERROR] {ex.Message}"); }
     }
@@ -597,9 +700,18 @@ public partial class SystemOptimizerViewModel : ObservableObject
     {
         try
         {
-            IsMinProcessorState100 = !IsMinProcessorState100;
-            var res = await _powerService.ConfigureMinProcessorStateAsync(IsMinProcessorState100 ? 100 : 5);
-            AppendLog($"[{DateTime.Now:HH:mm:ss}] ⚡ 插電時最低處理器頻率: {(IsMinProcessorState100 ? "鎖定 100% (防轉場掉頻)" : "預設 5%")}");
+            bool targetMinState = !IsMinProcessorState100;
+            var res = await _powerService.ConfigureMinProcessorStateAsync(targetMinState ? 100 : 5);
+            if (!string.Equals(res, "Success", StringComparison.OrdinalIgnoreCase))
+            {
+                RevertSwitch(() => IsMinProcessorState100 = !targetMinState);
+                StatusMessage = $"❌ 最低處理器頻率設定未套用: {res}";
+                AppendLog($"[{DateTime.Now:HH:mm:ss}] ❌ 最低處理器頻率設定失敗: {res}");
+                AudioFeedbackService.PlayError();
+                return;
+            }
+            IsMinProcessorState100 = targetMinState;
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] ⚡ 插電時最低處理器頻率: {(targetMinState ? "鎖定 100% (防轉場掉頻)" : "預設 5%")}");
         }
         catch (Exception ex) { AppendLog($"[ERROR] {ex.Message}"); }
     }
@@ -651,7 +763,9 @@ public partial class SystemOptimizerViewModel : ObservableObject
             var res = await _optimizer.RestoreRegistryFileAsync(item.FilePath);
             AppendLog($"[{DateTime.Now:HH:mm:ss}] 🔄 還原備份: {item.FileName} ({res})");
             await RefreshAllAsync();
-            StatusMessage = "登錄檔備份還原完成！";
+            StatusMessage = string.Equals(res, "Success", StringComparison.OrdinalIgnoreCase)
+                ? "登錄檔備份還原完成！"
+                : $"❌ 登錄檔備份還原失敗: {res}";
         }
         catch (Exception ex) { AppendLog($"[ERROR] {ex.Message}"); }
         finally { IsLoading = false; }
@@ -661,7 +775,13 @@ public partial class SystemOptimizerViewModel : ObservableObject
     public void DeleteBackup(RegistryBackupItem? item)
     {
         if (item == null) return;
-        _optimizer.DeleteBackup(item.FilePath);
+        if (!_optimizer.DeleteBackup(item.FilePath))
+        {
+            StatusMessage = $"❌ 刪除備份檔失敗: {item.FileName} (檔案可能正被其他程式使用)";
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] ❌ 刪除備份檔失敗: {item.FileName}");
+            AudioFeedbackService.PlayError();
+            return;
+        }
         Backups.Remove(item);
         AppendLog($"[{DateTime.Now:HH:mm:ss}] 🗑️ 已刪除備份檔: {item.FileName}");
     }
@@ -1305,9 +1425,17 @@ public partial class SystemOptimizerViewModel : ObservableObject
         {
             bool newTarget = !IsOneDrivePolicyBlocked;
             var (success, msg) = await _oneDriveService.ToggleOneDrivePolicyBlockAsync(newTarget);
+            if (!success)
+            {
+                // keep the previous state; the service message explains the refusal
+                AppendLog($"[{DateTime.Now:HH:mm:ss}] ❌ {msg}");
+                StatusMessage = msg;
+                AudioFeedbackService.PlayError();
+                return;
+            }
             IsOneDrivePolicyBlocked = newTarget;
             AppendLog($"[{DateTime.Now:HH:mm:ss}] 🛡️ {msg}");
-            if (success) AudioFeedbackService.PlaySuccess();
+            AudioFeedbackService.PlaySuccess();
             StatusMessage = msg;
         }
         catch (Exception ex)
@@ -1325,9 +1453,15 @@ public partial class SystemOptimizerViewModel : ObservableObject
     {
         try
         {
-            IsNagleDisabled = !IsNagleDisabled;
-            _optimizer.ConfigureNagleAlgorithm(IsNagleDisabled);
-            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🌐 Nagle's Algorithm (TcpAckFrequency / TCPNoDelay): {(IsNagleDisabled ? "已停用 (超低延遲模式)" : "已啟用 (標準模式)")}");
+            bool targetNagle = !IsNagleDisabled;
+            if (!_optimizer.ConfigureNagleAlgorithm(targetNagle))
+            {
+                RevertSwitch(() => IsNagleDisabled = !targetNagle);
+                ReportTuningNotApplied("Nagle's Algorithm (TcpAckFrequency / TCPNoDelay)");
+                return;
+            }
+            IsNagleDisabled = targetNagle;
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🌐 Nagle's Algorithm (TcpAckFrequency / TCPNoDelay): {(targetNagle ? "已停用 (超低延遲模式)" : "已啟用 (標準模式)")}");
         }
         catch (Exception ex) { AppendLog($"[ERROR] {ex.Message}"); }
     }
@@ -1337,9 +1471,15 @@ public partial class SystemOptimizerViewModel : ObservableObject
     {
         try
         {
-            IsDisablePagingExecutive = !IsDisablePagingExecutive;
-            _optimizer.ConfigureMemoryManagement(IsDisablePagingExecutive);
-            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🧠 核心常駐實體 RAM (DisablePagingExecutive): {(IsDisablePagingExecutive ? "已開啟 (常駐記憶體無分頁延遲)" : "已關閉")}");
+            bool targetPagingExecutive = !IsDisablePagingExecutive;
+            if (!_optimizer.ConfigureMemoryManagement(targetPagingExecutive))
+            {
+                RevertSwitch(() => IsDisablePagingExecutive = !targetPagingExecutive);
+                ReportTuningNotApplied("核心常駐實體 RAM (DisablePagingExecutive)");
+                return;
+            }
+            IsDisablePagingExecutive = targetPagingExecutive;
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🧠 核心常駐實體 RAM (DisablePagingExecutive): {(targetPagingExecutive ? "已開啟 (常駐記憶體無分頁延遲)" : "已關閉")}");
         }
         catch (Exception ex) { AppendLog($"[ERROR] {ex.Message}"); }
     }
@@ -1349,9 +1489,15 @@ public partial class SystemOptimizerViewModel : ObservableObject
     {
         try
         {
-            IsGroupPolicyTelemetryDisabled = !IsGroupPolicyTelemetryDisabled;
-            _optimizer.ConfigureGroupPolicyPrivacy(IsGroupPolicyTelemetryDisabled);
-            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🛡️ 本機群組原則隱私與遙測防護: {(IsGroupPolicyTelemetryDisabled ? "已套用極致隱私原則 (關閉遙測/廣告/P2P上傳)" : "已還原預設")}");
+            bool targetGroupPolicy = !IsGroupPolicyTelemetryDisabled;
+            if (!_optimizer.ConfigureGroupPolicyPrivacy(targetGroupPolicy))
+            {
+                RevertSwitch(() => IsGroupPolicyTelemetryDisabled = !targetGroupPolicy);
+                ReportTuningNotApplied("本機群組原則隱私與遙測防護");
+                return;
+            }
+            IsGroupPolicyTelemetryDisabled = targetGroupPolicy;
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🛡️ 本機群組原則隱私與遙測防護: {(targetGroupPolicy ? "已套用極致隱私原則 (關閉遙測/廣告/P2P上傳)" : "已還原預設")}");
         }
         catch (Exception ex) { AppendLog($"[ERROR] {ex.Message}"); }
     }

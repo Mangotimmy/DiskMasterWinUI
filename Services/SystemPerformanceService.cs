@@ -59,7 +59,17 @@ public partial class SystemPerformanceService
     // 1. Real-Time Hardware Performance Metrics (GlobalMemoryStatusEx + typeperf)
     // ═════════════════════════════════════════════════════════════════════
 
-    public async Task<SystemMetricsSnapshot> GetMetricsSnapshotAsync(CancellationToken ct = default)
+    /// <summary>
+    /// Samples the machine on the thread pool. The typeperf spawn and the CSV/regex parsing for
+    /// ~40 counters used to run on the UI thread (this method had no Task.Run wrapper and the
+    /// solution uses no ConfigureAwait(false)), which is what made the performance page hitch on
+    /// every 1.5 s tick. Callers may still await it from the UI thread: their continuation returns
+    /// to the UI thread as usual.
+    /// </summary>
+    public Task<SystemMetricsSnapshot> GetMetricsSnapshotAsync(CancellationToken ct = default)
+        => Task.Run(() => GetMetricsSnapshotCoreAsync(ct), ct);
+
+    private async Task<SystemMetricsSnapshot> GetMetricsSnapshotCoreAsync(CancellationToken ct)
     {
         var snap = new SystemMetricsSnapshot();
 
@@ -219,11 +229,20 @@ public partial class SystemPerformanceService
                             string mediaType = "SSD";
                             string capacity = "";
 
-                            if (diskIdx >= 0 && _physicalDiskCache.TryGetValue(diskIdx, out var cachedInfo))
+                            if (diskIdx >= 0)
                             {
-                                model = cachedInfo.Model;
-                                mediaType = cachedInfo.MediaType;
-                                capacity = cachedInfo.Capacity;
+                                // Guarded: the 1.5 s refresh timer can overlap a still-running
+                                // snapshot, so this Dictionary must not be read while another
+                                // thread writes it.
+                                lock (_diskCacheLock)
+                                {
+                                    if (_physicalDiskCache.TryGetValue(diskIdx, out var cachedInfo))
+                                    {
+                                        model = cachedInfo.Model;
+                                        mediaType = cachedInfo.MediaType;
+                                        capacity = cachedInfo.Capacity;
+                                    }
+                                }
                             }
 
                             string display = !string.IsNullOrEmpty(letters)
@@ -262,45 +281,69 @@ public partial class SystemPerformanceService
     }
 
     private readonly Dictionary<int, (string Model, string MediaType, string Capacity)> _physicalDiskCache = new();
+    private readonly object _diskCacheLock = new();
+    private int _diskCacheLoading = 0;
     private DateTime _lastDiskCacheTime = DateTime.MinValue;
 
     private async Task EnsurePhysicalDiskCacheAsync()
     {
-        if (DateTime.Now - _lastDiskCacheTime < TimeSpan.FromSeconds(60) && _physicalDiskCache.Count > 0) return;
-
-        await Task.Run(() =>
+        lock (_diskCacheLock)
         {
-            try
+            if (DateTime.Now - _lastDiskCacheTime < TimeSpan.FromSeconds(60) && _physicalDiskCache.Count > 0) return;
+        }
+
+        // Single-flight: the 1.5 s refresh timer can tick while the previous snapshot is still
+        // running, and two concurrent writers would corrupt the cache dictionary. The loser just
+        // skips — the winner is filling the same cache right now.
+        if (Interlocked.CompareExchange(ref _diskCacheLoading, 1, 0) != 0) return;
+
+        try
+        {
+            var discovered = new Dictionary<int, (string Model, string MediaType, string Capacity)>();
+
+            await Task.Run(() =>
             {
-                using var searcher = new System.Management.ManagementObjectSearcher("SELECT Index, Model, Size, MediaType, InterfaceType FROM Win32_DiskDrive");
-                foreach (var obj in searcher.Get())
+                try
                 {
-                    int index = Convert.ToInt32(obj["Index"]);
-                    string model = obj["Model"]?.ToString()?.Trim() ?? $"Disk {index}";
-                    ulong size = Convert.ToUInt64(obj["Size"] ?? 0);
-                    string mediaType = obj["MediaType"]?.ToString() ?? "";
-                    string iface = obj["InterfaceType"]?.ToString() ?? "";
+                    using var searcher = new System.Management.ManagementObjectSearcher("SELECT Index, Model, Size, MediaType, InterfaceType FROM Win32_DiskDrive");
+                    foreach (var obj in searcher.Get())
+                    {
+                        int index = Convert.ToInt32(obj["Index"]);
+                        string model = obj["Model"]?.ToString()?.Trim() ?? $"Disk {index}";
+                        ulong size = Convert.ToUInt64(obj["Size"] ?? 0);
+                        string mediaType = obj["MediaType"]?.ToString() ?? "";
+                        string iface = obj["InterfaceType"]?.ToString() ?? "";
 
-                    string typeStr = iface.Contains("NVMe", StringComparison.OrdinalIgnoreCase) || model.Contains("NVMe", StringComparison.OrdinalIgnoreCase)
-                        ? "NVMe SSD"
-                        : mediaType.Contains("External", StringComparison.OrdinalIgnoreCase) || iface.Contains("USB", StringComparison.OrdinalIgnoreCase)
-                            ? "外接磁碟 (USB)"
-                            : mediaType.Contains("Fixed", StringComparison.OrdinalIgnoreCase)
-                                ? "SSD / 內建"
-                                : "硬碟";
+                        string typeStr = iface.Contains("NVMe", StringComparison.OrdinalIgnoreCase) || model.Contains("NVMe", StringComparison.OrdinalIgnoreCase)
+                            ? "NVMe SSD"
+                            : mediaType.Contains("External", StringComparison.OrdinalIgnoreCase) || iface.Contains("USB", StringComparison.OrdinalIgnoreCase)
+                                ? "外接磁碟 (USB)"
+                                : mediaType.Contains("Fixed", StringComparison.OrdinalIgnoreCase)
+                                    ? "SSD / 內建"
+                                    : "硬碟";
 
-                    string capStr = size > 0
-                        ? size >= 1_000_000_000_000UL
-                            ? $"{size / 1_000_000_000_000.0:F1} TB ({size / (1024 * 1024 * 1024):N0} GB)"
-                            : $"{size / (1000 * 1000 * 1000):N0} GB"
-                        : "";
+                        string capStr = size > 0
+                            ? size >= 1_000_000_000_000UL
+                                ? $"{size / 1_000_000_000_000.0:F1} TB ({size / (1024 * 1024 * 1024):N0} GB)"
+                                : $"{size / (1000 * 1000 * 1000):N0} GB"
+                            : "";
 
-                    _physicalDiskCache[index] = (model, typeStr, capStr);
+                        discovered[index] = (model, typeStr, capStr);
+                    }
                 }
-                _lastDiskCacheTime = DateTime.Now;
+                catch { }
+            });
+
+            lock (_diskCacheLock)
+            {
+                foreach (var kv in discovered) _physicalDiskCache[kv.Key] = kv.Value;
+                if (discovered.Count > 0) _lastDiskCacheTime = DateTime.Now;
             }
-            catch { }
-        });
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _diskCacheLoading, 0);
+        }
     }
 
     private string _cachedGpuModelName = "GPU";
@@ -457,7 +500,89 @@ public partial class SystemPerformanceService
     // 2. Deep Process Hunter (tasklist + wmic/CIM commandlines + Parent PID)
     // ═════════════════════════════════════════════════════════════════════
 
-    public async Task<List<ProcessHunterItem>> GetRunningProcessesDeepAsync(CancellationToken ct = default)
+    // ── C1: wmic enrichment cache ──
+    // The maps are replaced wholesale (never mutated in place), so a reader that grabbed a reference
+    // keeps a consistent snapshot while a refresh is in flight. One spawn per WmicMinRefreshInterval
+    // at most, and no spawn at all while the TTL is valid and every live PID is already covered.
+    private static readonly object _wmicCacheLock = new();
+    private static Dictionary<int, int> _wmicParentPid = new();
+    private static Dictionary<int, string> _wmicCommandLine = new();
+    private static Dictionary<int, string> _wmicExePath = new();
+    private static DateTime _wmicCacheUtc = DateTime.MinValue;
+    private static DateTime _wmicLastAttemptUtc = DateTime.MinValue;
+    private static readonly TimeSpan WmicCacheTtl = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan WmicMinRefreshInterval = TimeSpan.FromSeconds(5);
+
+    /// <summary>Returns the cached wmic maps, re-spawning wmic.exe only when the cache is actually stale.</summary>
+    private static async Task<(Dictionary<int, int> ParentPid, Dictionary<int, string> CommandLine, Dictionary<int, string> ExePath)>
+        GetWmicProcessMapsAsync(HashSet<int> activePids, bool forceRefresh, CancellationToken ct)
+    {
+        lock (_wmicCacheLock)
+        {
+            var now = DateTime.UtcNow;
+            var age = _wmicCacheUtc == DateTime.MinValue ? TimeSpan.MaxValue : now - _wmicCacheUtc;
+            var attemptAge = _wmicLastAttemptUtc == DateTime.MinValue ? TimeSpan.MaxValue : now - _wmicLastAttemptUtc;
+            var coversAllLivePids = activePids.All(pid => _wmicParentPid.ContainsKey(pid));
+
+            var needSpawn = forceRefresh || age > WmicCacheTtl || !coversAllLivePids;
+            // Even when new PIDs appeared, never re-spawn more often than the minimum interval.
+            if (needSpawn && !forceRefresh && attemptAge < WmicMinRefreshInterval) needSpawn = false;
+
+            if (!needSpawn)
+                return (_wmicParentPid, _wmicCommandLine, _wmicExePath);
+
+            _wmicLastAttemptUtc = now;
+        }
+
+        var parentPidMap = new Dictionary<int, int>();
+        var commandLineMap = new Dictionary<int, string>();
+        var exePathMap = new Dictionary<int, string>();
+
+        try
+        {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(4));
+            var (wmicOut, _, code) = await ProcessHelper.RunProcessAsync("wmic.exe", "process get ProcessId,ParentProcessId,CommandLine,ExecutablePath /format:csv", cancellationToken: timeoutCts.Token);
+            if (code == 0 && !string.IsNullOrWhiteSpace(wmicOut))
+            {
+                var lines = wmicOut.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+                foreach (var line in lines.Skip(1))
+                {
+                    var parts = line.Split(',');
+                    // Format: Node, CommandLine, ExecutablePath, ParentProcessId, ProcessId
+                    if (parts.Length >= 5 && int.TryParse(parts[^1].Trim(), out int pid))
+                    {
+                        if (int.TryParse(parts[^2].Trim(), out int ppid))
+                        {
+                            parentPidMap[pid] = ppid;
+                        }
+                        var exe = parts[^3].Trim();
+                        if (!string.IsNullOrEmpty(exe)) exePathMap[pid] = exe;
+
+                        var cmd = string.Join(",", parts.Skip(1).Take(parts.Length - 4)).Trim();
+                        if (!string.IsNullOrEmpty(cmd)) commandLineMap[pid] = cmd;
+                    }
+                }
+            }
+        }
+        catch { }
+
+        lock (_wmicCacheLock)
+        {
+            // Publish only a non-empty snapshot; a failed spawn leaves the previous cache in place.
+            if (parentPidMap.Count > 0 || commandLineMap.Count > 0 || exePathMap.Count > 0)
+            {
+                _wmicParentPid = parentPidMap;
+                _wmicCommandLine = commandLineMap;
+                _wmicExePath = exePathMap;
+                _wmicCacheUtc = DateTime.UtcNow;
+            }
+
+            return (_wmicParentPid, _wmicCommandLine, _wmicExePath);
+        }
+    }
+
+    public async Task<List<ProcessHunterItem>> GetRunningProcessesDeepAsync(CancellationToken ct = default, bool forceWmicRefresh = false)
     {
         return await Task.Run(async () =>
         {
@@ -473,42 +598,11 @@ public partial class SystemPerformanceService
                 activePids.Add(p.Id);
             }
 
-            // 2. Fetch ParentProcessId and CommandLine via WMIC
-            var parentPidMap = new Dictionary<int, int>();
-            var commandLineMap = new Dictionary<int, string>();
-            var exePathMap = new Dictionary<int, string>();
-
-            try
-            {
-                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                timeoutCts.CancelAfter(TimeSpan.FromSeconds(4));
-                var (wmicOut, _, code) = await ProcessHelper.RunProcessAsync("wmic.exe", "process get ProcessId,ParentProcessId,CommandLine,ExecutablePath /format:csv", cancellationToken: timeoutCts.Token);
-                if (code == 0 && !string.IsNullOrWhiteSpace(wmicOut))
-                {
-                    var lines = wmicOut.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-                    foreach (var line in lines.Skip(1))
-                    {
-                        var parts = line.Split(',');
-                        // Format: Node, CommandLine, ExecutablePath, ParentProcessId, ProcessId
-                        if (parts.Length >= 5)
-                        {
-                            if (int.TryParse(parts[^1].Trim(), out int pid))
-                            {
-                                if (int.TryParse(parts[^2].Trim(), out int ppid))
-                                {
-                                    parentPidMap[pid] = ppid;
-                                }
-                                var exe = parts[^3].Trim();
-                                if (!string.IsNullOrEmpty(exe)) exePathMap[pid] = exe;
-
-                                var cmd = string.Join(",", parts.Skip(1).Take(parts.Length - 4)).Trim();
-                                if (!string.IsNullOrEmpty(cmd)) commandLineMap[pid] = cmd;
-                            }
-                        }
-                    }
-                }
-            }
-            catch { }
+            // 2. Fetch ParentProcessId and CommandLine via WMIC.
+            //    C1: served from a short-lived cache - the command-line/parent maps change slowly, so we
+            //    spawn wmic at most once per WmicMinRefreshInterval and skip the spawn entirely while the
+            //    cache is inside its TTL and already covers every live PID.
+            var (parentPidMap, commandLineMap, exePathMap) = await GetWmicProcessMapsAsync(activePids, forceWmicRefresh, ct);
 
             foreach (var p in procs)
             {

@@ -57,6 +57,13 @@ public sealed partial class DiskToolsPage : Page
             "ja-JP" => "💽 VHD/VHDX 仮想ディスクとキャッシュ消去",
             _ => "💽 VHD/VHDX 虛擬磁碟與快取清理"
         };
+        TabCloneFormat.Header = lang switch
+        {
+            "zh-CN" => "🧬 复制与格式化 (Clone & Format)",
+            "en-US" => "🧬 Clone & Format",
+            "ja-JP" => "🧬 クローンとフォーマット (Clone & Format)",
+            _ => "🧬 複製與格式化 (Clone & Format)"
+        };
         TabDirectoryAnalyzer.Header = lang switch
         {
             "zh-CN" => "📁 目录空间指南",
@@ -603,6 +610,121 @@ public sealed partial class DiskToolsPage : Page
         {
             ViewModel.ExecuteDirectoryActionCommand.Execute(item);
         }
+    }
+
+    // ── Disk Clone (raw block level + VHDX image) ──
+
+    /// <summary>
+    /// Mandatory destructive-target gate for every clone mode. The plan is re-validated here (admin rights,
+    /// source/target, system disk, capacity in the service) and the user has to tick an explicit
+    /// acknowledgement checkbox before the primary button becomes available. The ViewModel then calls the
+    /// service with DestructiveTargetConfirmed = true - service-side gates remain in force.
+    /// </summary>
+    private async void StartClone_Click(object sender, RoutedEventArgs e)
+    {
+        var plan = ViewModel.ValidateClonePlan();
+        if (!plan.Ok)
+        {
+            ViewModel.CloneGeometryText = $"❌ 已拒絕執行：{plan.Error}";
+            ViewModel.StatusMessage = plan.Error;
+            return;
+        }
+
+        if (XamlRoot == null) return;
+
+        var acknowledge = new CheckBox
+        {
+            Content = $"我了解 {plan.TargetName} 上的所有現存資料將被永久覆寫且無法復原"
+        };
+
+        var stack = new StackPanel { Spacing = 10 };
+        stack.Children.Add(new TextBlock { Text = plan.Summary, TextWrapping = TextWrapping.Wrap });
+        stack.Children.Add(new TextBlock
+        {
+            Text = "實際操作：" + plan.ScriptPreview,
+            TextWrapping = TextWrapping.Wrap,
+            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas"),
+            FontSize = 12
+        });
+        stack.Children.Add(new TextBlock
+        {
+            Text = "🔴 此操作需要系統管理員權限，且會覆寫目標裝置的原始磁區。",
+            Foreground = Application.Current.Resources["SystemFillColorCriticalBrush"] as Microsoft.UI.Xaml.Media.Brush,
+            FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+            TextWrapping = TextWrapping.Wrap
+        });
+        stack.Children.Add(acknowledge);
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "🔴 確認破壞性複製 (Confirm Destructive Clone)",
+            Content = stack,
+            PrimaryButtonText = "確認並開始複製",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Close,
+            IsPrimaryButtonEnabled = false
+        };
+        acknowledge.Checked += (_, _) => dialog.IsPrimaryButtonEnabled = true;
+        acknowledge.Unchecked += (_, _) => dialog.IsPrimaryButtonEnabled = false;
+
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary) return;
+
+        await ViewModel.StartCloneAsync(destructiveConfirmed: true);
+    }
+
+    // ── Volume format (NTFS / FAT32 / exFAT / ReFS) ──
+
+    /// <summary>
+    /// Destructive gate for the format flow. ReFS / removable / boot-volume pre-checks are performed by
+    /// ValidateFormatPlan (clear rejection reason instead of a raw diskpart error) before any dialog or script.
+    /// </summary>
+    private async void StartFormat_Click(object sender, RoutedEventArgs e)
+    {
+        var plan = ViewModel.ValidateFormatPlan();
+        if (!plan.Ok)
+        {
+            ViewModel.FormatStatusText = $"❌ 已拒絕格式化：{plan.Error}";
+            ViewModel.StatusMessage = plan.Error;
+            return;
+        }
+
+        if (XamlRoot == null) return;
+
+        var acknowledge = new CheckBox
+        {
+            Content = "我了解格式化會永久清除此磁碟區上的所有資料"
+        };
+
+        var stack = new StackPanel { Spacing = 10 };
+        stack.Children.Add(new TextBlock { Text = plan.Summary, TextWrapping = TextWrapping.Wrap });
+        stack.Children.Add(new TextBlock
+        {
+            Text = "diskpart 指令：" + plan.ScriptPreview.Replace("\r\n", " / "),
+            TextWrapping = TextWrapping.Wrap,
+            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Consolas"),
+            FontSize = 12
+        });
+        stack.Children.Add(acknowledge);
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "🔴 確認格式化 (Confirm Format)",
+            Content = stack,
+            PrimaryButtonText = "確認並格式化",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Close,
+            IsPrimaryButtonEnabled = false
+        };
+        acknowledge.Checked += (_, _) => dialog.IsPrimaryButtonEnabled = true;
+        acknowledge.Unchecked += (_, _) => dialog.IsPrimaryButtonEnabled = false;
+
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary) return;
+
+        await ViewModel.StartFormatAsync(destructiveConfirmed: true);
     }
 
     private void OpenDirectoryExplorer_Click(object sender, RoutedEventArgs e)

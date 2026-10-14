@@ -21,6 +21,12 @@ public partial class App : Application
 {
     private MainWindow? _window;
     private static System.Threading.Mutex? s_singleInstanceMutex;
+
+    /// <summary>
+    /// Path passed by the Explorer "Recover with DiskMaster" shell verb (--recover "&lt;path&gt;").
+    /// Consumed by MainWindow when it opens the Recovery page.
+    /// </summary>
+    public static string? PendingRecoverPath { get; set; }
     
     /// <summary>
     /// Initializes the singleton application object.
@@ -94,20 +100,51 @@ public partial class App : Application
 
             _ = Services.JumpListService.InitializeAsync();
 
+            // Parse every launch argument. The Explorer shell verb passes:
+            //   DiskMasterWinUI.exe --tab Recovery --recover "<path>"
             var cmd = Environment.GetCommandLineArgs();
+            string? tabTag = null;
             for (int i = 0; i < cmd.Length; i++)
             {
                 if (cmd[i] == "--tab" && i + 1 < cmd.Length)
                 {
-                    _window.NavigateToTag(cmd[i + 1]);
-                    break;
+                    tabTag = cmd[i + 1];
+                    i++;
                 }
+                else if (cmd[i] == "--recover" && i + 1 < cmd.Length)
+                {
+                    PendingRecoverPath = cmd[i + 1];
+                    i++;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(PendingRecoverPath))
+            {
+                // Explorer shell verb: open the Recovery tab AND hand over the clicked path.
+                // The path must win over --tab: the launcher sends "--tab Recovery --recover X",
+                // so a tab-only branch would open the tab and silently drop X.
+                var target = PendingRecoverPath;
+                PendingRecoverPath = null;
+                _window.NavigateToTag("Recovery");
+                if (_window.GetOrCreatePageForTag("Recovery") is DiskMasterWinUI.Pages.RecoveryPage recoveryPage)
+                {
+                    recoveryPage.LoadTarget(target);
+                }
+            }
+            else if (!string.IsNullOrEmpty(tabTag))
+            {
+                _window.NavigateToTag(tabTag);
             }
         }
         catch (Exception ex)
         {
-            var logPath = System.IO.Path.Combine(AppContext.BaseDirectory, "crash.log");
-            System.IO.File.WriteAllText(logPath, $"[OnLaunched Exception] {DateTime.Now}\n{ex}");
+            // Never let the diagnostic write replace the real startup failure.
+            try
+            {
+                var logPath = System.IO.Path.Combine(AppContext.BaseDirectory, "crash.log");
+                System.IO.File.WriteAllText(logPath, $"[OnLaunched Exception] {DateTime.Now}\n{ex}");
+            }
+            catch { }
             throw;
         }
     }

@@ -113,6 +113,7 @@ public static partial class OutputParser
                     if (label.Equals("NTFS", StringComparison.OrdinalIgnoreCase) ||
                         label.Equals("FAT32", StringComparison.OrdinalIgnoreCase) ||
                         label.Equals("exFAT", StringComparison.OrdinalIgnoreCase) ||
+                        label.Equals("ReFS", StringComparison.OrdinalIgnoreCase) ||
                         label.Equals("RAW", StringComparison.OrdinalIgnoreCase))
                     {
                         info = status;

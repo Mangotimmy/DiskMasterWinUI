@@ -49,7 +49,7 @@ if (-not (Test-Path $outputDir)) {
 }
 
 # 1. Ensure publish directory is fresh
-Write-Host "`n[1/5] Publishing main WinUI 3 project ($Architecture)..." -ForegroundColor Yellow
+Write-Host "`n[1/6] Publishing main WinUI 3 project ($Architecture)..." -ForegroundColor Yellow
 dotnet publish "$projectDir\DiskMasterWinUI.csproj" -c Release -r $Architecture --self-contained true -o $publishDir
 Copy-Item -Recurse -Force "$projectDir\Scripts" "$publishDir\"
 Copy-Item -Recurse -Force "$projectDir\Assets" "$publishDir\"
@@ -64,7 +64,7 @@ Get-ChildItem -Path $publishDir -Directory | Where-Object {
 # 1.1 Ensure native uninstaller binary is compiled into publish directory
 $uninstallerProj = "$projectDir\tools\DiskMasterUninstaller\DiskMasterUninstaller.csproj"
 if (Test-Path $uninstallerProj) {
-    Write-Host "`n[1.1/5] Compiling Native Uninstaller executable ($Architecture)..." -ForegroundColor Yellow
+    Write-Host "`n[1.1/6] Compiling Native Uninstaller executable ($Architecture)..." -ForegroundColor Yellow
     $uninstTempOut = "$projectDir\tools\DiskMasterUninstaller\bin\temp_uninst_out_$(Get-Random)"
     if (Test-Path $uninstTempOut) { Remove-Item $uninstTempOut -Recurse -Force -ErrorAction SilentlyContinue }
     dotnet publish $uninstallerProj `
@@ -82,12 +82,40 @@ if (Test-Path $uninstallerProj) {
     Remove-Item $uninstTempOut -Recurse -Force -ErrorAction SilentlyContinue
 }
 
+# 1.2 Ensure the Explorer "Recover with DiskMaster" shell launcher is in the payload.
+# ShellIntegrationService.Install() looks for DiskMasterShellHost.exe next to the app exe and
+# refuses to register the context menu when it is missing, so it must ship or the feature is dead.
+$shellHostProj = "$projectDir\tools\DiskMasterShellHost\DiskMasterShellHost.csproj"
+if (Test-Path $shellHostProj) {
+    Write-Host "`n[1.2/6] Publishing Explorer shell launcher ($Architecture)..." -ForegroundColor Yellow
+    $shellHostTempOut = "$projectDir\tools\DiskMasterShellHost\bin\temp_shellout_$(Get-Random)"
+    if (Test-Path $shellHostTempOut) { Remove-Item $shellHostTempOut -Recurse -Force -ErrorAction SilentlyContinue }
+    # Self-contained + single file: the launcher must run from a bare install directory with no
+    # companion .dll / .runtimeconfig.json next to it (ShellIntegrationService launches it directly).
+    dotnet publish $shellHostProj `
+        -c Release `
+        -r $Architecture `
+        --self-contained true `
+        -p:PublishSingleFile=true `
+        -p:IncludeNativeLibrariesForSelfExtract=true `
+        -p:EnableCompressionInSingleFile=true `
+        -o $shellHostTempOut
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to publish Explorer shell launcher (exit code $LASTEXITCODE)"
+    }
+    Copy-Item "$shellHostTempOut\DiskMasterShellHost.exe" "$publishDir\DiskMasterShellHost.exe" -Force
+    Remove-Item $shellHostTempOut -Recurse -Force -ErrorAction SilentlyContinue
+}
+
 # 2. Sign inner binaries if not already signed
 if (Test-Path $signScript) {
-    Write-Host "`n[2/5] Verifying & signing payload binaries..." -ForegroundColor Yellow
+    Write-Host "`n[3/6] Verifying & signing payload binaries..." -ForegroundColor Yellow
     $targetsToSign = @("$publishDir\DiskMasterWinUI.exe")
     if (Test-Path "$publishDir\Uninstall.exe") {
         $targetsToSign += "$publishDir\Uninstall.exe"
+    }
+    if (Test-Path "$publishDir\DiskMasterShellHost.exe") {
+        $targetsToSign += "$publishDir\DiskMasterShellHost.exe"
     }
     $signArgs = @{
         TargetPath = $targetsToSign
@@ -125,17 +153,33 @@ $finalExePath = Join-Path $outputDir $finalExeName
 $useInnoSetup = ($isccPath -and (Test-Path "$projectDir\DiskMasterSetup.iss") -and ($Architecture -eq "win-x64"))
 
 if ($useInnoSetup) {
-    Write-Host "`n[3/5] Compiling Standard Inno Setup Installer ($Architecture)..." -ForegroundColor Yellow
+    Write-Host "`n[4/6] Compiling Standard Inno Setup Installer ($Architecture)..." -ForegroundColor Yellow
     Write-Host "Compiler: $isccPath" -ForegroundColor DarkGray
-    & $isccPath "/DMyAppVersion=$appVersion" "$projectDir\DiskMasterSetup.iss"
-    if ($LASTEXITCODE -ne 0) {
+    # ISCC rewrites PE resources on the previous output file. A setup process left over from an
+    # aborted run (or a scanner holding the file) makes it fail with "EndUpdateResource failed".
+    # Drop the stale output first, then retry the compile a few times before giving up.
+    if (Test-Path -LiteralPath $finalExePath) {
+        Remove-Item -LiteralPath $finalExePath -Force -ErrorAction SilentlyContinue
+    }
+    $isccOk = $false
+    for ($attempt = 1; $attempt -le 3 -and -not $isccOk; $attempt++) {
+        if ($attempt -gt 1) {
+            Write-Warning "Retrying Inno Setup compile (attempt $attempt/3) after clearing $finalExeName..."
+            Get-Process -Name 'DiskMaster_Setup' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 3
+            Remove-Item -LiteralPath $finalExePath -Force -ErrorAction SilentlyContinue
+        }
+        & $isccPath "/DMyAppVersion=$appVersion" "$projectDir\DiskMasterSetup.iss"
+        if ($LASTEXITCODE -eq 0) { $isccOk = $true }
+    }
+    if (-not $isccOk) {
         throw "Failed to compile Inno Setup script (exit code $LASTEXITCODE)"
     }
     Write-Host "[OK] Standard Inno Setup Installer compiled successfully." -ForegroundColor Green
 }
 else {
     # 3. Compress publish directory into payload.zip
-    Write-Host "`n[3/5] Compacting payload archive into installer..." -ForegroundColor Yellow
+    Write-Host "`n[4/6] Compacting payload archive into installer..." -ForegroundColor Yellow
     if (Test-Path $payloadZip) { Remove-Item $payloadZip -Force }
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -151,7 +195,7 @@ else {
     }
 
     # 4. Compile Installer into single-file executable
-    Write-Host "`n[4/5] Compiling Single-File Setup Installer ($Architecture)..." -ForegroundColor Yellow
+    Write-Host "`n[5/6] Compiling Single-File Setup Installer ($Architecture)..." -ForegroundColor Yellow
     $tempOut = "$projectDir\tools\DiskMasterInstaller\bin\temp_out_$(Get-Random)"
     if (Test-Path $tempOut) { Remove-Item $tempOut -Recurse -Force -ErrorAction SilentlyContinue }
 
@@ -178,7 +222,7 @@ else {
 
 # 6. Sign final Setup installer binary
 if (Test-Path $signScript) {
-    Write-Host "`n[5/5] Signing setup installer with Authenticode..." -ForegroundColor Yellow
+    Write-Host "`n[6/6] Signing setup installer with Authenticode..." -ForegroundColor Yellow
     $signArgs = @{
         TargetPath = @($finalExePath)
     }

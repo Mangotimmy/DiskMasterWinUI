@@ -25,10 +25,24 @@ public static class AudioFeedbackService
     [DllImport("winmm.dll", SetLastError = true, CharSet = CharSet.Auto)]
     private static extern bool PlaySound(string pszSound, IntPtr hmod, uint fdwSound);
 
+    private static bool? _soundEnabledOverride;
+
     /// <summary>
-    /// Gets or sets whether audible feedback effects are globally enabled.
+    /// Whether audible feedback is globally enabled. This follows the user's
+    /// "音效回饋" setting unless a caller explicitly overrides it for this session —
+    /// previously the property was never assigned, so the setting was ignored by every
+    /// caller except MainWindow and the app kept beeping with feedback switched off.
     /// </summary>
-    public static bool IsSoundEnabled { get; set; } = true;
+    public static bool IsSoundEnabled
+    {
+        get
+        {
+            if (_soundEnabledOverride.HasValue) return _soundEnabledOverride.Value;
+            try { return SettingsService.Instance.Current.EnableAudioFeedback; }
+            catch { return true; }
+        }
+        set => _soundEnabledOverride = value;
+    }
 
     /// <summary>
     /// Plays standard completion / success audio cue through multi-tiered fallback,
@@ -49,14 +63,13 @@ public static class AudioFeedbackService
 
         Task.Run(() =>
         {
-            bool played = false;
-
-            // Tier 1: WinMM PlaySound system notification alias
+            // Each tier is a fallback for the previous one. Playing all tiers back to back
+            // produced up to three overlapping sounds for a single notification.
             try
             {
                 if (PlaySound("SystemNotification", IntPtr.Zero, SND_ALIAS | SND_ASYNC | SND_NODEFAULT))
                 {
-                    played = true;
+                    return;
                 }
             }
             catch { }
@@ -76,8 +89,7 @@ public static class AudioFeedbackService
                     if (File.Exists(wav))
                     {
                         PlaySound(wav, IntPtr.Zero, SND_FILENAME | SND_ASYNC);
-                        played = true;
-                        break;
+                        return;
                     }
                 }
             }
@@ -86,15 +98,12 @@ public static class AudioFeedbackService
             // Tier 3: Native User32 MessageBeep
             try
             {
-                MessageBeep(MB_ICONASTERISK);
+                if (MessageBeep(MB_ICONASTERISK)) return;
             }
             catch { }
 
             // Tier 4: Console Beep hardware fallback if no audio device responded
-            if (!played)
-            {
-                try { Console.Beep(1200, 100); } catch { }
-            }
+            try { Console.Beep(1200, 100); } catch { }
         });
     }
 
@@ -148,8 +157,8 @@ public static class AudioFeedbackService
 
         Task.Run(() =>
         {
-            try { PlaySound("SystemExclamation", IntPtr.Zero, SND_ALIAS | SND_ASYNC | SND_NODEFAULT); } catch { }
-            try { MessageBeep(MB_ICONEXCLAMATION); } catch { }
+            try { if (PlaySound("SystemExclamation", IntPtr.Zero, SND_ALIAS | SND_ASYNC | SND_NODEFAULT)) return; } catch { }
+            try { if (MessageBeep(MB_ICONEXCLAMATION)) return; } catch { }
             try { Console.Beep(800, 150); } catch { }
         });
     }
@@ -165,8 +174,8 @@ public static class AudioFeedbackService
 
         Task.Run(() =>
         {
-            try { PlaySound("SystemHand", IntPtr.Zero, SND_ALIAS | SND_ASYNC | SND_NODEFAULT); } catch { }
-            try { MessageBeep(MB_ICONHAND); } catch { }
+            try { if (PlaySound("SystemHand", IntPtr.Zero, SND_ALIAS | SND_ASYNC | SND_NODEFAULT)) return; } catch { }
+            try { if (MessageBeep(MB_ICONHAND)) return; } catch { }
             try { Console.Beep(600, 250); } catch { }
         });
     }

@@ -12,8 +12,38 @@ namespace DiskMasterWinUI.Services;
 /// </summary>
 public class MemoryManagerService
 {
-    private static readonly SemaphoreSlim _lock = new(1, 1);
+    // C6: this lock now guards the WRITE path only (two Enable/Disable-MMAgent writes must not overlap).
+    // A status refresh spawns PowerShell for several seconds and used to hold this lock, which made a
+    // toggle clicked during a refresh look dead - it no longer participates in the write lock.
+    private static readonly SemaphoreSlim _writeLock = new(1, 1);
     private static string? _cachedPsExe;
+
+    // ── C6: MMAgent status cache ──
+    // Refresh runs outside the write lock; concurrent callers share one in-flight refresh instead of
+    // spawning extra PowerShell processes. Every write invalidates the cache, so a post-toggle read is
+    // always a real read. When a read cannot happen (write in flight, or PowerShell failed) the last
+    // known values are returned with IsStatusStale = true - never presented as fresh numbers.
+    private static readonly object _statusCacheLock = new();
+    private static MMAgentConfig? _cachedStatus;
+    private static DateTime _cachedStatusUtc = DateTime.MinValue;
+    private static bool _cachedStatusStale = true;
+    private static Task<MMAgentConfig>? _inflightStatusRefresh;
+    private static readonly TimeSpan StatusCacheTtl = TimeSpan.FromSeconds(15);
+
+    /// <summary>True when the values last handed out were not read after the most recent write (or a read failed).</summary>
+    public static bool IsStatusStale
+    {
+        get { lock (_statusCacheLock) return _cachedStatusStale; }
+    }
+
+    /// <summary>UTC time of the last successful MMAgent read (null when never read).</summary>
+    public static DateTime? LastStatusUtc
+    {
+        get { lock (_statusCacheLock) return _cachedStatusUtc == DateTime.MinValue ? null : _cachedStatusUtc; }
+    }
+
+    /// <summary>True while a toggle/write is being applied; callers can show a busy state instead of blocking.</summary>
+    public static bool IsWriteInProgress => _writeLock.CurrentCount == 0;
 
     /// <summary>
     /// Detects whether modern PowerShell 7 (pwsh.exe) or Windows PowerShell 5.1 (powershell.exe) is available.
@@ -58,11 +88,88 @@ public class MemoryManagerService
     /// <summary>
     /// Queries the live MMAgent status from Windows.
     /// Uses dual parsing: robust key-value text matching (matches exact terminal display) + JSON fallback.
+    /// C6: served from a 15 s cache; a refresh never holds the write lock, so toggles stay responsive.
     /// </summary>
-    public async Task<MMAgentConfig> GetStatusAsync()
+    public async Task<MMAgentConfig> GetStatusAsync(bool forceRefresh = false)
+    {
+        if (!forceRefresh)
+        {
+            lock (_statusCacheLock)
+            {
+                if (_cachedStatus != null && !_cachedStatusStale &&
+                    _cachedStatusUtc != DateTime.MinValue && DateTime.UtcNow - _cachedStatusUtc <= StatusCacheTtl)
+                {
+                    return _cachedStatus;
+                }
+            }
+
+            // A write is in flight: don't race it with another PowerShell read and don't block the caller
+            // behind it - hand back the last known values, explicitly marked stale.
+            if (IsWriteInProgress)
+            {
+                lock (_statusCacheLock)
+                {
+                    if (_cachedStatus != null)
+                    {
+                        _cachedStatusStale = true;
+                        return _cachedStatus;
+                    }
+                }
+            }
+        }
+
+        Task<MMAgentConfig> refresh;
+        lock (_statusCacheLock)
+        {
+            if (_inflightStatusRefresh == null || _inflightStatusRefresh.IsCompleted)
+            {
+                _inflightStatusRefresh = RefreshStatusCoreAsync();
+            }
+            refresh = _inflightStatusRefresh;
+        }
+
+        return await refresh;
+    }
+
+    /// <summary>Performs the real PowerShell read and publishes it to the cache (single-flight).</summary>
+    private async Task<MMAgentConfig> RefreshStatusCoreAsync()
+    {
+        MMAgentConfig? fresh = null;
+        try
+        {
+            fresh = await ReadStatusFromWindowsAsync();
+        }
+        catch
+        {
+            fresh = null;
+        }
+
+        lock (_statusCacheLock)
+        {
+            if (fresh != null)
+            {
+                _cachedStatus = fresh;
+                _cachedStatusUtc = DateTime.UtcNow;
+                _cachedStatusStale = false;
+            }
+            else
+            {
+                // Keep the last known numbers usable but mark them honestly as not freshly read.
+                _cachedStatus ??= new MMAgentConfig();
+                _cachedStatusStale = true;
+            }
+
+            _inflightStatusRefresh = null;
+            return _cachedStatus;
+        }
+    }
+
+    /// <summary>Reads MMAgent from PowerShell; returns null when nothing could be parsed.</summary>
+    private async Task<MMAgentConfig?> ReadStatusFromWindowsAsync()
     {
         var config = new MMAgentConfig();
-        await _lock.WaitAsync();
+        var parsedAnyField = false;
+
         try
         {
             var psExe = GetPowerShellExe();
@@ -78,7 +185,6 @@ public class MemoryManagerService
                 if (fbExit == 0 && !string.IsNullOrWhiteSpace(fbStdout))
                 {
                     stdout = fbStdout;
-                    exitCode = 0;
                 }
             }
 
@@ -86,34 +192,41 @@ public class MemoryManagerService
             {
                 // Parse key-value lines from Get-MMAgent (e.g., "MemoryCompression : True")
                 var mcMatch = Regex.Match(stdout, @"MemoryCompression\s*:\s*(?<val>True|False)", RegexOptions.IgnoreCase);
-                if (mcMatch.Success) config.MemoryCompression = bool.Parse(mcMatch.Groups["val"].Value);
+                if (mcMatch.Success) { config.MemoryCompression = bool.Parse(mcMatch.Groups["val"].Value); parsedAnyField = true; }
 
                 var pcMatch = Regex.Match(stdout, @"PageCombining\s*:\s*(?<val>True|False)", RegexOptions.IgnoreCase);
-                if (pcMatch.Success) config.PageCombining = bool.Parse(pcMatch.Groups["val"].Value);
+                if (pcMatch.Success) { config.PageCombining = bool.Parse(pcMatch.Groups["val"].Value); parsedAnyField = true; }
 
                 var aplMatch = Regex.Match(stdout, @"ApplicationPreLaunch\s*:\s*(?<val>True|False)", RegexOptions.IgnoreCase);
-                if (aplMatch.Success) config.ApplicationPreLaunch = bool.Parse(aplMatch.Groups["val"].Value);
+                if (aplMatch.Success) { config.ApplicationPreLaunch = bool.Parse(aplMatch.Groups["val"].Value); parsedAnyField = true; }
 
                 var alpMatch = Regex.Match(stdout, @"ApplicationLaunchPrefetching\s*:\s*(?<val>True|False)", RegexOptions.IgnoreCase);
                 if (!alpMatch.Success)
                     alpMatch = Regex.Match(stdout, @"ApplicationLaunchProfiling\s*:\s*(?<val>True|False)", RegexOptions.IgnoreCase);
-                if (alpMatch.Success) config.ApplicationLaunchProfiling = bool.Parse(alpMatch.Groups["val"].Value);
+                if (alpMatch.Success) { config.ApplicationLaunchProfiling = bool.Parse(alpMatch.Groups["val"].Value); parsedAnyField = true; }
 
                 var oaMatch = Regex.Match(stdout, @"OperationAPI\s*:\s*(?<val>True|False)", RegexOptions.IgnoreCase);
                 if (!oaMatch.Success)
                     oaMatch = Regex.Match(stdout, @"OperationRecording\s*:\s*(?<val>True|False)", RegexOptions.IgnoreCase);
-                if (oaMatch.Success) config.OperationRecording = bool.Parse(oaMatch.Groups["val"].Value);
+                if (oaMatch.Success) { config.OperationRecording = bool.Parse(oaMatch.Groups["val"].Value); parsedAnyField = true; }
             }
         }
         catch
         {
-            // Fallback default state
+            return null;
         }
-        finally
+
+        return parsedAnyField ? config : null;
+    }
+
+    /// <summary>Marks the cached status as no longer current; called by every write path.</summary>
+    private static void InvalidateStatusCache()
+    {
+        lock (_statusCacheLock)
         {
-            _lock.Release();
+            _cachedStatusUtc = DateTime.MinValue;   // forces the next GetStatusAsync to really re-read
+            _cachedStatusStale = true;
         }
-        return config;
     }
 
     private static async Task<(bool Success, string Message)> ExecuteMmAgentCommandAsync(
@@ -122,7 +235,7 @@ public class MemoryManagerService
         bool enable,
         string customSuccessState = "")
     {
-        await _lock.WaitAsync();
+        await _writeLock.WaitAsync();
         try
         {
             var psExe = GetPowerShellExe();
@@ -176,7 +289,9 @@ public class MemoryManagerService
         }
         finally
         {
-            _lock.Release();
+            // Every write attempt invalidates the cache: the next GetStatusAsync is a real read.
+            InvalidateStatusCache();
+            _writeLock.Release();
         }
     }
 
@@ -253,7 +368,7 @@ public class MemoryManagerService
     /// </summary>
     public async Task<(bool Success, string Message)> ApplyGamingRamProfileAsync()
     {
-        await _lock.WaitAsync();
+        await _writeLock.WaitAsync();
         try
         {
             var psExe = GetPowerShellExe();
@@ -263,7 +378,8 @@ public class MemoryManagerService
         }
         finally
         {
-            _lock.Release();
+            InvalidateStatusCache();
+            _writeLock.Release();
         }
     }
 
@@ -272,7 +388,7 @@ public class MemoryManagerService
     /// </summary>
     public async Task<(bool Success, string Message)> RestoreStockDefaultsAsync()
     {
-        await _lock.WaitAsync();
+        await _writeLock.WaitAsync();
         try
         {
             var psExe = GetPowerShellExe();
@@ -282,7 +398,8 @@ public class MemoryManagerService
         }
         finally
         {
-            _lock.Release();
+            InvalidateStatusCache();
+            _writeLock.Release();
         }
     }
 }

@@ -17,43 +17,63 @@ public partial class ProgressAndEtaTracker
     [GeneratedRegex(@"processed\s+(\d+)\s+files", RegexOptions.IgnoreCase)]
     private static partial Regex IcaclsProgressRegex();
 
+    // ProcessLine is driven by Process.OutputDataReceived, which fires on ThreadPool threads, while
+    // Start/Stop/Reset/UpdateProgress come from the UI thread. Stopwatch and the counters are not
+    // thread-safe, so every access goes through this lock. ProgressUpdated is always raised OUTSIDE
+    // the lock (on the UI thread) so a handler that reads these members cannot deadlock.
+    private readonly object _sync = new();
+
     private readonly Stopwatch _stopwatch = new();
     private double _currentPercentage;
     private long _processedFiles;
+    private volatile bool _isActive;
 
     public event Action<double, string, string>? ProgressUpdated;
 
-    public bool IsActive { get; private set; }
-    public double CurrentPercentage => _currentPercentage;
-    public TimeSpan ElapsedTime => _stopwatch.Elapsed;
+    public bool IsActive => _isActive;
+    public double CurrentPercentage { get { lock (_sync) return _currentPercentage; } }
+    public TimeSpan ElapsedTime { get { lock (_sync) return _stopwatch.Elapsed; } }
 
     public void Start(string initialOperation = "Running...")
     {
-        _currentPercentage = 0;
-        _processedFiles = 0;
-        _stopwatch.Restart();
-        IsActive = true;
+        lock (_sync)
+        {
+            _currentPercentage = 0;
+            _processedFiles = 0;
+            _stopwatch.Restart();
+            _isActive = true;
+        }
         NotifyUpdate(0, "00:00", "Estimating...");
     }
 
     public void Stop()
     {
-        _stopwatch.Stop();
-        IsActive = false;
-        NotifyUpdate(_currentPercentage, FormatTimeSpan(_stopwatch.Elapsed), "Completed");
+        double percent;
+        string elapsed;
+        lock (_sync)
+        {
+            _stopwatch.Stop();
+            _isActive = false;
+            percent = _currentPercentage;
+            elapsed = FormatTimeSpan(_stopwatch.Elapsed);
+        }
+        NotifyUpdate(percent, elapsed, "Completed");
     }
 
     public void Reset()
     {
-        _stopwatch.Reset();
-        _currentPercentage = 0;
-        _processedFiles = 0;
-        IsActive = false;
+        lock (_sync)
+        {
+            _stopwatch.Reset();
+            _currentPercentage = 0;
+            _processedFiles = 0;
+            _isActive = false;
+        }
     }
 
     public void ProcessLine(string line)
     {
-        if (!IsActive || string.IsNullOrWhiteSpace(line)) return;
+        if (!_isActive || string.IsNullOrWhiteSpace(line)) return;
 
         // 1. Try DISM regex
         var dismMatch = DismProgressRegex().Match(line);
@@ -75,20 +95,32 @@ public partial class ProgressAndEtaTracker
         var icaclsMatch = IcaclsProgressRegex().Match(line);
         if (icaclsMatch.Success && long.TryParse(icaclsMatch.Groups[1].Value, out var files))
         {
-            _processedFiles = files;
-            var elapsedStr = FormatTimeSpan(_stopwatch.Elapsed);
-            NotifyUpdate(0, elapsedStr, $"{_processedFiles:N0} files processed");
+            TimeSpan elapsed;
+            lock (_sync)
+            {
+                if (!_isActive) return;
+                _processedFiles = files;
+                elapsed = _stopwatch.Elapsed;
+            }
+            NotifyUpdate(0, FormatTimeSpan(elapsed), $"{files:N0} files processed");
         }
     }
 
     public void UpdateProgress(double percentage)
     {
-        _currentPercentage = Math.Clamp(percentage, 0.0, 100.0);
-        var elapsed = _stopwatch.Elapsed;
-        var elapsedStr = FormatTimeSpan(elapsed);
-        var etaStr = CalculateEta(elapsed, _currentPercentage);
+        double percent;
+        string elapsedStr;
+        string etaStr;
+        lock (_sync)
+        {
+            _currentPercentage = Math.Clamp(percentage, 0.0, 100.0);
+            percent = _currentPercentage;
+            var elapsed = _stopwatch.Elapsed;
+            elapsedStr = FormatTimeSpan(elapsed);
+            etaStr = CalculateEta(elapsed, _currentPercentage);
+        }
 
-        NotifyUpdate(_currentPercentage, elapsedStr, etaStr);
+        NotifyUpdate(percent, elapsedStr, etaStr);
     }
 
     private string CalculateEta(TimeSpan elapsed, double percentage)

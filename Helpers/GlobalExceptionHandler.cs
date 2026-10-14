@@ -10,10 +10,26 @@ namespace DiskMasterWinUI.Helpers;
 /// </summary>
 public static class GlobalExceptionHandler
 {
+    private const long MaxCrashLogBytes = 2 * 1024 * 1024; // roll at 2 MB so the log cannot grow without bound
+    private static readonly object _logLock = new();
+    private static readonly object _lastLock = new();
     private static DispatcherQueue? _dispatcherQueue;
+    private static Exception? _lastException;
+    private static string _lastExceptionContext = "";
+
     public static event Action<Exception, string>? ExceptionReported;
-    public static Exception? LastException { get; private set; }
-    public static string LastExceptionContext { get; private set; } = "";
+
+    public static Exception? LastException { get { lock (_lastLock) return _lastException; } }
+    public static string LastExceptionContext { get { lock (_lastLock) return _lastExceptionContext; } }
+
+    /// <summary>
+    /// Reads the last reported failure as one atomic pair, so the details shown in the UI and
+    /// the exception copied to the clipboard always belong to the same report.
+    /// </summary>
+    public static (Exception? Exception, string Context) GetLastFailure()
+    {
+        lock (_lastLock) return (_lastException, _lastExceptionContext);
+    }
 
     /// <summary>
     /// Initializes the dispatcher queue for safe UI invocation from any background thread.
@@ -28,17 +44,14 @@ public static class GlobalExceptionHandler
     /// </summary>
     public static void ReportException(Exception ex, string context = "一般非同步操作 (General Operation)")
     {
-        LastException = ex;
-        LastExceptionContext = context;
-
-        // Log to crash.log
-        try
+        lock (_lastLock)
         {
-            var logPath = Path.Combine(AppContext.BaseDirectory, "crash.log");
-            var logEntry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{context}]\nException: {ex.GetType().FullName}: {ex.Message}\nStackTrace:\n{ex.StackTrace}\n\n";
-            File.AppendAllText(logPath, logEntry);
+            _lastException = ex;
+            _lastExceptionContext = context;
         }
-        catch { }
+
+        var logEntry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{context}]\nException: {ex.GetType().FullName}: {ex.Message}\nStackTrace:\n{ex.StackTrace}\n\n";
+        AppendCrashLog(logEntry);
 
         // Dispatch to UI thread if possible
         if (_dispatcherQueue != null && !_dispatcherQueue.HasThreadAccess)
@@ -52,6 +65,50 @@ public static class GlobalExceptionHandler
         {
             ExceptionReported?.Invoke(ex, context);
         }
+    }
+
+    /// <summary>
+    /// Appends a crash record under a lock, rolling the file at a fixed size, and falls back to
+    /// %LOCALAPPDATA% when the application directory is not writable (Program Files, read-only
+    /// portable media). Failures here are ignored on purpose: this runs inside exception handling.
+    /// </summary>
+    private static void AppendCrashLog(string logEntry)
+    {
+        lock (_logLock)
+        {
+            foreach (var path in GetCrashLogPaths())
+            {
+                try
+                {
+                    var info = new FileInfo(path);
+                    if (info.Exists && info.Length > MaxCrashLogBytes)
+                    {
+                        File.Move(path, path + ".1", overwrite: true);
+                    }
+                    File.AppendAllText(path, logEntry);
+                    return;
+                }
+                catch
+                {
+                    // Try the next candidate location.
+                }
+            }
+        }
+    }
+
+    private static List<string> GetCrashLogPaths()
+    {
+        var paths = new List<string> { Path.Combine(AppContext.BaseDirectory, "crash.log") };
+        try
+        {
+            var local = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "DiskMaster_Portable");
+            Directory.CreateDirectory(local);
+            paths.Add(Path.Combine(local, "crash.log"));
+        }
+        catch { }
+        return paths;
     }
 
     /// <summary>

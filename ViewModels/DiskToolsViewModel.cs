@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DiskMasterWinUI.Helpers;
@@ -1760,5 +1761,543 @@ public partial class DiskToolsViewModel : ObservableObject
     public void ClearLog()
     {
         _logBuffer.Clear();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  Disk Clone (raw block level + VHDX image) & Volume Format (ReFS)
+    //  Every destructive action here is: pre-validated -> explicitly confirmed by the page
+    //  (ContentDialog) -> passed to the service with DestructiveTargetConfirmed = true.
+    //  The services re-check elevation and the confirmation flag, so no code path can skip them.
+    // ══════════════════════════════════════════════════════════════════════
+
+    private readonly DiskCloneService _cloneService = new();
+    private CancellationTokenSource? _cloneCts;
+    private CancellationTokenSource? _formatCts;
+    private const int LogLimit = 24000;
+
+    public ObservableCollection<DiskCloneService.CloneDevice> CloneDevices { get; } = new();
+    public ObservableCollection<VolumeInfo> FormatVolumes { get; } = new();
+
+    public ObservableCollection<string> CloneModeOptions { get; } = new()
+    {
+        DiskCloneService.ModeRaw,
+        DiskCloneService.ModeCreateImage,
+        DiskCloneService.ModeRestoreImage
+    };
+
+    public ObservableCollection<string> FormatFileSystemOptions { get; } = new() { "NTFS", "FAT32", "exFAT", "ReFS" };
+
+    public ObservableCollection<string> FormatClusterSizeOptions { get; } = new()
+    {
+        "預設 (Default)", "4096", "8192", "16384", "32768", "65536"
+    };
+
+    // Clone state
+    [ObservableProperty] private string _cloneMode = DiskCloneService.ModeRaw;
+    [ObservableProperty] private DiskCloneService.CloneDevice? _cloneSourceDevice;
+    [ObservableProperty] private DiskCloneService.CloneDevice? _cloneTargetDevice;
+    [ObservableProperty] private string _cloneImagePath = "";
+    [ObservableProperty] private bool _cloneVerifyAfterWrite;
+    [ObservableProperty] private bool _cloneOfflineTargetFirst = true;
+    [ObservableProperty] private bool _isCloning;
+    [ObservableProperty] private double _cloneProgress;
+    [ObservableProperty] private string _cloneStageText = "閒置 (Idle)";
+    [ObservableProperty] private string _cloneProgressText = "";
+    [ObservableProperty] private string _cloneThroughputText = "";
+    [ObservableProperty] private string _cloneEtaText = "";
+    [ObservableProperty] private string _cloneGeometryText = "尚未查詢裝置幾何資訊（按下「讀取裝置幾何」以取得磁區大小與精確容量）。";
+    [ObservableProperty] private string _cloneLog = "";
+
+    // Format state
+    [ObservableProperty] private VolumeInfo? _formatSelectedVolume;
+    [ObservableProperty] private string _formatFileSystem = "NTFS";
+    [ObservableProperty] private string _formatLabel = "";
+    [ObservableProperty] private bool _formatQuick = true;
+    [ObservableProperty] private string _formatClusterSize = "預設 (Default)";
+    [ObservableProperty] private bool _isFormatting;
+    [ObservableProperty] private string _formatStatusText = "";
+    [ObservableProperty] private string _reFsSupportText = "尚未檢查 ReFS 支援狀態。";
+    [ObservableProperty] private string _formatLog = "";
+
+    private void AppendCloneLog(string line) => CloneLog = AppendCapped(CloneLog, line);
+    private void AppendFormatLog(string line) => FormatLog = AppendCapped(FormatLog, line);
+
+    private static string AppendCapped(string current, string line)
+    {
+        var text = current + $"[{DateTime.Now:HH:mm:ss}] {line}{Environment.NewLine}";
+        return text.Length > LogLimit ? text[^LogLimit..] : text;
+    }
+
+    // ── Inventory / geometry ──
+
+    [RelayCommand]
+    public async Task RefreshCloneInventoryAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            StatusMessage = "正在列舉可複製的原始裝置 (diskpart list disk / list volume)...";
+            AppendCloneLog("▸ diskpart: list disk / list volume");
+            var (devices, raw) = await _cloneService.ListCloneDevicesAsync();
+
+            CloneDevices.Clear();
+            foreach (var device in devices) CloneDevices.Add(device);
+
+            CloneSourceDevice = CloneDevices.FirstOrDefault(d => d.IsPhysicalDrive) ?? CloneDevices.FirstOrDefault();
+            CloneTargetDevice = CloneDevices.FirstOrDefault(d => d.IsPhysicalDrive && !ReferenceEquals(d, CloneSourceDevice))
+                                ?? CloneDevices.Skip(1).FirstOrDefault();
+
+            AppendCloneLog($"✔ 找到 {CloneDevices.Count} 個可選裝置（{CloneDevices.Count(d => d.IsPhysicalDrive)} 顆磁碟 / {CloneDevices.Count(d => !d.IsPhysicalDrive)} 個磁碟區）。");
+            AppendCloneLog(raw);
+            StatusMessage = $"裝置清單已更新（{CloneDevices.Count} 項）。";
+        }
+        catch (Exception ex)
+        {
+            AppendCloneLog($"❌ 列舉裝置失敗: {ex.Message}");
+            StatusMessage = $"列舉裝置失敗: {ex.Message}";
+        }
+        finally { IsLoading = false; }
+    }
+
+    [RelayCommand]
+    public async Task RefreshFormatVolumesAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            StatusMessage = "正在列舉磁碟區 (diskpart list volume)...";
+            var diskPart = new DiskPartService();
+            var (volumes, _) = await diskPart.ListVolumesAsync();
+
+            FormatVolumes.Clear();
+            foreach (var volume in volumes) FormatVolumes.Add(volume);
+            FormatSelectedVolume ??= FormatVolumes.FirstOrDefault();
+
+            AppendFormatLog($"✔ 找到 {FormatVolumes.Count} 個磁碟區。");
+            StatusMessage = $"磁碟區清單已更新（{FormatVolumes.Count} 項）。";
+        }
+        catch (Exception ex)
+        {
+            AppendFormatLog($"❌ 列舉磁碟區失敗: {ex.Message}");
+            StatusMessage = $"列舉磁碟區失敗: {ex.Message}";
+        }
+        finally { IsLoading = false; }
+    }
+
+    [RelayCommand]
+    public async Task LoadCloneGeometryAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            var sb = new StringBuilder();
+            sb.AppendLine($"模式: {CloneMode}");
+
+            if (CloneMode == DiskCloneService.ModeCreateImage || CloneMode == DiskCloneService.ModeRestoreImage)
+            {
+                sb.AppendLine($"映像檔: {(string.IsNullOrWhiteSpace(CloneImagePath) ? "(未指定)" : CloneImagePath)}");
+                if (File.Exists(CloneImagePath))
+                {
+                    var info = new FileInfo(CloneImagePath);
+                    sb.AppendLine($"映像檔實際大小: {NativeStorageService.FormatBytes(info.Length)} (最後寫入 {info.LastWriteTime:yyyy-MM-dd HH:mm:ss})");
+                }
+                else if (!string.IsNullOrWhiteSpace(CloneImagePath))
+                {
+                    sb.AppendLine("⚠️ 映像檔尚不存在（建立模式會新建，還原模式需先存在）。");
+                }
+            }
+
+            var sourcePath = CloneMode == DiskCloneService.ModeRestoreImage ? null : CloneSourceDevice?.DevicePath;
+            var targetPath = CloneMode == DiskCloneService.ModeCreateImage ? null : CloneTargetDevice?.DevicePath;
+
+            if (!string.IsNullOrWhiteSpace(sourcePath))
+            {
+                var info = await _cloneService.QueryDeviceInfoAsync(sourcePath);
+                sb.AppendLine($"來源: {info.GeometrySummary}");
+            }
+            if (!string.IsNullOrWhiteSpace(targetPath))
+            {
+                var info = await _cloneService.QueryDeviceInfoAsync(targetPath);
+                sb.AppendLine($"目標: {info.GeometrySummary}");
+            }
+
+            var plan = ValidateClonePlan();
+            sb.AppendLine(plan.Ok ? $"✅ 計畫檢查通過：{plan.Summary}" : $"❌ 計畫檢查未通過：{plan.Error}");
+
+            CloneGeometryText = sb.ToString().TrimEnd();
+            AppendCloneLog(CloneGeometryText);
+            StatusMessage = plan.Ok ? "裝置幾何讀取完成，計畫檢查通過。" : "裝置幾何讀取完成，但計畫檢查未通過。";
+        }
+        catch (Exception ex)
+        {
+            CloneGeometryText = $"❌ 讀取幾何資訊失敗: {ex.Message}";
+            AppendCloneLog(CloneGeometryText);
+            StatusMessage = $"讀取幾何資訊失敗: {ex.Message}";
+        }
+        finally { IsLoading = false; }
+    }
+
+    [RelayCommand]
+    public async Task BrowseCloneImageAsync()
+    {
+        var folder = await FilePickerHelper.PickFolderAsync();
+        if (string.IsNullOrWhiteSpace(folder)) return;
+        CloneImagePath = Path.Combine(folder, $"DiskImage_{DateTime.Now:yyyyMMdd_HHmmss}.vhdx");
+        AppendCloneLog($"▸ 映像輸出路徑: {CloneImagePath}");
+    }
+
+    [RelayCommand]
+    public async Task BrowseCloneImageSourceAsync()
+    {
+        var picked = await FilePickerHelper.PickSingleFileAsync(new[] { ".vhdx" });
+        if (!string.IsNullOrWhiteSpace(picked))
+        {
+            CloneImagePath = picked;
+            AppendCloneLog($"▸ 選取映像檔: {picked}");
+        }
+    }
+
+    // ── Clone plan validation (used by the page before it shows the confirmation dialog) ──
+
+    public (bool Ok, string Error, string Summary, string TargetName, string ScriptPreview) ValidateClonePlan()
+    {
+        if (IsCloning) return (false, "已有複製作業正在進行中。", "", "", "");
+
+        var source = CloneSourceDevice;
+        var target = CloneTargetDevice;
+
+        if (CloneMode == DiskCloneService.ModeRaw)
+        {
+            if (source is null) return (false, "請選擇來源裝置。", "", "", "");
+            if (target is null) return (false, "請選擇目標裝置。", "", "", "");
+            if (string.Equals(source.DevicePath, target.DevicePath, StringComparison.OrdinalIgnoreCase))
+                return (false, "來源與目標不可為同一個裝置。", "", "", "");
+
+            var systemDisk = DiskCloneService.TryGetSystemDiskNumber();
+            if (target.IsPhysicalDrive && systemDisk.HasValue && target.DiskNumber == systemDisk.Value)
+                return (false, $"Disk {target.DiskNumber} 是執行中的系統磁碟，已拒絕。", "", "", "");
+
+            var summary =
+                $"模式：原始區塊複製（Raw block clone，raw device handle）\n" +
+                $"來源：{source.DisplayName}\n" +
+                $"目標：{target.DisplayName}\n" +
+                $"寫入後讀回驗證：{(CloneVerifyAfterWrite ? "是" : "否")}\n" +
+                $"目標磁碟先離線：{(CloneOfflineTargetFirst && target.IsPhysicalDrive ? "是 (diskpart offline disk)" : "否")}\n\n" +
+                "⚠️ 目標裝置上的所有現存資料將被來源內容覆寫，且無法復原！";
+            var preview = $@"複製來源 {source.DevicePath} → 目標 {target.DevicePath}（CreateFile + ReadFile/WriteFile 原始磁區 I/O，" +
+                          $"目標磁碟區會先 FSCTL_LOCK_VOLUME + FSCTL_DISMOUNT_VOLUME）";
+            return (true, "", summary, target.DevicePath, preview);
+        }
+
+        if (CloneMode == DiskCloneService.ModeCreateImage)
+        {
+            if (source is null) return (false, "請選擇要製作映像的來源裝置。", "", "", "");
+            if (string.IsNullOrWhiteSpace(CloneImagePath)) return (false, "請指定 .vhdx 映像輸出路徑。", "", "", "");
+            if (!Path.GetExtension(CloneImagePath).Equals(".vhdx", StringComparison.OrdinalIgnoreCase))
+                return (false, "VHDX 映像模式僅支援 .vhdx 輸出。", "", "", "");
+            if (File.Exists(CloneImagePath))
+                return (false, $"映像檔已存在，請改用其他檔名以免覆寫：{CloneImagePath}", "", "", "");
+
+            var summary =
+                $"模式：建立 VHDX 映像（raw 區塊映像 → .vhdx）\n" +
+                $"來源：{source.DisplayName}\n" +
+                $"輸出映像：{CloneImagePath}\n" +
+                $"寫入後讀回驗證：{(CloneVerifyAfterWrite ? "是" : "否")}\n\n" +
+                "映像檔內容為來源磁區的逐位元組副本；整顆磁碟映像可直接掛載使用，單一磁碟區映像主要用於還原。";
+            var preview = $"diskpart: create vdisk file=\"{CloneImagePath}\" maximum=<依來源幾何計算> type=expandable → attach vdisk → 以原始磁區 I/O 寫入 \\\\.\\PhysicalDrive<新虛擬磁碟> → detach vdisk";
+            return (true, "", summary, CloneImagePath, preview);
+        }
+
+        // Restore
+        if (string.IsNullOrWhiteSpace(CloneImagePath)) return (false, "請選擇要還原的 .vhdx 映像檔。", "", "", "");
+        if (!File.Exists(CloneImagePath)) return (false, $"找不到映像檔：{CloneImagePath}", "", "", "");
+        if (target is null) return (false, "請選擇還原目標裝置。", "", "", "");
+
+        var sysDisk = DiskCloneService.TryGetSystemDiskNumber();
+        if (target.IsPhysicalDrive && sysDisk.HasValue && target.DiskNumber == sysDisk.Value)
+            return (false, $"Disk {target.DiskNumber} 是執行中的系統磁碟，已拒絕。", "", "", "");
+
+        var restoreSummary =
+            $"模式：從 VHDX 映像還原（.vhdx → raw 裝置）\n" +
+            $"映像來源：{CloneImagePath}\n" +
+            $"目標：{target.DisplayName}\n" +
+            $"寫入後讀回驗證：{(CloneVerifyAfterWrite ? "是" : "否")}\n" +
+            $"目標磁碟先離線：{(CloneOfflineTargetFirst && target.IsPhysicalDrive ? "是 (diskpart offline disk)" : "否")}\n\n" +
+            "⚠️ 目標裝置上的所有現存資料將被映像內容覆寫，且無法復原！";
+        var restorePreview = $"diskpart: attach vdisk readonly → 取得 \\\\.\\PhysicalDrive<虛擬磁碟> → 原始磁區 I/O 複製到 {target.DevicePath} → detach vdisk";
+        return (true, "", restoreSummary, target.DevicePath, restorePreview);
+    }
+
+    /// <summary>Runs the currently selected clone plan. Only ever called with destructiveConfirmed = true after the page dialog.</summary>
+    public async Task StartCloneAsync(bool destructiveConfirmed)
+    {
+        var plan = ValidateClonePlan();
+        if (!plan.Ok)
+        {
+            AppendCloneLog($"❌ 已拒絕執行：{plan.Error}");
+            StatusMessage = plan.Error;
+            return;
+        }
+
+        if (!AdminHelper.IsRunningAsAdmin())
+        {
+            AppendCloneLog("❌ 已拒絕執行：需要系統管理員權限。");
+            StatusMessage = "需要系統管理員權限才能進行區塊級複製。";
+            return;
+        }
+
+        _cloneCts = new CancellationTokenSource();
+        var ct = _cloneCts.Token;
+        IsCloning = true;
+        CloneProgress = 0;
+        CloneStageText = "準備中...";
+        CloneProgressText = "";
+        CloneThroughputText = "";
+        CloneEtaText = "";
+
+        AppendCloneLog($"▶ 開始：{plan.ScriptPreview}");
+        if (!destructiveConfirmed) AppendCloneLog("⚠️ 未帶入確認旗標，服務層將拒絕此次破壞性寫入。");
+
+        var progress = new Progress<DiskCloneService.CloneProgress>(p =>
+        {
+            CloneProgress = p.Percent;
+            CloneStageText = p.Stage;
+            CloneProgressText = $"{p.Percent:0.0}%　{NativeStorageService.FormatBytes(p.BytesDone)} / {NativeStorageService.FormatBytes(p.TotalBytes)}";
+            CloneThroughputText = $"寫入速度 {p.BytesPerSecond / 1024 / 1024:0.0} MB/s　已耗時 {p.Elapsed:hh\\:mm\\:ss}";
+            CloneEtaText = p.Eta.HasValue ? $"預估剩餘 {p.Eta.Value:hh\\:mm\\:ss}" : "預估剩餘：計算中...";
+        });
+
+        var options = new DiskCloneService.CloneOptions
+        {
+            DestructiveTargetConfirmed = destructiveConfirmed,
+            VerifyAfterWrite = CloneVerifyAfterWrite,
+            OfflineTargetDiskFirst = CloneOfflineTargetFirst
+        };
+
+        try
+        {
+            if (CloneMode == DiskCloneService.ModeRaw)
+            {
+                var result = await _cloneService.CloneDeviceToDeviceAsync(
+                    CloneSourceDevice!.DevicePath, CloneTargetDevice!.DevicePath, options, progress, ct);
+                ReportCloneResult(result);
+            }
+            else if (CloneMode == DiskCloneService.ModeCreateImage)
+            {
+                var result = await _vhdService.CreateImageFromDeviceAsync(CloneSourceDevice!.DevicePath, CloneImagePath, options, progress, ct);
+                ReportCloneResult(result);
+            }
+            else
+            {
+                var result = await _vhdService.RestoreImageToDeviceAsync(
+                    CloneImagePath, CloneTargetDevice!.DevicePath, options, progress, ct);
+                ReportCloneResult(result);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            AppendCloneLog("⏹️ 已取消。");
+            StatusMessage = "複製作業已取消。";
+        }
+        catch (Exception ex)
+        {
+            GlobalExceptionHandler.ReportException(ex, "磁碟複製");
+            AppendCloneLog($"❌ 例外：{ex.Message}");
+            StatusMessage = $"複製失敗: {ex.Message}";
+        }
+        finally
+        {
+            IsCloning = false;
+            CloneStageText = "已結束";
+            _cloneCts?.Dispose();
+            _cloneCts = null;
+        }
+    }
+
+    private void ReportCloneResult(DiskCloneService.CloneResult result)
+    {
+        foreach (var line in result.Diagnostics) AppendCloneLog(line);
+        AppendCloneLog(result.Message);
+        CloneGeometryText = result.Message;
+
+        if (result.Cancelled)
+        {
+            StatusMessage = "複製作業已取消。";
+        }
+        else if (result.Success)
+        {
+            CloneProgress = 100;
+            StatusMessage = "複製作業成功完成。";
+            if (result.VerificationRequested && !result.VerificationPassed)
+                StatusMessage = "複製完成，但讀回驗證失敗！請檢查目標裝置。";
+        }
+        else
+        {
+            StatusMessage = "複製作業失敗（詳見日誌）。";
+        }
+    }
+
+    [RelayCommand]
+    public void CancelClone()
+    {
+        if (_cloneCts is null || _cloneCts.IsCancellationRequested) return;
+        AppendCloneLog("⏹️ 已送出取消要求，正在安全停止（已完成寫入的磁區會保留）...");
+        _cloneCts.Cancel();
+    }
+
+    // ── Format plan validation & execution ──
+
+    public (bool Ok, string Error, string Summary, string ScriptPreview) ValidateFormatPlan()
+    {
+        if (IsFormatting) return (false, "已有格式化作業正在進行中。", "", "");
+        var volume = FormatSelectedVolume;
+        if (volume is null) return (false, "請先選擇要格式化的磁碟區（按「重新整理磁碟區」）。", "", "");
+
+        var fs = DiskPartService.CanonicalFileSystem(FormatFileSystem);
+        int? clusterSize = null;
+        if (!string.IsNullOrWhiteSpace(FormatClusterSize) && !FormatClusterSize.StartsWith("預設", StringComparison.Ordinal))
+        {
+            if (!int.TryParse(FormatClusterSize.Trim(), out var parsed))
+                return (false, $"叢集大小必須是整數：{FormatClusterSize}", "", "");
+            clusterSize = parsed;
+        }
+
+        var letter = string.IsNullOrWhiteSpace(volume.Letter) ? (char?)null : char.ToUpperInvariant(volume.Letter.TrimEnd(':')[0]);
+        var label = (FormatLabel ?? "").Trim();
+
+        // Explicit boot-volume gate for every file system (not just ReFS).
+        var systemDrive = (Environment.GetEnvironmentVariable("SystemDrive") ?? "C:").TrimEnd('\\')[0];
+        if (letter.HasValue && letter.Value == char.ToUpperInvariant(systemDrive))
+            return (false, $"Volume {volume.Number} ({letter}:) 是執行中的系統 / 開機磁碟區，禁止格式化。", "", "");
+
+        var rejection = DiskPartService.ValidateFormatArguments(volume.Number, fs, label, clusterSize, letter);
+        if (rejection != null) return (false, rejection, "", "");
+
+        var quickArg = FormatQuick ? " quick" : "";
+        var clusterArg = clusterSize.HasValue ? $" unit={clusterSize.Value}" : "";
+        var labelArg = string.IsNullOrEmpty(label) ? "" : $" label=\"{label}\"";
+        var script = $"select volume {volume.Number}\r\nformat fs={fs}{clusterArg}{labelArg}{quickArg}";
+
+        var volumeText = string.IsNullOrWhiteSpace(volume.Letter)
+            ? $"Volume {volume.Number} [{volume.Label}]"
+            : $"Volume {volume.Number} {volume.Letter}: [{volume.Label}]";
+        var summary =
+            $"目標磁碟區：{volumeText}　目前檔案系統：{(string.IsNullOrWhiteSpace(volume.FileSystem) ? "未知" : volume.FileSystem)}　容量：{volume.SizeDisplay}\n" +
+            $"格式化為：{fs}　標籤：{(string.IsNullOrEmpty(label) ? "(不變更/空白)" : label)}　" +
+            $"快速格式化：{(FormatQuick ? "是" : "否（完整格式化，可能耗時數小時）")}　叢集大小：{(clusterSize.HasValue ? clusterSize.Value + " bytes" : "預設")}\n" +
+            $"實際 diskpart 指令：{script.Replace("\r\n", " / ")}\n\n" +
+            "⚠️ 格式化會永久清除此磁碟區上的所有資料！";
+
+        return (true, "", summary, script);
+    }
+
+    public async Task StartFormatAsync(bool destructiveConfirmed)
+    {
+        var plan = ValidateFormatPlan();
+        if (!plan.Ok)
+        {
+            AppendFormatLog($"❌ 已拒絕格式化：{plan.Error}");
+            FormatStatusText = plan.Error;
+            StatusMessage = plan.Error;
+            return;
+        }
+
+        if (!AdminHelper.IsRunningAsAdmin())
+        {
+            AppendFormatLog("❌ 已拒絕執行：需要系統管理員權限。");
+            FormatStatusText = "需要系統管理員權限才能格式化。";
+            return;
+        }
+
+        if (!destructiveConfirmed)
+        {
+            AppendFormatLog("❌ 已拒絕執行：未取得使用者確認。");
+            FormatStatusText = "未確認，已取消。";
+            return;
+        }
+
+        var volume = FormatSelectedVolume!;
+        var fs = DiskPartService.CanonicalFileSystem(FormatFileSystem);
+        int? clusterSize = null;
+        if (!string.IsNullOrWhiteSpace(FormatClusterSize) && !FormatClusterSize.StartsWith("預設", StringComparison.Ordinal) &&
+            int.TryParse(FormatClusterSize.Trim(), out var parsed))
+        {
+            clusterSize = parsed;
+        }
+        var letter = string.IsNullOrWhiteSpace(volume.Letter) ? (char?)null : char.ToUpperInvariant(volume.Letter.TrimEnd(':')[0]);
+
+        IsFormatting = true;
+        FormatStatusText = "正在格式化...（DiskPart 為全域序列化，若其他磁碟操作正在進行會先排隊等待，可按「⏹️ 取消格式化」中止）";
+        AppendFormatLog($"▶ diskpart: {plan.ScriptPreview.Replace("\r\n", " / ")}");
+
+        _formatCts = new CancellationTokenSource();
+        try
+        {
+            var diskPart = new DiskPartService();
+            var (success, output) = await diskPart.FormatVolumeCheckedAsync(
+                volume.Number, fs, (FormatLabel ?? "").Trim(), FormatQuick, clusterSize, letter, _formatCts.Token);
+
+            AppendFormatLog(output);
+            if (success)
+            {
+                FormatStatusText = $"✅ Volume {volume.Number} 已格式化為 {fs}。";
+                AppendFormatLog(FormatStatusText);
+                StatusMessage = FormatStatusText;
+                await RefreshFormatVolumesAsync();
+            }
+            else
+            {
+                FormatStatusText = $"❌ 格式化失敗（Volume {volume.Number} → {fs}），詳見日誌。";
+                AppendFormatLog(FormatStatusText);
+                StatusMessage = FormatStatusText;
+            }
+        }
+        catch (Exception ex)
+        {
+            GlobalExceptionHandler.ReportException(ex, "格式化磁碟區");
+            AppendFormatLog($"❌ 例外：{ex.Message}");
+            FormatStatusText = $"格式化失敗: {ex.Message}";
+            StatusMessage = FormatStatusText;
+        }
+        finally
+        {
+            IsFormatting = false;
+            _formatCts?.Dispose();
+            _formatCts = null;
+        }
+    }
+
+    /// <summary>A4: gives the user a way out of a queued / long-running diskpart session.</summary>
+    [RelayCommand]
+    public void CancelFormat()
+    {
+        if (!IsFormatting || _formatCts is null || _formatCts.IsCancellationRequested) return;
+        AppendFormatLog("⏹️ 已送出取消要求（將中止 diskpart 並釋放 DiskPart 鎖定）...");
+        FormatStatusText = "已送出取消要求，正在中止 DiskPart...";
+        _formatCts.Cancel();
+    }
+
+    [RelayCommand]
+    public void CheckReFsSupport()
+    {
+        var (supported, reason) = DiskPartService.CheckReFsSupport();
+        ReFsSupportText = (supported ? "✅ ReFS 支援：" : "❌ 不支援 ReFS：") + reason;
+        AppendFormatLog(ReFsSupportText);
+
+        var sizes = string.Join(", ", DiskPartService.GetAllowedClusterSizes("ReFS"));
+        AppendFormatLog($"ℹ️ ReFS 允許的叢集大小：{sizes} bytes；且不可用於可卸除媒體或開機磁碟區。");
+        StatusMessage = supported ? "此系統支援 ReFS 格式化。" : reason;
+    }
+
+    [RelayCommand]
+    public void ClearCloneLog()
+    {
+        CloneLog = "";
+    }
+
+    [RelayCommand]
+    public void ClearFormatLog()
+    {
+        FormatLog = "";
     }
 }

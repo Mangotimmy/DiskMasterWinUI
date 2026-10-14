@@ -152,17 +152,19 @@ public class VhdService
         string vhdPath,
         string label = "VHDX_DATA",
         char? driveLetter = null,
-        bool asGpt = true)
+        bool asGpt = true,
+        string fileSystem = "ntfs")
     {
         var style = asGpt ? "gpt" : "mbr";
         var letterCmd = driveLetter.HasValue ? $"assign letter={driveLetter.Value}" : "assign";
+        var fs = string.IsNullOrWhiteSpace(fileSystem) ? "ntfs" : fileSystem.Trim().ToLowerInvariant();
 
         var script = $"""
 select vdisk file="{vhdPath}"
 attach vdisk
 convert {style}
 create partition primary
-format fs=ntfs quick label="{label}"
+format fs={fs} quick label="{label}"
 {letterCmd}
 detail vdisk
 """;
@@ -175,10 +177,272 @@ detail vdisk
             output.Contains("順利格式化", StringComparison.OrdinalIgnoreCase) ||
             output.Contains("成功格式化", StringComparison.OrdinalIgnoreCase))
         {
-            return (true, $"虛擬硬碟已初始化並格式化為 NTFS，磁碟代號: {assigned}:", assigned);
+            return (true, $"虛擬硬碟已初始化並格式化為 {fs.ToUpperInvariant()}，磁碟代號: {assigned}:", assigned);
         }
 
         return (false, output, assigned);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  VHDX image mode (raw disk/volume ⇄ .vhdx)
+    //  The created image holds a byte-for-byte copy of the source device,
+    //  written through the raw handle of the freshly attached virtual disk.
+    // ══════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Resolves the physical disk number of an attached VHD/VHDX (the virtual disk is exposed as \\.\PhysicalDriveN).
+    /// </summary>
+    public async Task<(bool Found, int DiskNumber, string Message)> GetAttachedDiskNumberAsync(string vhdPath)
+    {
+        if (!File.Exists(vhdPath))
+            return (false, -1, $"找不到虛擬硬碟檔案: {vhdPath}");
+
+        var escaped = vhdPath.Replace("'", "''");
+        var ps = $"$d = Get-DiskImage -ImagePath '{escaped}' | Get-Disk; if ($d) {{ [string]$d.Number }} else {{ 'NOT_ATTACHED' }}";
+
+        // The disk needs a moment to appear in the storage stack right after "attach vdisk".
+        for (int attempt = 0; attempt < 10; attempt++)
+        {
+            var (outStr, errStr, _) = await ProcessHelper.RunProcessAsync(
+                "powershell.exe", $"-NoProfile -NonInteractive -Command \"{ps}\"");
+
+            var text = (outStr ?? "").Trim();
+            var lastLine = text.Split('\n', StringSplitOptions.RemoveEmptyEntries).LastOrDefault()?.Trim() ?? "";
+            if (int.TryParse(lastLine, out var diskNumber) && diskNumber >= 0)
+                return (true, diskNumber, $"映像磁碟已掛載為 \\\\.\\PhysicalDrive{diskNumber}");
+
+            if (lastLine.Contains("NOT_ATTACHED", StringComparison.OrdinalIgnoreCase) && attempt >= 2)
+                return (false, -1, "映像未掛載（Get-DiskImage 查無磁碟）。" + (string.IsNullOrWhiteSpace(errStr) ? "" : $" [{errStr.Trim()}]"));
+
+            await Task.Delay(700);
+        }
+
+        return (false, -1, "逾時：無法取得映像的實體磁碟編號（Get-DiskImage / Get-Disk 無回應）。");
+    }
+
+    /// <summary>
+    /// Creates a .vhdx image whose block content is an exact copy of a raw source device
+    /// (\\.\PhysicalDriveN or \\.\X:). Creation parameters come from the real source geometry.
+    /// The VHDX is created, attached, filled through raw handles, then detached so the file is a
+    /// self-contained image that can be attached/mounted again at any time.
+    /// </summary>
+    public async Task<DiskCloneService.CloneResult> CreateImageFromDeviceAsync(
+        string sourceDevicePath,
+        string vhdPath,
+        DiskCloneService.CloneOptions options,
+        IProgress<DiskCloneService.CloneProgress>? progress = null,
+        CancellationToken ct = default)
+    {
+        var cloneService = new DiskCloneService();
+        var result = new DiskCloneService.CloneResult { SourceDevice = sourceDevicePath, TargetDevice = vhdPath };
+
+        if (!AdminHelper.IsRunningAsAdmin())
+        {
+            result.Message = "❌ 拒絕執行：建立原始區塊映像需要系統管理員權限。";
+            return result;
+        }
+        if (!options.DestructiveTargetConfirmed)
+        {
+            result.Message = "❌ 拒絕執行：未取得映像建立/覆寫確認。";
+            return result;
+        }
+        if (string.IsNullOrWhiteSpace(vhdPath))
+        {
+            result.Message = "❌ 請指定 .vhdx 映像輸出路徑。";
+            return result;
+        }
+        if (!Path.GetExtension(vhdPath).Equals(".vhdx", StringComparison.OrdinalIgnoreCase))
+        {
+            result.Message = "❌ VHDX 映像模式僅支援 .vhdx 輸出（VHD 上限 2TB 且不支援 4Kn 磁區）。";
+            return result;
+        }
+
+        bool attached = false;
+        try
+        {
+            progress?.Report(new DiskCloneService.CloneProgress { Stage = "讀取來源幾何", Percent = 0 });
+
+            // Exact source geometry - never a guessed size.
+            var sourceInfo = await cloneService.QueryDeviceInfoAsync(sourceDevicePath, ct);
+            result.SourceBytes = sourceInfo.TotalBytes;
+            result.SourceBytesPerSector = sourceInfo.BytesPerSector;
+            result.CopyLength = sourceInfo.TotalBytes;
+
+            var sizeMB = (long)Math.Ceiling(sourceInfo.TotalBytes / 1048576.0);
+            if (sizeMB <= 0) { result.Message = "❌ 來源裝置容量無效。"; return result; }
+
+            // 1. Create the VHDX (expandable by default so the file stays small when the source has holes/zeros).
+            var create = await CreateVhdAsync(vhdPath, sizeMB, isVhdx: true, isDynamic: true);
+            result.Diagnostics.Add($"[diskpart] create vdisk maximum={sizeMB} MB type=expandable → {(create.Success ? "OK" : create.Message)}");
+            if (!create.Success) { result.Message = $"❌ 建立 VHDX 失敗：{create.Message}"; return result; }
+
+            // 2. Attach it, resolve its PhysicalDriveN.
+            var attach = await AttachVhdAsync(vhdPath, readOnly: false);
+            result.Diagnostics.Add($"[diskpart] attach vdisk → {(attach.Success ? "OK" : attach.Message)}");
+            if (!attach.Success) { result.Message = $"❌ 掛載 VHDX 失敗：{attach.Message}"; return result; }
+            attached = true;
+
+            var (found, diskNumber, numberMsg) = await GetAttachedDiskNumberAsync(vhdPath);
+            result.Diagnostics.Add(numberMsg);
+            if (!found) { result.Message = $"❌ 無法取得 VHDX 的磁碟編號：{numberMsg}"; return result; }
+
+            // 3. Raw copy source → the virtual disk. A fresh VHDX has no volumes, so it must not be offlined.
+            var imageOptions = new DiskCloneService.CloneOptions
+            {
+                DestructiveTargetConfirmed = true,
+                VerifyAfterWrite = options.VerifyAfterWrite,
+                OfflineTargetDiskFirst = false,
+                BringTargetOnlineAfterwards = false,
+                ChunkSizeBytes = options.ChunkSizeBytes
+            };
+
+            var copy = await cloneService.CloneDeviceToDeviceAsync(
+                sourceDevicePath, DiskCloneService.GetPhysicalDrivePath(diskNumber), imageOptions,
+                progress, ct);
+
+            result.CopiedBytes = copy.CopiedBytes;
+            result.Cancelled = copy.Cancelled;
+            result.SourceBytesPerSector = copy.SourceBytesPerSector;
+            result.TargetBytesPerSector = copy.TargetBytesPerSector;
+            result.CopyLength = copy.CopyLength;
+            result.TargetBytes = copy.TargetBytes;
+            result.Elapsed = copy.Elapsed;
+            result.AverageBytesPerSecond = copy.AverageBytesPerSecond;
+            result.VerificationRequested = copy.VerificationRequested;
+            result.VerificationPassed = copy.VerificationPassed;
+            result.VerificationSummary = copy.VerificationSummary;
+            result.Diagnostics.AddRange(copy.Diagnostics);
+
+            // 4. Detach so the image file is closed cleanly.
+            var detach = await DetachVhdAsync(vhdPath);
+            attached = false;
+            result.Diagnostics.Add($"[diskpart] detach vdisk → {(detach.Success ? "OK" : detach.Message)}");
+
+            if (!copy.Success)
+            {
+                result.Message = copy.Cancelled
+                    ? $"⏹️ 映像建立已取消：{vhdPath}\n影像檔為「部分寫入」狀態（已寫入 {NativeStorageService.FormatBytes(result.CopiedBytes)}），請刪除後重新建立。\n{copy.Message}"
+                    : $"❌ 映像建立失敗：{copy.Message}\n影像檔可能不完整：{vhdPath}";
+                return result;
+            }
+
+            result.Success = true;
+            result.TargetDevice = vhdPath;
+            result.Message =
+                $"✅ VHDX 映像建立完成：{Path.GetFileName(vhdPath)}\n" +
+                $"來源 {sourceDevicePath}（{NativeStorageService.FormatBytes(sourceInfo.TotalBytes)}，邏輯磁區 {sourceInfo.BytesPerSector} B）\n" +
+                $"已寫入 {NativeStorageService.FormatBytes(result.CopiedBytes)}，耗時 {result.Elapsed:hh\\:mm\\:ss}，平均 {result.AverageBytesPerSecond / 1024 / 1024:0.0} MB/s\n" +
+                (result.VerificationRequested ? (result.VerificationPassed ? $"🔎 {result.VerificationSummary}\n" : $"❌ {result.VerificationSummary}\n") : "") +
+                "ℹ️ 整顆磁碟映像可直接掛載使用；單一磁碟區映像為原始磁區內容，主要用於還原。";
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            result.Cancelled = true;
+            result.Message = $"⏹️ 已取消：映像 {vhdPath} 為部分寫入狀態，請刪除後重新建立。";
+            return result;
+        }
+        catch (Exception ex)
+        {
+            result.Message = $"❌ 建立 VHDX 映像時發生例外：{ex.Message}";
+            result.Diagnostics.Add($"[EXCEPTION] {ex.GetType().Name}: {ex.Message}");
+            return result;
+        }
+        finally
+        {
+            if (attached)
+            {
+                try { await DetachVhdAsync(vhdPath); }
+                catch (Exception ex) { result.Diagnostics.Add($"[WARN] 清理時 detach vdisk 失敗: {ex.Message}"); }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Restores a .vhdx image (whole disk image or single volume image) back onto a raw target device
+    /// with the full DiskCloneService safety gates. The image is attached read-only for the transfer.
+    /// </summary>
+    public async Task<DiskCloneService.CloneResult> RestoreImageToDeviceAsync(
+        string vhdPath,
+        string targetDevicePath,
+        DiskCloneService.CloneOptions options,
+        IProgress<DiskCloneService.CloneProgress>? progress = null,
+        CancellationToken ct = default)
+    {
+        var cloneService = new DiskCloneService();
+        var result = new DiskCloneService.CloneResult { SourceDevice = vhdPath, TargetDevice = targetDevicePath };
+
+        if (!AdminHelper.IsRunningAsAdmin())
+        {
+            result.Message = "❌ 拒絕執行：從映像還原需要系統管理員權限。";
+            return result;
+        }
+        if (!options.DestructiveTargetConfirmed)
+        {
+            result.Message = "❌ 拒絕執行：未取得目標裝置的破壞性覆寫確認。";
+            return result;
+        }
+        if (!File.Exists(vhdPath))
+        {
+            result.Message = $"❌ 找不到映像檔：{vhdPath}";
+            return result;
+        }
+
+        bool attached = false;
+        try
+        {
+            var attach = await AttachVhdAsync(vhdPath, readOnly: true);
+            result.Diagnostics.Add($"[diskpart] attach vdisk readonly → {(attach.Success ? "OK" : attach.Message)}");
+            if (!attach.Success) { result.Message = $"❌ 無法以唯讀模式掛載映像：{attach.Message}"; return result; }
+            attached = true;
+
+            var (found, diskNumber, numberMsg) = await GetAttachedDiskNumberAsync(vhdPath);
+            result.Diagnostics.Add(numberMsg);
+            if (!found) { result.Message = $"❌ 無法取得映像的磁碟編號：{numberMsg}"; return result; }
+
+            var copy = await cloneService.CloneDeviceToDeviceAsync(
+                DiskCloneService.GetPhysicalDrivePath(diskNumber), targetDevicePath, options, progress, ct);
+
+            result.CopiedBytes = copy.CopiedBytes;
+            result.Cancelled = copy.Cancelled;
+            result.Success = copy.Success;
+            result.SourceBytes = copy.SourceBytes;
+            result.TargetBytes = copy.TargetBytes;
+            result.SourceBytesPerSector = copy.SourceBytesPerSector;
+            result.TargetBytesPerSector = copy.TargetBytesPerSector;
+            result.CopyLength = copy.CopyLength;
+            result.UntouchedTailBytes = copy.UntouchedTailBytes;
+            result.Elapsed = copy.Elapsed;
+            result.AverageBytesPerSecond = copy.AverageBytesPerSecond;
+            result.VerificationRequested = copy.VerificationRequested;
+            result.VerificationPassed = copy.VerificationPassed;
+            result.VerificationSummary = copy.VerificationSummary;
+            result.Diagnostics.AddRange(copy.Diagnostics);
+            result.Message = copy.Success
+                ? $"✅ 映像還原完成：{Path.GetFileName(vhdPath)} → {targetDevicePath}\n{copy.Message}"
+                : copy.Message;
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            result.Cancelled = true;
+            result.Message = "⏹️ 映像還原已取消（目標可能為部分寫入狀態）。";
+            return result;
+        }
+        catch (Exception ex)
+        {
+            result.Message = $"❌ 從映像還原時發生例外：{ex.Message}";
+            result.Diagnostics.Add($"[EXCEPTION] {ex.GetType().Name}: {ex.Message}");
+            return result;
+        }
+        finally
+        {
+            if (attached)
+            {
+                try { await DetachVhdAsync(vhdPath); }
+                catch (Exception ex) { result.Diagnostics.Add($"[WARN] 清理時 detach vdisk 失敗: {ex.Message}"); }
+            }
+        }
     }
 
     /// <summary>

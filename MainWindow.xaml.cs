@@ -20,6 +20,7 @@ public sealed partial class MainWindow : Window
     private WimDeployPage? _wimDeployPage;
     private BootManagerPage? _bootManagerPage;
     private DiskToolsPage? _diskToolsPage;
+    private RecoveryPage? _recoveryPage;
     private SystemHealthPage? _systemHealthPage;
     private NtfsPermissionsPage? _ntfsPermissionsPage;
     private GroupPolicyPage? _groupPolicyPage;
@@ -36,8 +37,26 @@ public sealed partial class MainWindow : Window
     private bool _suppressWorkspaceSelectionChanged = false;
     private bool _isApplyingWorkspacePreset = false;
 
+    // ── C5: coalesced settings-driven tab-strip rebuild ──
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _workspaceApplyTimer;
+    private string _lastWorkspaceSignature = "";
+    private string _pendingWorkspacePreset = "Master";
+
+    // ── B15: capped, de-duplicated modal exception reporting ──
+    private readonly HashSet<string> _reportedExceptionKeys = new();
+    private readonly object _exceptionKeyLock = new();
+    private Exception? _lastModalException;
+    private int _modalExceptionCount = 0;
+    private const int MaxModalExceptionDialogs = 3;
+
     private readonly List<TabViewItem> _allTabItems = new();
     private readonly Dictionary<string, FloatingTabWindow> _floatingWindows = new();
+
+    /// <summary>
+    /// Logical order of every known tab. Tabs that are currently docked, floating or filtered out of
+    /// the active workspace keep their slot here so reordering the visible strip never drops them.
+    /// </summary>
+    private readonly List<string> _logicalTabOrder = new();
 
     private string? _rightDockTag;
     private Page? _rightDockPage;
@@ -58,9 +77,9 @@ public sealed partial class MainWindow : Window
 
     private static readonly Dictionary<string, string[]> WorkspaceTabTags = new()
     {
-        ["Master"] = ["Starter", "EasyMode", "WimDeploy", "BootManager", "DiskTools", "SystemHealth", "NtfsPermissions", "GroupPolicy", "AdvancedMode", "SystemOptimizer", "NetworkTools", "SystemPerformance", "Settings"],
+        ["Master"] = ["Starter", "EasyMode", "WimDeploy", "BootManager", "DiskTools", "Recovery", "SystemHealth", "NtfsPermissions", "GroupPolicy", "AdvancedMode", "SystemOptimizer", "NetworkTools", "SystemPerformance", "Settings"],
         ["Deploy"] = ["Starter", "WimDeploy", "BootManager", "EasyMode", "DiskTools", "Settings"],
-        ["Repair"] = ["Starter", "SystemHealth", "BootManager", "DiskTools", "NtfsPermissions", "GroupPolicy", "SystemPerformance", "EasyMode", "Settings"],
+        ["Repair"] = ["Starter", "SystemHealth", "BootManager", "DiskTools", "Recovery", "NtfsPermissions", "GroupPolicy", "SystemPerformance", "EasyMode", "Settings"],
         ["Gaming"] = ["Starter", "SystemOptimizer", "NetworkTools", "SystemPerformance", "DiskTools", "SystemHealth", "Settings"],
         ["Lite"] = ["Starter", "EasyMode", "NetworkTools", "SystemPerformance", "Settings"]
     };
@@ -98,6 +117,7 @@ public sealed partial class MainWindow : Window
             TabWimDeploy,
             TabBootManager,
             TabDiskTools,
+            TabRecovery,
             TabSystemHealth,
             TabNtfsPermissions,
             TabGroupPolicy,
@@ -210,22 +230,37 @@ public sealed partial class MainWindow : Window
                 }
                 if (!_isApplyingWorkspacePreset)
                 {
-                    var currentWorkspace = SettingsService.Instance.Current.WorkspacePreset ?? "Master";
-                    ApplyWorkspacePreset(currentWorkspace);
-                    PopulateWorkspaceCombo(forceRebuild: false);
+                    ScheduleWorkspaceRebuild();
                 }
             });
         };
 
         GlobalExceptionHandler.ExceptionReported += (ex, context) =>
         {
+            // The InfoBar stays the always-on surface. The modal dialog is de-duplicated per exception
+            // instance and per type+message, and is capped per session so a repeat offender cannot
+            // stack dialogs while the app keeps running.
+            bool firstOccurrence = false;
+            lock (_exceptionKeyLock)
+            {
+                firstOccurrence = _reportedExceptionKeys.Add($"{ex.GetType().FullName}:{ex.Message}");
+                if (_reportedExceptionKeys.Count > 200) _reportedExceptionKeys.Clear();
+            }
+
+            bool showModal = firstOccurrence
+                && !ReferenceEquals(_lastModalException, ex)
+                && _modalExceptionCount < MaxModalExceptionDialogs
+                && SettingsService.Instance.Current.EnablePromptWindows;
+
             DispatcherQueue.TryEnqueue(() =>
             {
                 GlobalExceptionBar.Message = $"[{context}] {ex.Message}";
                 GlobalExceptionBar.IsOpen = true;
 
-                if (SettingsService.Instance.Current.EnablePromptWindows && WindowHelper.RootXamlRoot != null)
+                if (showModal && WindowHelper.RootXamlRoot != null && !_isShowingDialog)
                 {
+                    _lastModalException = ex;
+                    _modalExceptionCount++;
                     ShowModalExceptionDialog(ex, context);
                 }
             });
@@ -235,6 +270,16 @@ public sealed partial class MainWindow : Window
         if (MainTabs.TabItems.Count > 0)
         {
             MainTabs.SelectedIndex = 0;
+        }
+
+        // Diagnostic harness: only active with "--tabchrome-selftest <report-path>". It exercises the
+        // real tear-out / dock / reorder code paths and writes PASS-FAIL evidence to the report file.
+        var cmdArgs = Environment.GetCommandLineArgs();
+        var selfTestIndex = Array.IndexOf(cmdArgs, "--tabchrome-selftest");
+        if (selfTestIndex >= 0 && selfTestIndex + 1 < cmdArgs.Length)
+        {
+            var reportPath = cmdArgs[selfTestIndex + 1];
+            NormalView.Loaded += (_, _) => RunTabChromeSelfTestAsync(reportPath);
         }
     }
 
@@ -258,6 +303,22 @@ public sealed partial class MainWindow : Window
             }
         }
         catch { }
+    }
+
+    /// <summary>
+    /// B12: awaits a fire-and-forget operation and routes faults to GlobalExceptionHandler instead of
+    /// letting them surface only at GC time (or not at all).
+    /// </summary>
+    private static async Task RunGuardedAsync(Func<Task> operation, string context)
+    {
+        try
+        {
+            await operation();
+        }
+        catch (Exception ex)
+        {
+            GlobalExceptionHandler.ReportException(ex, context);
+        }
     }
 
     private void HandleQuickAction(string action)
@@ -286,7 +347,9 @@ public sealed partial class MainWindow : Window
                 NavigateToTag("SystemHealth");
                 if (_systemHealthPage != null)
                 {
-                    _ = _systemHealthPage.ViewModel.CleanSelectedTempCategoriesCommand.ExecuteAsync(null);
+                    _ = RunGuardedAsync(
+                        () => _systemHealthPage.ViewModel.CleanSelectedTempCategoriesCommand.ExecuteAsync(null),
+                        "QuickAction CleanCache (SystemHealth)");
                 }
                 break;
             case "ToggleOverlay":
@@ -307,8 +370,31 @@ public sealed partial class MainWindow : Window
 
     public void ApplyCustomTabOrder(IEnumerable<string> order, IEnumerable<string> disabledTags)
     {
-        var preset = SettingsService.Instance.Current.WorkspacePreset ?? "Master";
-        ApplyWorkspacePreset(preset);
+        var requested = order?.Where(t => !string.IsNullOrEmpty(t)).ToList() ?? new List<string>();
+        var s = SettingsService.Instance.Current;
+
+        if (requested.Count > 0)
+        {
+            // Resync the logical order (all known tabs, including docked / floating ones) from the
+            // settings UI so later SaveCustomTabOrder calls keep every slot consistent.
+            GetFullLogicalOrder();
+            _logicalTabOrder.RemoveAll(tag => requested.Contains(tag));
+            _logicalTabOrder.InsertRange(0, requested);
+            foreach (var tag in WorkspaceTabTags["Master"])
+            {
+                if (!_logicalTabOrder.Contains(tag)) _logicalTabOrder.Add(tag);
+            }
+
+            s.CustomTabOrder = _logicalTabOrder.ToList();
+        }
+
+        if (disabledTags != null)
+        {
+            s.DisabledTabTags = disabledTags.ToList();
+        }
+
+        SettingsService.Instance.Save();
+        ApplyWorkspacePreset(s.WorkspacePreset ?? "Master");
     }
 
     public void ResetTabOrderToDefault()
@@ -494,6 +580,58 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Everything about the settings that can change the tab strip / workspace layout.
+    /// Used to skip the expensive strip rebuild when an unrelated setting changed.
+    /// </summary>
+    private static string ComputeWorkspaceSignature()
+    {
+        var s = SettingsService.Instance.Current;
+        return string.Join("|",
+            s.WorkspacePreset ?? "Master",
+            s.IsEasyMode ? "1" : "0",
+            s.EnableCustomTabReorder ? "1" : "0",
+            string.Join(",", s.CustomTabOrder ?? new List<string>()),
+            string.Join(",", s.DisabledTabTags ?? new List<string>()));
+    }
+
+    /// <summary>
+    /// C5: SettingsService.Save() is raised by every zoom click, companion drag and settings toggle,
+    /// each of which used to trigger a synchronous Clear()+re-add+NavigateToTag of the whole tab strip.
+    /// The rebuild is now coalesced into one timer tick after the burst, and skipped entirely when the
+    /// setting cannot affect the tab strip. Workspace combobox / tab-order changes still call
+    /// ApplyWorkspacePreset directly, so user-visible workspace changes stay immediate.
+    /// </summary>
+    private void ScheduleWorkspaceRebuild()
+    {
+        var signature = ComputeWorkspaceSignature();
+        if (signature == _lastWorkspaceSignature) return;
+
+        _pendingWorkspacePreset = SettingsService.Instance.Current.WorkspacePreset ?? "Master";
+
+        if (_workspaceApplyTimer == null)
+        {
+            _workspaceApplyTimer = DispatcherQueue.CreateTimer();
+            _workspaceApplyTimer.Interval = TimeSpan.FromMilliseconds(200);
+            _workspaceApplyTimer.IsRepeating = false;
+            _workspaceApplyTimer.Tick += (_, _) =>
+            {
+                _workspaceApplyTimer?.Stop();
+                if (_isApplyingWorkspacePreset) return;
+
+                var current = ComputeWorkspaceSignature();
+                if (current == _lastWorkspaceSignature) return;
+                _lastWorkspaceSignature = current;
+
+                ApplyWorkspacePreset(_pendingWorkspacePreset);
+                PopulateWorkspaceCombo(forceRebuild: false);
+            };
+        }
+
+        _workspaceApplyTimer.Stop();
+        _workspaceApplyTimer.Start();
+    }
+
     private void ApplyWorkspacePreset(string presetKey)
     {
         if (_isApplyingWorkspacePreset) return;
@@ -564,10 +702,21 @@ public sealed partial class MainWindow : Window
                     NavigateToTag(targetTag);
                 }
             }
+            else if (ContentFrame.Content is Page stalePage &&
+                     (ReferenceEquals(RightDockFrame.Content, stalePage) ||
+                      ReferenceEquals(BottomDockFrame.Content, stalePage) ||
+                      _floatingWindows.Values.Any(w => ReferenceEquals(w.HostedPage, stalePage))))
+            {
+                // No tab is available in this preset: never leave a page parented by the central frame
+                // while a dock pane / floating window owns it too.
+                ContentFrame.Content = null;
+            }
         }
         finally
         {
             _isApplyingWorkspacePreset = false;
+            // Record the applied state so a Save() that follows this rebuild does not rebuild again.
+            _lastWorkspaceSignature = ComputeWorkspaceSignature();
         }
     }
 
@@ -623,6 +772,7 @@ public sealed partial class MainWindow : Window
         "WimDeploy" => _wimDeployPage ??= new WimDeployPage(),
         "BootManager" => _bootManagerPage ??= new BootManagerPage(),
         "DiskTools" => _diskToolsPage ??= new DiskToolsPage(),
+        "Recovery" => _recoveryPage ??= new RecoveryPage(),
         "SystemHealth" => _systemHealthPage ??= new SystemHealthPage(),
         "NtfsPermissions" => _ntfsPermissionsPage ??= new NtfsPermissionsPage(),
         "GroupPolicy" => _groupPolicyPage ??= new GroupPolicyPage(),
@@ -634,42 +784,159 @@ public sealed partial class MainWindow : Window
         _ => new Page()
     };
 
+    // ── Single-parent Page ownership ──
+    // A Page may only ever be the child of one host: ContentFrame, RightDockFrame, BottomDockFrame or
+    // exactly one FloatingTabWindow. Every re-parenting path below detaches first, so XAML can never
+    // throw "Element is already the child of another element." / "Value does not fall within the
+    // expected range." (the FloatingTabWindow..ctor crash).
+
+    /// <summary>
+    /// Releases <paramref name="page"/> from every host frame and floating window that currently owns it.
+    /// </summary>
+    public void DetachPageFromAllHosts(Page? page)
+    {
+        if (page == null) return;
+
+        if (ReferenceEquals(ContentFrame.Content, page)) ContentFrame.Content = null;
+        if (ReferenceEquals(RightDockFrame.Content, page)) RightDockFrame.Content = null;
+        if (ReferenceEquals(BottomDockFrame.Content, page)) BottomDockFrame.Content = null;
+
+        foreach (var win in _floatingWindows.Values.ToList())
+        {
+            if (ReferenceEquals(win.HostedPage, page))
+            {
+                win.DetachHostedPage();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Removes the tab of <paramref name="tag"/> from the tab strip. The caller re-hosts the page, so
+    /// the central frame is released here (exactly one host at any time).
+    /// </summary>
+    private TabViewItem? RemoveTabFromStrip(string tag)
+    {
+        var tabItem = MainTabs.TabItems.OfType<TabViewItem>().FirstOrDefault(t => t.Tag?.ToString() == tag);
+        if (tabItem == null) return null;
+
+        var page = GetOrCreatePageForTag(tag);
+        MainTabs.TabItems.Remove(tabItem);
+        DetachPageFromAllHosts(page);
+        if (MainTabs.TabItems.Count > 0 && MainTabs.SelectedItem == null)
+        {
+            MainTabs.SelectedIndex = 0;
+        }
+        return tabItem;
+    }
+
+    /// <summary>
+    /// Closes the floating window of <paramref name="tag"/> without letting the window dock itself.
+    /// The page is detached; when <paramref name="dockBackToTabs"/> is true the tab returns to the strip.
+    /// </summary>
+    private void CloseFloatingWindowFor(string tag, bool dockBackToTabs)
+    {
+        if (!_floatingWindows.TryGetValue(tag, out var win)) return;
+
+        _floatingWindows.Remove(tag);
+        win.DetachAndClose();
+
+        if (dockBackToTabs)
+        {
+            ReinsertTabToMainTabs(tag);
+        }
+    }
+
+    /// <summary>The full logical tab order (includes docked / floating / filtered-out tabs).</summary>
+    private List<string> GetFullLogicalOrder()
+    {
+        if (_logicalTabOrder.Count == 0)
+        {
+            var knownTags = WorkspaceTabTags["Master"];
+            var saved = SettingsService.Instance.Current.CustomTabOrder;
+            if (saved != null)
+            {
+                foreach (var tag in saved)
+                {
+                    if (knownTags.Contains(tag) && !_logicalTabOrder.Contains(tag)) _logicalTabOrder.Add(tag);
+                }
+            }
+            foreach (var tag in knownTags)
+            {
+                if (!_logicalTabOrder.Contains(tag)) _logicalTabOrder.Add(tag);
+            }
+        }
+        return _logicalTabOrder;
+    }
+
+    /// <summary>Tags visible in the active workspace preset, easy mode and disabled-tab filters.</summary>
+    private List<string> GetAllowedTagsForCurrentWorkspace()
+    {
+        var s = SettingsService.Instance.Current;
+        var preset = s.WorkspacePreset ?? "Master";
+        if (!WorkspaceTabTags.TryGetValue(preset, out var allowedTags))
+        {
+            allowedTags = WorkspaceTabTags["Master"];
+        }
+
+        if (s.IsEasyMode)
+        {
+            allowedTags = allowedTags.Where(tag => EasyModeAllowedTags.Contains(tag)).ToArray();
+        }
+
+        if (s.DisabledTabTags != null && s.DisabledTabTags.Count > 0)
+        {
+            allowedTags = allowedTags.Where(tag => !s.DisabledTabTags.Contains(tag)).ToArray();
+        }
+
+        return allowedTags.ToList();
+    }
+
+    /// <summary>
+    /// Position a returning tab belongs to, derived from the persisted logical order.
+    /// </summary>
+    private int GetInsertIndexForTag(string tag)
+    {
+        var allowedTags = GetAllowedTagsForCurrentWorkspace();
+        if (!allowedTags.Contains(tag)) return MainTabs.TabItems.Count;
+
+        // When custom reordering is disabled the strip follows the workspace preset order.
+        bool usePresetOrder = !SettingsService.Instance.Current.EnableCustomTabReorder;
+        var reference = usePresetOrder ? allowedTags : GetFullLogicalOrder();
+
+        int tagIndex = reference.IndexOf(tag);
+        if (tagIndex < 0) return MainTabs.TabItems.Count;
+
+        int insertIndex = 0;
+        for (int i = 0; i < MainTabs.TabItems.Count; i++)
+        {
+            var otherTag = (MainTabs.TabItems[i] as TabViewItem)?.Tag?.ToString();
+            if (otherTag == null) continue;
+            int otherIndex = reference.IndexOf(otherTag);
+            if (otherIndex >= 0 && otherIndex < tagIndex) insertIndex = i + 1;
+        }
+        return Math.Clamp(insertIndex, 0, MainTabs.TabItems.Count);
+    }
+
     public void DockToRight(string tag)
     {
         if (string.IsNullOrEmpty(tag)) return;
         if (_rightDockTag == tag) return;
 
-        if (_bottomDockTag == tag)
-        {
-            CloseBottomDock(reinsertToTabs: false);
-        }
+        var page = GetOrCreatePageForTag(tag);
 
-        if (_floatingWindows.TryGetValue(tag, out var floatWin))
-        {
-            _floatingWindows.Remove(tag);
-            floatWin.PerformDock(closeWindow: true);
-        }
+        // Release every other host that may currently own this tag/page.
+        if (_bottomDockTag == tag) CloseBottomDock(reinsertToTabs: false);
+        CloseFloatingWindowFor(tag, dockBackToTabs: false);
+        DetachPageFromAllHosts(page);
 
+        // A dock pane hosts exactly one page, so evict its previous tab straight back into the strip.
         if (!string.IsNullOrEmpty(_rightDockTag))
         {
             CloseRightDock(reinsertToTabs: true);
         }
 
-        var tabItem = MainTabs.TabItems.OfType<TabViewItem>().FirstOrDefault(t => t.Tag?.ToString() == tag);
-        if (tabItem != null)
-        {
-            if (ReferenceEquals(MainTabs.SelectedItem, tabItem))
-            {
-                ContentFrame.Content = null;
-            }
-            MainTabs.TabItems.Remove(tabItem);
-            if (MainTabs.TabItems.Count > 0 && MainTabs.SelectedItem == null)
-            {
-                MainTabs.SelectedIndex = 0;
-            }
-        }
+        RemoveTabFromStrip(tag);
 
-        var page = GetOrCreatePageForTag(tag);
         _rightDockTag = tag;
         _rightDockPage = page;
 
@@ -680,6 +947,7 @@ public sealed partial class MainWindow : Window
         RightDockColDef.Width = new GridLength(460);
 
         UpdateFloatingManagerUI();
+        SaveCustomTabOrder();
     }
 
     public void CloseRightDock(bool reinsertToTabs = true)
@@ -700,6 +968,7 @@ public sealed partial class MainWindow : Window
             ReinsertTabToMainTabs(tag);
         }
         UpdateFloatingManagerUI();
+        SaveCustomTabOrder();
     }
 
     public void DockToBottom(string tag)
@@ -707,37 +976,21 @@ public sealed partial class MainWindow : Window
         if (string.IsNullOrEmpty(tag)) return;
         if (_bottomDockTag == tag) return;
 
-        if (_rightDockTag == tag)
-        {
-            CloseRightDock(reinsertToTabs: false);
-        }
+        var page = GetOrCreatePageForTag(tag);
 
-        if (_floatingWindows.TryGetValue(tag, out var floatWin))
-        {
-            _floatingWindows.Remove(tag);
-            floatWin.PerformDock(closeWindow: true);
-        }
+        // Release every other host that may currently own this tag/page.
+        if (_rightDockTag == tag) CloseRightDock(reinsertToTabs: false);
+        CloseFloatingWindowFor(tag, dockBackToTabs: false);
+        DetachPageFromAllHosts(page);
 
+        // A dock pane hosts exactly one page, so evict its previous tab straight back into the strip.
         if (!string.IsNullOrEmpty(_bottomDockTag))
         {
             CloseBottomDock(reinsertToTabs: true);
         }
 
-        var tabItem = MainTabs.TabItems.OfType<TabViewItem>().FirstOrDefault(t => t.Tag?.ToString() == tag);
-        if (tabItem != null)
-        {
-            if (ReferenceEquals(MainTabs.SelectedItem, tabItem))
-            {
-                ContentFrame.Content = null;
-            }
-            MainTabs.TabItems.Remove(tabItem);
-            if (MainTabs.TabItems.Count > 0 && MainTabs.SelectedItem == null)
-            {
-                MainTabs.SelectedIndex = 0;
-            }
-        }
+        RemoveTabFromStrip(tag);
 
-        var page = GetOrCreatePageForTag(tag);
         _bottomDockTag = tag;
         _bottomDockPage = page;
 
@@ -748,6 +1001,7 @@ public sealed partial class MainWindow : Window
         BottomDockRowDef.Height = new GridLength(280);
 
         UpdateFloatingManagerUI();
+        SaveCustomTabOrder();
     }
 
     public void CloseBottomDock(bool reinsertToTabs = true)
@@ -768,40 +1022,26 @@ public sealed partial class MainWindow : Window
             ReinsertTabToMainTabs(tag);
         }
         UpdateFloatingManagerUI();
+        SaveCustomTabOrder();
     }
 
     private void ReinsertTabToMainTabs(string tag)
     {
         var tabItem = _allTabItems.FirstOrDefault(t => t.Tag?.ToString() == tag);
-        if (tabItem != null && !MainTabs.TabItems.Contains(tabItem))
-        {
-            var currentPreset = SettingsService.Instance.Current.WorkspacePreset ?? "Master";
-            if (!WorkspaceTabTags.TryGetValue(currentPreset, out var allowedTags))
-            {
-                allowedTags = WorkspaceTabTags["Master"];
-            }
+        if (tabItem == null) return;
 
-            int insertIndex = MainTabs.TabItems.Count;
-            if (allowedTags.Contains(tag))
-            {
-                insertIndex = 0;
-                int tagIndexInAllowed = Array.IndexOf(allowedTags, tag);
-                for (int i = 0; i < MainTabs.TabItems.Count; i++)
-                {
-                    var otherTag = (MainTabs.TabItems[i] as TabViewItem)?.Tag?.ToString() ?? "";
-                    int otherIndexInAllowed = Array.IndexOf(allowedTags, otherTag);
-                    if (otherIndexInAllowed < tagIndexInAllowed)
-                    {
-                        insertIndex = i + 1;
-                    }
-                }
-                insertIndex = Math.Clamp(insertIndex, 0, MainTabs.TabItems.Count);
-            }
-            MainTabs.TabItems.Insert(insertIndex, tabItem);
-            MainTabs.SelectedItem = tabItem;
-            NavigateToTag(tag);
-            SaveCustomTabOrder();
+        if (!MainTabs.TabItems.Contains(tabItem))
+        {
+            MainTabs.TabItems.Insert(GetInsertIndexForTag(tag), tabItem);
         }
+
+        // The page must no longer be parented by the closing window / dock pane when it comes home.
+        DetachPageFromAllHosts(GetOrCreatePageForTag(tag));
+
+        MainTabs.SelectedItem = tabItem;
+        NavigateToTag(tag);
+        UpdateFloatingManagerUI();
+        SaveCustomTabOrder();
     }
 
     private void RightToBottom_Click(object sender, RoutedEventArgs e)
@@ -866,14 +1106,16 @@ public sealed partial class MainWindow : Window
         if (MainTabs.TabItems.Count <= 1) return;
 
         var header = tabItem.Header?.ToString() ?? tag;
-        Page page = GetOrCreatePageForTag(tag);
+        var page = GetOrCreatePageForTag(tag);
 
-        if (ReferenceEquals(ContentFrame.Content, page))
-        {
-            ContentFrame.Content = null;
-        }
+        // The tab may also be sitting in a dock pane (right-click "float" on a docked tag).
+        if (_rightDockTag == tag) CloseRightDock(reinsertToTabs: false);
+        if (_bottomDockTag == tag) CloseBottomDock(reinsertToTabs: false);
+        CloseFloatingWindowFor(tag, dockBackToTabs: false);
 
-        MainTabs.TabItems.Remove(tabItem);
+        RemoveTabFromStrip(tag);
+        DetachPageFromAllHosts(page);
+
         if (MainTabs.TabItems.Count > 0)
         {
             var nextIndex = Math.Clamp(MainTabs.SelectedIndex, 0, MainTabs.TabItems.Count - 1);
@@ -891,19 +1133,12 @@ public sealed partial class MainWindow : Window
     {
         if (_floatingWindows.ContainsKey(tag)) return;
 
-        // Ensure page is detached from MainWindow frames before hosting in FloatingTabWindow
-        if (ReferenceEquals(ContentFrame.Content, page))
-        {
-            ContentFrame.Content = null;
-        }
-        if (ReferenceEquals(RightDockFrame.Content, page))
-        {
-            RightDockFrame.Content = null;
-        }
-        if (ReferenceEquals(BottomDockFrame.Content, page))
-        {
-            BottomDockFrame.Content = null;
-        }
+        // Exactly one parent: release the page from the strip, both dock panes and any other floating
+        // window before FloatingTabWindow hosts it.
+        if (_rightDockTag == tag) CloseRightDock(reinsertToTabs: false);
+        if (_bottomDockTag == tag) CloseBottomDock(reinsertToTabs: false);
+        CloseFloatingWindowFor(tag, dockBackToTabs: false);
+        DetachPageFromAllHosts(page);
 
         var win = new FloatingTabWindow(tag, header, page, mousePos);
         win.DockRequested += OnFloatingTabDockRequested;
@@ -965,18 +1200,45 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Persists the tab order. The visible strip order is projected onto the slots the visible tabs
+    /// occupy in the logical order, so tabs that are docked, floating or workspace-filtered keep their
+    /// persisted position instead of being pushed to the end.
+    /// </summary>
     private void SaveCustomTabOrder()
     {
         try
         {
-            var order = MainTabs.TabItems
+            var logical = GetFullLogicalOrder();
+
+            var visible = MainTabs.TabItems
                 .OfType<TabViewItem>()
                 .Select(t => t.Tag?.ToString())
                 .Where(t => !string.IsNullOrEmpty(t))
+                .Select(t => t!)
                 .ToList();
 
+            foreach (var tag in visible)
+            {
+                if (!logical.Contains(tag)) logical.Add(tag);
+            }
+
+            if (visible.Count > 0)
+            {
+                var slots = new List<int>();
+                for (int i = 0; i < logical.Count; i++)
+                {
+                    if (visible.Contains(logical[i])) slots.Add(i);
+                }
+
+                for (int i = 0; i < slots.Count && i < visible.Count; i++)
+                {
+                    logical[slots[i]] = visible[i];
+                }
+            }
+
             var s = SettingsService.Instance.Current;
-            s.CustomTabOrder = order!;
+            s.CustomTabOrder = logical.ToList();
             SettingsService.Instance.Save();
         }
         catch { }
@@ -993,9 +1255,9 @@ public sealed partial class MainWindow : Window
     private void OnFloatingTabDockRequested(FloatingTabWindow win)
     {
         var tag = win.TabTag;
+        win.DetachHostedPage();
         _floatingWindows.Remove(tag);
         ReinsertTabToMainTabs(tag);
-        UpdateFloatingManagerUI();
     }
 
     private void DockAllFloatingTabs_Click(object sender, RoutedEventArgs e)
@@ -1037,6 +1299,286 @@ public sealed partial class MainWindow : Window
         else
         {
             FloatingManagerBtn.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    // ── Diagnostic self-test harness (only runs with --tabchrome-selftest <report-path>) ──
+    // Exercises the exact production code paths used by drag tear-out, the dock buttons, the
+    // floating window close button and tab reordering, and writes PASS/FAIL evidence to the file.
+
+    private async void RunTabChromeSelfTestAsync(string reportPath)
+    {
+        int failures = 0;
+        int passes = 0;
+        var log = new System.Text.StringBuilder();
+
+        void Write(string line)
+        {
+            lock (log)
+            {
+                log.AppendLine(line);
+                try { System.IO.File.WriteAllText(reportPath, log.ToString()); } catch { }
+            }
+        }
+
+        bool Check(string name, bool ok, string detail = "")
+        {
+            if (ok) passes++; else failures++;
+            Write($"{(ok ? "PASS" : "FAIL")}\t{name}\t{detail}");
+            return ok;
+        }
+
+        bool Probe(string name, Func<bool> probe)
+        {
+            try { return Check(name, probe(), ""); }
+            catch (Exception ex) { return Check(name, false, ex.GetType().Name + ": " + ex.Message); }
+        }
+
+        void Skip(string name, string reason) => Write($"SKIP\t{name}\t{reason}");
+
+        static string SettingsFilePath() => System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DiskMaster_Portable", "settings.json");
+
+        static bool SettingsFileWritable()
+        {
+            try
+            {
+                using var fs = new System.IO.FileStream(SettingsFilePath(), System.IO.FileMode.Open, System.IO.FileAccess.Write, System.IO.FileShare.ReadWrite);
+                return true;
+            }
+            catch { return false; }
+        }
+
+        static Frame? OwningFrameOf(Page p)
+        {
+            var node = VisualTreeHelper.GetParent(p);
+            while (node != null)
+            {
+                if (node is Frame frame) return frame;
+                node = VisualTreeHelper.GetParent(node);
+            }
+            return null;
+        }
+
+        static List<string>? OnDiskOrder()
+        {
+            try
+            {
+                var path = SettingsFilePath();
+                if (!System.IO.File.Exists(path)) return null;
+                using var doc = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText(path));
+                if (!doc.RootElement.TryGetProperty("CustomTabOrder", out var arr)) return null;
+                return arr.EnumerateArray().Select(e => e.GetString() ?? "").ToList();
+            }
+            catch { return null; }
+        }
+
+        var settings = SettingsService.Instance.Current;
+        var savedOrder = settings.CustomTabOrder?.ToList() ?? new List<string>();
+        var savedDisabled = settings.DisabledTabTags?.ToList() ?? new List<string>();
+        var savedPreset = settings.WorkspacePreset;
+        var savedEasyMode = settings.IsEasyMode;
+
+        const string tag = "Settings";
+        var header = GetTabHeader(tag);
+        var page = GetOrCreatePageForTag(tag);
+
+        Write($"=== DiskMaster Pro tab chrome self-test {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
+        try
+        {
+            settings.WorkspacePreset = "Master";
+            settings.IsEasyMode = false;
+            settings.DisabledTabTags = new List<string>();
+            _logicalTabOrder.Clear();
+            SettingsService.Instance.Save();
+            await Task.Delay(400);
+            ApplyWorkspacePreset("Master");
+            await Task.Delay(400);
+
+            var tabItem = MainTabs.TabItems.OfType<TabViewItem>().FirstOrDefault(t => t.Tag?.ToString() == tag);
+            if (!Check("0.1 tab exists in strip", tabItem != null)) return;
+            MainTabs.SelectedItem = tabItem;
+            await Task.Delay(400);
+            ContentFrame.UpdateLayout();
+            Probe("0.2 central frame owns page", () => ReferenceEquals(ContentFrame.Content, page));
+            Probe("0.3 page visual parent is ContentFrame", () => ReferenceEquals(OwningFrameOf(page), ContentFrame));
+
+            // ── 1. Tear out by drag (entry point used by TabDroppedOutside) ──
+            FloatTab(tabItem!, DisplayHelper.GetCurrentCursorPosition());
+            await Task.Delay(900);
+            var floated = _floatingWindows.TryGetValue(tag, out var win);
+            Check("1.1 floating window registered", floated);
+            Probe("1.2 page detached from central frame", () => !ReferenceEquals(ContentFrame.Content, page));
+            Probe("1.3 page detached from both dock panes",
+                () => !ReferenceEquals(RightDockFrame.Content, page) && !ReferenceEquals(BottomDockFrame.Content, page));
+            Check("1.4 tab removed from strip", !MainTabs.TabItems.Contains(tabItem!));
+            if (!floated || win == null) return;
+            win.ContentFrame.UpdateLayout();
+            Probe("1.5 floating window hosts page", () => win.IsHostingPage);
+            Probe("1.6 page visual parent is the floating frame", () => ReferenceEquals(OwningFrameOf(page), win.ContentFrame));
+
+            // ── 2. Dock back into the tab strip (path of the '嵌回主視窗' button) ──
+            win.PerformDock();
+            await Task.Delay(900);
+            NormalView.UpdateLayout();
+            Check("2.1 floating window unregistered", !_floatingWindows.ContainsKey(tag));
+            Probe("2.2 floating frame released the page", () => !win.IsHostingPage);
+            Check("2.3 tab restored to the strip", MainTabs.TabItems.Contains(tabItem!));
+            Check("2.4 tab header preserved", tabItem!.Header?.ToString() == header, $"{tabItem.Header}");
+            Probe("2.5 page back in the central frame", () => ReferenceEquals(ContentFrame.Content, page));
+            Probe("2.6 page visual parent is ContentFrame again", () => ReferenceEquals(OwningFrameOf(page), ContentFrame));
+
+            // ── 3. Dock right, then dock back ──
+            DockToRight(tag);
+            await Task.Delay(600);
+            NormalView.UpdateLayout();
+            Check("3.1 tag registered as right-docked", _rightDockTag == tag);
+            Probe("3.2 right dock frame owns page", () => ReferenceEquals(RightDockFrame.Content, page));
+            Probe("3.3 page visual parent is RightDockFrame", () => ReferenceEquals(OwningFrameOf(page), RightDockFrame));
+            CloseRightDock(reinsertToTabs: true);
+            await Task.Delay(600);
+            Check("3.4 tab re-inserted after dock closed", MainTabs.TabItems.Contains(tabItem!));
+            Probe("3.5 page back in the central frame", () => ReferenceEquals(ContentFrame.Content, page));
+
+            // ── 4. Dock bottom, then dock back ──
+            DockToBottom(tag);
+            await Task.Delay(600);
+            NormalView.UpdateLayout();
+            Check("4.1 tag registered as bottom-docked", _bottomDockTag == tag);
+            Probe("4.2 bottom dock frame owns page", () => ReferenceEquals(BottomDockFrame.Content, page));
+            CloseBottomDock(reinsertToTabs: true);
+            await Task.Delay(600);
+            Check("4.3 tab re-inserted after bottom dock closed", MainTabs.TabItems.Contains(tabItem!));
+            Probe("4.4 page back in the central frame", () => ReferenceEquals(ContentFrame.Content, page));
+
+            // ── 5. Right dock -> float, then close the floating window (X) ──
+            DockToRight(tag);
+            await Task.Delay(500);
+            CloseRightDock(reinsertToTabs: false);
+            CreateFloatingWindow(tag, header, page);
+            await Task.Delay(900);
+            var reopened = _floatingWindows.TryGetValue(tag, out var win5);
+            Check("5.1 tag floated again from the right dock", reopened);
+            if (reopened && win5 != null)
+            {
+                win5.Close();                       // identical to the user clicking the window's X
+                await Task.Delay(900);
+                NormalView.UpdateLayout();
+                Check("5.2 floating window unregistered after close", !_floatingWindows.ContainsKey(tag));
+                Check("5.3 tab returned to the strip after close", MainTabs.TabItems.Contains(tabItem!));
+                Probe("5.4 page re-hosted in the central frame", () => ReferenceEquals(ContentFrame.Content, page));
+                Probe("5.5 single parent after close", () => ReferenceEquals(OwningFrameOf(page), ContentFrame));
+            }
+
+            // ── 6. Reorder (switch positions) while another tab is docked, then simulate a restart ──
+            DockToRight("SystemHealth");
+            await Task.Delay(600);
+            var visibleBefore = MainTabs.TabItems.OfType<TabViewItem>().Select(t => t.Tag?.ToString()).ToList();
+            var moveTab = MainTabs.TabItems[0] as TabViewItem;
+            var moveTag = moveTab?.Tag?.ToString();
+            int dockedSlotBefore = GetFullLogicalOrder().IndexOf("SystemHealth");
+            if (Check("6.1 reorder candidate available", moveTab != null && visibleBefore.Count > 2))
+            {
+                TabReorderHelper.MoveTab(MainTabs, moveTab!, +1, SaveCustomTabOrder);
+                await Task.Delay(600);
+
+                var visibleAfter = MainTabs.TabItems.OfType<TabViewItem>().Select(t => t.Tag?.ToString()).ToList();
+                Check("6.2 helper swapped exactly once",
+                    visibleAfter.Count == visibleBefore.Count &&
+                    visibleAfter[0] == visibleBefore[1] && visibleAfter[1] == visibleBefore[0],
+                    string.Join(",", visibleAfter.Take(3)));
+
+                var persisted = SettingsService.Instance.Current.CustomTabOrder?.ToList() ?? new List<string>();
+                var onDisk = OnDiskOrder();
+                bool diskWritable = SettingsFileWritable();
+                Check("6.3 docked tag keeps its logical slot", persisted.IndexOf("SystemHealth") == dockedSlotBefore,
+                    $"slot {persisted.IndexOf("SystemHealth")} (expected {dockedSlotBefore})");
+                Check("6.4 moved tag follows visible order",
+                    moveTag != null && persisted.IndexOf(moveTag) > persisted.IndexOf(visibleBefore[1] ?? ""),
+                    $"'{moveTag ?? ""}' at {persisted.IndexOf(moveTag ?? "")}");
+                if (diskWritable)
+                {
+                    Check("6.5 order written to settings.json", onDisk != null && onDisk.SequenceEqual(persisted),
+                        onDisk == null ? "settings.json unreadable" : string.Join(",", onDisk));
+                }
+                else
+                {
+                    Skip("6.5 order written to settings.json", "sandbox denies writes to %LOCALAPPDATA%");
+                }
+
+                // Simulated restart: the order must survive the settings persistence format and rebuild
+                // the strip exactly like a cold start does. The JSON round trip below is precisely what
+                // SettingsService.Save/Load use; the real file reload is used when it is writable.
+                CloseRightDock(reinsertToTabs: true);
+                await Task.Delay(500);
+
+                List<string> restoredExpected;
+                if (diskWritable)
+                {
+                    SettingsService.Instance.Load();
+                    restoredExpected = SettingsService.Instance.Current.CustomTabOrder?.ToList() ?? new List<string>();
+                }
+                else
+                {
+                    var json = System.Text.Json.JsonSerializer.Serialize(SettingsService.Instance.Current);
+                    var reloaded = System.Text.Json.JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+                    restoredExpected = reloaded.CustomTabOrder?.ToList() ?? new List<string>();
+                    SettingsService.Instance.Current.CustomTabOrder = restoredExpected;
+                }
+
+                Check("6.6 persisted order survives settings round trip",
+                    restoredExpected.SequenceEqual(persisted), string.Join(",", restoredExpected));
+
+                _logicalTabOrder.Clear();
+                ApplyWorkspacePreset(SettingsService.Instance.Current.WorkspacePreset ?? "Master");
+                await Task.Delay(700);
+
+                var restoredVisible = MainTabs.TabItems.OfType<TabViewItem>().Select(t => t.Tag?.ToString()).ToList();
+                Check("6.7 restart restores persisted order", restoredVisible.SequenceEqual(restoredExpected),
+                    string.Join(",", restoredVisible));
+                Check("6.8 docked tag present after restart", restoredVisible.Contains("SystemHealth"));
+                Check("6.9 moved tag at its persisted position",
+                    moveTag != null && restoredVisible.IndexOf(moveTag) == restoredExpected.IndexOf(moveTag));
+            }
+
+            // ── 7. C5: settings-driven rebuild must be coalesced (not synchronous) and must apply ──
+            bool HasTab(string t) => MainTabs.TabItems.OfType<TabViewItem>().Any(x => x.Tag?.ToString() == t);
+            var s7 = SettingsService.Instance.Current;
+            var disabledBefore = s7.DisabledTabTags?.ToList() ?? new List<string>();
+            s7.DisabledTabTags = new List<string> { "GroupPolicy" };
+            ScheduleWorkspaceRebuild();
+            Check("7.1 rebuild is deferred, not synchronous", HasTab("GroupPolicy"));
+            await Task.Delay(700);
+            Check("7.2 debounced rebuild applied the visibility change", !HasTab("GroupPolicy"));
+            s7.DisabledTabTags = disabledBefore;
+            ScheduleWorkspaceRebuild();
+            await Task.Delay(700);
+            Check("7.3 debounced rebuild restored the tab", HasTab("GroupPolicy"));
+        }
+        catch (Exception ex)
+        {
+            Check("FATAL self-test exception", false, ex.ToString());
+        }
+        finally
+        {
+            try
+            {
+                if (_floatingWindows.ContainsKey(tag)) CloseFloatingWindowFor(tag, dockBackToTabs: false);
+                CloseRightDock(reinsertToTabs: true);
+                CloseBottomDock(reinsertToTabs: true);
+
+                var restore = SettingsService.Instance.Current;
+                restore.CustomTabOrder = savedOrder;
+                restore.DisabledTabTags = savedDisabled;
+                restore.WorkspacePreset = savedPreset;
+                restore.IsEasyMode = savedEasyMode;
+                _logicalTabOrder.Clear();
+                SettingsService.Instance.Save();
+                ApplyWorkspacePreset(savedPreset ?? "Master");
+            }
+            catch { }
+
+            Write($"=== SELFTEST RESULT: {(failures == 0 ? "PASS" : "FAIL")} — {passes} passed, {failures} failed ===");
         }
     }
 
@@ -1627,6 +2169,7 @@ public sealed partial class MainWindow : Window
         _wimDeployPage?.ApplyLanguage();
         _bootManagerPage?.ApplyLanguage();
         _diskToolsPage?.ApplyLanguage();
+        _recoveryPage?.ApplyLanguage();
         _systemHealthPage?.ApplyLanguage();
         _ntfsPermissionsPage?.ApplyLanguage();
         _advancedModePage?.ApplyLanguage();
@@ -1642,18 +2185,36 @@ public sealed partial class MainWindow : Window
     {
         if (string.IsNullOrEmpty(tag)) return;
 
+        // A page that is currently docked or floating must come home before it can be shown in the
+        // central frame, otherwise it would end up with two parents.
+        if (_floatingWindows.ContainsKey(tag))
+        {
+            CloseFloatingWindowFor(tag, dockBackToTabs: true);
+        }
+        if (_rightDockTag == tag)
+        {
+            CloseRightDock(reinsertToTabs: true);
+        }
+        if (_bottomDockTag == tag)
+        {
+            CloseBottomDock(reinsertToTabs: true);
+        }
+
         var tabItem = MainTabs.TabItems.OfType<TabViewItem>().FirstOrDefault(t => t.Tag?.ToString() == tag);
         if (tabItem != null && !ReferenceEquals(MainTabs.SelectedItem, tabItem))
         {
             MainTabs.SelectedItem = tabItem;
         }
 
-        if (tag == _currentNavigatedTag && ContentFrame.Content != null) return;
+        var page = GetOrCreatePageForTag(tag);
+
+        if (tag == _currentNavigatedTag && ReferenceEquals(ContentFrame.Content, page)) return;
         _currentNavigatedTag = tag;
         var sw = System.Diagnostics.Stopwatch.StartNew();
         DebugLogService.Instance.Debug($"Navigating to tab '{tag}'...", "Navigation");
 
-        ContentFrame.Content = GetOrCreatePageForTag(tag);
+        DetachPageFromAllHosts(page);
+        ContentFrame.Content = page;
         UpdateViewportLayout();
 
         sw.Stop();

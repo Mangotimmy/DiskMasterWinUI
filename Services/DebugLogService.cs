@@ -23,6 +23,10 @@ public class DebugLogService
     private const long MaxLogFileSizeBytes = 10 * 1024 * 1024; // 10 MB limit before roll
     private const int MaxRollingFiles = 5;
 
+    // How much log text to accumulate before stat-ing the file again for the roll check.
+    private const int SizeCheckIntervalChars = 64 * 1024;
+    private long _bytesSinceSizeCheck = 0;
+
     public bool IsEnabled { get; set; }
 
     public string LogFilePath => _logFilePath;
@@ -93,8 +97,16 @@ public class DebugLogService
 
             lock (_lock)
             {
-                CheckAndRollLogFile();
                 File.AppendAllText(_logFilePath, line, Encoding.UTF8);
+
+                // Only stat the file once every N bytes: File.Exists + FileInfo + Length on
+                // every single log line was two extra syscalls per line, all inside the lock.
+                _bytesSinceSizeCheck += line.Length;
+                if (_bytesSinceSizeCheck >= SizeCheckIntervalChars)
+                {
+                    _bytesSinceSizeCheck = 0;
+                    CheckAndRollLogFile();
+                }
             }
         }
         catch

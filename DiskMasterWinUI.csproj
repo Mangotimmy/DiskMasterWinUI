@@ -61,10 +61,13 @@
     <PropertyGroup> above to opt out.
   -->
   <ItemGroup>
+    <!-- Pinned on purpose: Version="*" forces NuGet to query nuget.org on every restore, which
+         fails with NU1301 on an offline or CI machine even when the packages are already cached,
+         and silently changes the Windows App SDK version between builds. Bump deliberately. -->
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="*" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="*" />
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.WinApp" Version="*" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.WinApp" Version="0.7.1" />
     <PackageReference Include="System.Management" Version="10.0.12" />
   </ItemGroup>
 

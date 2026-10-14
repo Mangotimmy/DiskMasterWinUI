@@ -6,6 +6,7 @@ namespace DiskMasterWinUI.Helpers;
 /// <summary>
 /// High-throughput, thread-safe log buffer that throttles UI thread dispatches to 60 FPS
 /// and enforces bounds on total log size to prevent UI stutter and excessive GC allocation.
+/// The flush timer only runs while lines are queued, so an idle page costs nothing.
 /// </summary>
 public class ThrottledLogBuffer : IDisposable
 {
@@ -13,6 +14,7 @@ public class ThrottledLogBuffer : IDisposable
     private readonly ConcurrentQueue<string> _pendingLines = new();
     private readonly StringBuilder _buffer = new();
     private readonly Timer _timer;
+    private readonly int _intervalMs;
     private readonly int _maxLines;
     private readonly int _maxChars;
     private int _lineCount = 0;
@@ -29,7 +31,11 @@ public class ThrottledLogBuffer : IDisposable
         _updateUiAction = updateUiAction ?? throw new ArgumentNullException(nameof(updateUiAction));
         _maxLines = maxLines;
         _maxChars = maxChars;
-        _timer = new Timer(OnTimerTick, null, intervalMs, intervalMs);
+        _intervalMs = intervalMs;
+
+        // Starts idle; Append() starts it. A permanently ticking 60 ms timer kept firing after
+        // the owning page was gone and rooted the whole ViewModel graph through the callback.
+        _timer = new Timer(OnTimerTick, null, Timeout.Infinite, Timeout.Infinite);
     }
 
     /// <summary>
@@ -39,7 +45,12 @@ public class ThrottledLogBuffer : IDisposable
     {
         if (string.IsNullOrEmpty(text) || _disposed) return;
         _pendingLines.Enqueue(text);
-        _hasNewContent = true;
+        if (!_hasNewContent)
+        {
+            _hasNewContent = true;
+            try { _timer.Change(_intervalMs, _intervalMs); }
+            catch (ObjectDisposedException) { }
+        }
     }
 
     /// <summary>
@@ -83,8 +94,32 @@ public class ThrottledLogBuffer : IDisposable
 
     private void OnTimerTick(object? state)
     {
-        if (!_hasNewContent && _pendingLines.IsEmpty) return;
+        if (!_hasNewContent && _pendingLines.IsEmpty)
+        {
+            StopTimerIfIdle();
+            return;
+        }
+
         FlushInternal();
+        StopTimerIfIdle();
+    }
+
+    /// <summary>
+    /// Stops the periodic flush while nothing is queued, then re-checks: an Append on another
+    /// thread can land between the check and the stop, and that line must not be stranded.
+    /// </summary>
+    private void StopTimerIfIdle()
+    {
+        if (_hasNewContent || !_pendingLines.IsEmpty) return;
+
+        try { _timer.Change(Timeout.Infinite, Timeout.Infinite); }
+        catch (ObjectDisposedException) { return; }
+
+        if (_hasNewContent || !_pendingLines.IsEmpty)
+        {
+            try { _timer.Change(_intervalMs, _intervalMs); }
+            catch (ObjectDisposedException) { }
+        }
     }
 
     private void FlushInternal()
@@ -151,8 +186,12 @@ public class ThrottledLogBuffer : IDisposable
 
     public void Dispose()
     {
-        _disposed = true;
-        _timer.Dispose();
+        // Flush before marking disposed: FlushInternal() returns immediately once _disposed is
+        // set, so the previous order silently dropped the last queued lines — including the error
+        // that triggered the shutdown.
         FlushInternal();
+        _disposed = true;
+        try { _timer.Dispose(); } catch { }
+        while (_pendingLines.TryDequeue(out _)) { }
     }
 }

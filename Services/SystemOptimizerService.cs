@@ -437,71 +437,83 @@ public class SystemOptimizerService
     // ══════════════════════════════════════════════════════════
 
     public async Task<string> ApplyGamingProfileAsync(int win32PriorityVal = 38)
+        => (await ApplyGamingProfileWithResultAsync(win32PriorityVal)).Log;
+
+    /// <summary>
+    /// Applies the one-click gaming profile and reports whether every registry write was accepted.
+    /// A refused write (typically a non-elevated or policy-locked machine) is called out in the log
+    /// instead of the previous unconditional "applied" text.
+    /// </summary>
+    public async Task<(bool Success, string Log)> ApplyGamingProfileWithResultAsync(int win32PriorityVal = 38)
     {
         var sb = new StringBuilder();
+        bool allApplied = true;
         sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] 🎮 正在建立登錄檔自動備份快照...");
         await CreatePreTweakBackupAsync("Before_GamingProfile");
 
-        sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] ⚡ 設定 Win32PrioritySeparation = 0x{win32PriorityVal:X} ({win32PriorityVal})...");
-        SetWin32PrioritySeparation(win32PriorityVal);
+        allApplied &= AppendStep(sb, $"⚡ 設定 Win32PrioritySeparation = 0x{win32PriorityVal:X} ({win32PriorityVal})...", SetWin32PrioritySeparation(win32PriorityVal));
+        allApplied &= AppendStep(sb, "⚡ 停用 CPU 能源節流 (PowerThrottlingOff = 1)...", SetPowerThrottlingDisabled(true));
+        allApplied &= AppendStep(sb, "🚀 設定 MMCSS SystemResponsiveness = 0 (100% 前台優先)...", SetSystemResponsiveness(0));
+        allApplied &= AppendStep(sb, "🌐 停用網路節流佇列 (NetworkThrottlingIndex = 0xFFFFFFFF)...", SetNetworkThrottlingDisabled(true));
+        allApplied &= AppendStep(sb, "🎮 提升 MMCSS Games 工作排程為 High Priority...", ConfigureMmcssGamesTask(true));
+        allApplied &= AppendStep(sb, "🛡️ 關閉 Game DVR / Game Bar 背景開銷與啟用全螢幕優化...", SetGameDvrDisabled(true));
+        allApplied &= AppendStep(sb, "🖥️ 啟用硬體加速 GPU 排程 (HAGS HwSchMode = 2)...", SetHagsStatus(true));
+        allApplied &= AppendStep(sb, "🖱️ 最佳化滑鼠 1:1 感應器追蹤與按鍵零延遲...", ConfigureInputLatency(true));
 
-        sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] ⚡ 停用 CPU 能源節流 (PowerThrottlingOff = 1)...");
-        SetPowerThrottlingDisabled(true);
-
-        sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] 🚀 設定 MMCSS SystemResponsiveness = 0 (100% 前台優先)...");
-        SetSystemResponsiveness(0);
-
-        sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] 🌐 停用網路節流佇列 (NetworkThrottlingIndex = 0xFFFFFFFF)...");
-        SetNetworkThrottlingDisabled(true);
-
-        sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] 🎮 提升 MMCSS Games 工作排程為 High Priority...");
-        ConfigureMmcssGamesTask(true);
-
-        sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] 🛡️ 關閉 Game DVR / Game Bar 背景開銷與啟用全螢幕優化...");
-        SetGameDvrDisabled(true);
-
-        sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] 🖥️ 啟用硬體加速 GPU 排程 (HAGS HwSchMode = 2)...");
-        SetHagsStatus(true);
-
-        sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] 🖱️ 最佳化滑鼠 1:1 感應器追蹤與按鍵零延遲...");
-        ConfigureInputLatency(true);
-
-        sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] ✅ 電競遊戲極致模式套用完成！建議重新開機以完全載入核心排程設定。");
-        return sb.ToString();
+        if (allApplied)
+        {
+            sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] ✅ 電競遊戲極致模式套用完成！建議重新開機以完全載入核心排程設定。");
+        }
+        else
+        {
+            sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ 部分登錄檔設定未套用：請以系統管理員身分重新執行 DiskMaster Pro 後再試。");
+        }
+        return (allApplied, sb.ToString());
     }
 
     public async Task<string> RestoreWindowsDefaultsAsync()
+        => (await RestoreWindowsDefaultsWithResultAsync()).Log;
+
+    /// <summary>
+    /// Restores the Windows factory defaults and reports whether every registry write was accepted.
+    /// </summary>
+    public async Task<(bool Success, string Log)> RestoreWindowsDefaultsWithResultAsync()
     {
         var sb = new StringBuilder();
+        bool allApplied = true;
         sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] 🛡️ 正在建立登錄檔自動備份快照...");
         await CreatePreTweakBackupAsync("Before_RestoreDefaults");
 
-        sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] 🔄 還原 Win32PrioritySeparation = 2 (Windows 預設)...");
-        SetWin32PrioritySeparation(2);
+        allApplied &= AppendStep(sb, "🔄 還原 Win32PrioritySeparation = 2 (Windows 預設)...", SetWin32PrioritySeparation(2));
+        allApplied &= AppendStep(sb, "🔄 還原 CPU 能源節流 (預設啟用)...", SetPowerThrottlingDisabled(false));
+        allApplied &= AppendStep(sb, "🔄 還原 MMCSS SystemResponsiveness = 20 (保留 20% 背景)...", SetSystemResponsiveness(20));
+        allApplied &= AppendStep(sb, "🔄 還原 MMCSS NetworkThrottlingIndex = 10...", SetNetworkThrottlingDisabled(false));
+        allApplied &= AppendStep(sb, "🔄 還原 MMCSS Games 工作排程為預設值...", ConfigureMmcssGamesTask(false));
+        allApplied &= AppendStep(sb, "🔄 還原 Game DVR 與 Game Bar 為預設啟用...", SetGameDvrDisabled(false));
+        allApplied &= AppendStep(sb, "🔄 還原硬體加速 GPU 排程 (HwSchMode = 1)...", SetHagsStatus(false));
+        allApplied &= AppendStep(sb, "🔄 還原滑鼠/鍵盤/桌面選單為 Windows 原生設定...", ConfigureInputLatency(false));
 
-        sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] 🔄 還原 CPU 能源節流 (預設啟用)...");
-        SetPowerThrottlingDisabled(false);
+        if (allApplied)
+        {
+            sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] ✅ 系統設定已全數安全還原為 Windows 官方出廠預設值！");
+        }
+        else
+        {
+            sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] ⚠️ 部分設定未還原：請以系統管理員身分重新執行 DiskMaster Pro 後再試。");
+        }
+        return (allApplied, sb.ToString());
+    }
 
-        sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] 🔄 還原 MMCSS SystemResponsiveness = 20 (保留 20% 背景)...");
-        SetSystemResponsiveness(20);
-
-        sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] 🔄 還原 MMCSS NetworkThrottlingIndex = 10...");
-        SetNetworkThrottlingDisabled(false);
-
-        sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] 🔄 還原 MMCSS Games 工作排程為預設值...");
-        ConfigureMmcssGamesTask(false);
-
-        sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] 🔄 還原 Game DVR 與 Game Bar 為預設啟用...");
-        SetGameDvrDisabled(false);
-
-        sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] 🔄 還原硬體加速 GPU 排程 (HwSchMode = 1)...");
-        SetHagsStatus(false);
-
-        sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] 🔄 還原滑鼠/鍵盤/桌面選單為 Windows 原生設定...");
-        ConfigureInputLatency(false);
-
-        sb.AppendLine($"[{DateTime.Now:HH:mm:ss}] ✅ 系統設定已全數安全還原為 Windows 官方出廠預設值！");
-        return sb.ToString();
+    /// <summary>
+    /// Appends one tweak step to the log. Success keeps the original text unchanged; a refused
+    /// registry write is reported explicitly so a profile run can never claim an unapplied tuning.
+    /// </summary>
+    private static bool AppendStep(StringBuilder sb, string description, bool applied)
+    {
+        sb.AppendLine(applied
+            ? $"[{DateTime.Now:HH:mm:ss}] {description}"
+            : $"[{DateTime.Now:HH:mm:ss}] ❌ 未套用 (需要系統管理員權限): {description}");
+        return applied;
     }
 
     // ══════════════════════════════════════════════════════════

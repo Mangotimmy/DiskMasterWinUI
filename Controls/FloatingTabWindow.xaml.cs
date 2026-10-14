@@ -18,6 +18,47 @@ public sealed partial class FloatingTabWindow : Window
 
     private bool _isDocking = false;
 
+    /// <summary>Frame that owns the hosted page while this window is alive (diagnostics only).</summary>
+    public Frame ContentFrame => FloatingContentFrame;
+
+    /// <summary>True when this window is currently the single parent of the hosted page.</summary>
+    public bool IsHostingPage
+    {
+        get
+        {
+            try { return ReferenceEquals(FloatingContentFrame.Content, HostedPage); }
+            catch { return false; }
+        }
+    }
+
+    /// <summary>
+    /// Releases the hosted page from this window's frame. Idempotent and safe after Close().
+    /// </summary>
+    public void DetachHostedPage()
+    {
+        try
+        {
+            if (ReferenceEquals(FloatingContentFrame.Content, HostedPage))
+            {
+                FloatingContentFrame.Content = null;
+            }
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Detaches the page and closes the window WITHOUT raising DockRequested, so the caller
+    /// (MainWindow) can re-parent the page exactly once into another host.
+    /// </summary>
+    public void DetachAndClose()
+    {
+        if (_isDocking) return;
+        _isDocking = true;
+        UnsubscribeEvents();
+        DetachHostedPage();
+        try { this.Close(); } catch { }
+    }
+
     public FloatingTabWindow(string tag, string header, Page page, Windows.Graphics.PointInt32? initialPosition = null)
     {
         InitializeComponent();
@@ -38,7 +79,11 @@ public sealed partial class FloatingTabWindow : Window
             try { AppWindow.SetIcon(iconPath); } catch { }
         }
 
-        // Host the page
+        // Host the page. A Page may only ever have one parent, so first ask MainWindow to release it
+        // from the central frame / dock panes / any other floating window it currently lives in.
+        // Without this detach the assignment below throws
+        // "Element is already the child of another element." / "Value does not fall within the expected range."
+        try { MainWindow.CurrentInstance?.DetachPageFromAllHosts(page); } catch { }
         FloatingContentFrame.Content = page;
 
         // Apply font & language
@@ -120,7 +165,7 @@ public sealed partial class FloatingTabWindow : Window
         if (_isDocking) return;
         _isDocking = true;
         UnsubscribeEvents();
-        FloatingContentFrame.Content = null;
+        DetachHostedPage();
         DockToRightRequested?.Invoke(this);
         try { this.Close(); } catch { }
     }
@@ -130,7 +175,7 @@ public sealed partial class FloatingTabWindow : Window
         if (_isDocking) return;
         _isDocking = true;
         UnsubscribeEvents();
-        FloatingContentFrame.Content = null;
+        DetachHostedPage();
         DockToBottomRequested?.Invoke(this);
         try { this.Close(); } catch { }
     }
@@ -161,7 +206,7 @@ public sealed partial class FloatingTabWindow : Window
         UnsubscribeEvents();
 
         // Remove page from frame before docking
-        FloatingContentFrame.Content = null;
+        DetachHostedPage();
         DockRequested?.Invoke(this);
 
         if (closeWindow)
