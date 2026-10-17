@@ -269,6 +269,7 @@ public partial class NetworkToolsViewModel : ObservableObject
             DnsPresets.Add(dns);
         }
         SelectedDnsPreset = DnsPresets.FirstOrDefault();
+        RefreshL2tpVpnNatTStatus();
     }
 
     [RelayCommand]
@@ -330,6 +331,7 @@ public partial class NetworkToolsViewModel : ObservableObject
             var sharesTask = RefreshSharesAsync();
             var rdpTask = RefreshRdpStatusAsync();
             var tcpTask = RefreshTcpGlobalAsync();
+            RefreshL2tpVpnNatTStatus();
 
             await Task.WhenAll(nicTask, upnpTask, hostsTask, sharesTask, rdpTask, tcpTask);
             _isInitialized = true;
@@ -912,6 +914,13 @@ public partial class NetworkToolsViewModel : ObservableObject
     [RelayCommand]
     public async Task RestoreDefaultHostsAsync()
     {
+        var confirmed = await DialogHelper.ConfirmDestructiveOperationAsync(
+            WindowHelper.GetXamlRoot(),
+            "還原 Windows 預設 Hosts 檔案 (Restore Default Hosts)",
+            "即將覆寫 C:\\Windows\\System32\\drivers\\etc\\hosts 為 Windows 官方預設空白內容，現有自訂網域解析將會被清除 (系統會自動建立備份快照)。",
+            "Restore Default Hosts");
+        if (!confirmed) return;
+
         try
         {
             IsLoadingHosts = true;
@@ -975,6 +984,13 @@ public partial class NetworkToolsViewModel : ObservableObject
     public async Task DeleteShareAsync(NetShareItem? item)
     {
         if (item == null) return;
+        var confirmed = await DialogHelper.ConfirmDestructiveOperationAsync(
+            WindowHelper.GetXamlRoot(),
+            "停止網路共用資料夾 (Stop Network Share)",
+            $"即將移除共用名稱「{item.ShareName}」({item.ResourcePath})，區域網路內其他電腦將無法再存取此共用路徑。",
+            item.ShareName);
+        if (!confirmed) return;
+
         var (ok, msg) = await _netShareService.DeleteShareAsync(item.ShareName);
         NetShareStatusMessage = msg;
         if (ok) await RefreshSharesAsync();
@@ -1161,6 +1177,13 @@ public partial class NetworkToolsViewModel : ObservableObject
     public async Task LogoffSessionAsync(RdpSessionItem? session)
     {
         if (session == null) return;
+        var confirmed = await DialogHelper.ConfirmDestructiveOperationAsync(
+            WindowHelper.GetXamlRoot(),
+            "強制登出遠端桌面工作階段 (Logoff RDP Session)",
+            $"即將強制登出使用者「{session.UserName}」(Session ID: {session.SessionId})，該工作階段中未儲存的工作將會遺失。",
+            $"Session {session.SessionId}");
+        if (!confirmed) return;
+
         var (ok, msg) = await _rdpService.LogoffSessionAsync(session.SessionId);
         RdpStatusMessage = msg;
         if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
@@ -1254,6 +1277,14 @@ public partial class NetworkToolsViewModel : ObservableObject
     {
         int p = port ?? FilterPort ?? 0;
         if (p <= 0) return;
+
+        var confirmed = await DialogHelper.ConfirmDestructiveOperationAsync(
+            WindowHelper.GetXamlRoot(),
+            "強制終止通訊埠佔用程序 (Kill Port Occupant)",
+            $"即將強制終止目前佔用 Port {p} 的處理程序。請確認該程序非系統核心服務！",
+            $"Port {p}");
+        if (!confirmed) return;
+
         var (ok, msg) = await _cliToolsService.KillProcessHoldingPortAsync(p);
         StatusMessage = msg;
         if (ok) AudioFeedbackService.PlaySuccess();
@@ -1264,6 +1295,14 @@ public partial class NetworkToolsViewModel : ObservableObject
     public async Task KillProcessPidAsync(int pid)
     {
         if (pid <= 0) return;
+
+        var confirmed = await DialogHelper.ConfirmDestructiveOperationAsync(
+            WindowHelper.GetXamlRoot(),
+            "強制終止網路處理程序 (Terminate Process by PID)",
+            $"即將強制終止 PID = {pid} 的處理程序，未儲存資料可能遺失。",
+            $"PID {pid}");
+        if (!confirmed) return;
+
         var (ok, msg) = await _cliToolsService.KillProcessByPidAsync(pid);
         StatusMessage = msg;
         if (ok) AudioFeedbackService.PlaySuccess();
@@ -1523,6 +1562,52 @@ public partial class NetworkToolsViewModel : ObservableObject
         {
             IsApplyingTcpGlobal = false;
         }
+    }
+
+    // ── L2TP/IPsec VPN NAT-T Fix (AssumeUDPEncapsulationContextOnSendRule = 2) ──
+    private readonly SystemOptimizerService _vpnOptimizerService = new();
+    [ObservableProperty] private int _l2tpVpnNatTValue;
+    [ObservableProperty] private string _l2tpVpnNatTStatusText = "尚未檢測";
+
+    [RelayCommand]
+    public void RefreshL2tpVpnNatTStatus()
+    {
+        try
+        {
+            int val = _vpnOptimizerService.GetL2tpVpnNatRuleValue();
+            L2tpVpnNatTValue = val;
+            L2tpVpnNatTStatusText = val == 2
+                ? "🟢 已修復 (AssumeUDPEncapsulationContextOnSendRule = 2，支援 NAT 後方 L2TP/IPsec 伺服器與客戶端)"
+                : $"⚠️ 未套用 (目前數值: {val}，NAT 後方 L2TP VPN 連線容易卡在錯誤 789 / 809)";
+        }
+        catch (Exception ex)
+        {
+            L2tpVpnNatTStatusText = $"讀取失敗: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    public async Task ApplyL2tpVpnNatTFixAsync()
+    {
+        await _vpnOptimizerService.CreatePreTweakBackupAsync("Before_L2tpVpnNatFix");
+        bool ok = _vpnOptimizerService.SetL2tpVpnNatFix(true);
+        StatusMessage = ok
+            ? "✅ 已寫入 HKLM\\SYSTEM\\CurrentControlSet\\Services\\PolicyAgent\\AssumeUDPEncapsulationContextOnSendRule = 2 (REG_DWORD)！重新開機後生效。"
+            : "❌ 寫入 PolicyAgent 登錄檔失敗，請確認是否以系統管理員身分執行。";
+        if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+        RefreshL2tpVpnNatTStatus();
+    }
+
+    [RelayCommand]
+    public async Task RestoreL2tpVpnNatTDefaultAsync()
+    {
+        await _vpnOptimizerService.CreatePreTweakBackupAsync("Before_L2tpVpnNatRestore");
+        bool ok = _vpnOptimizerService.SetL2tpVpnNatFix(false);
+        StatusMessage = ok
+            ? "🔄 已移除 AssumeUDPEncapsulationContextOnSendRule 鍵值，還原為 Windows 預設。"
+            : "❌ 還原 PolicyAgent 登錄檔失敗，請確認是否以系統管理員身分執行。";
+        if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+        RefreshL2tpVpnNatTStatus();
     }
 
     [RelayCommand]

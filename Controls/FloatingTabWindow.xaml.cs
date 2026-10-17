@@ -85,10 +85,12 @@ public sealed partial class FloatingTabWindow : Window
         // "Element is already the child of another element." / "Value does not fall within the expected range."
         try { MainWindow.CurrentInstance?.DetachPageFromAllHosts(page); } catch { }
         FloatingContentFrame.Content = page;
+        UndoCutManager.Attach(RootContainer, () => HostedPage);
 
-        // Apply font & language
+        // Apply font, scale & language
         ApplyFont();
         ApplyLanguage();
+        UpdateFloatingViewportLayout();
 
         LocalizationService.Instance.LanguageChanged += ApplyLanguage;
         SettingsService.Instance.SettingsChanged += ApplyFont;
@@ -157,6 +159,45 @@ public sealed partial class FloatingTabWindow : Window
                 WindowNoticeText.FontFamily = ff;
             }
             catch { }
+        }
+        UpdateFloatingViewportLayout();
+    }
+
+    private void UpdateFloatingViewportLayout()
+    {
+        if (FloatingScrollViewer == null || FloatingContentRoot == null) return;
+        var viewportW = FloatingScrollViewer.ActualWidth;
+        var viewportH = FloatingScrollViewer.ActualHeight;
+        if (viewportW <= 0) return;
+
+        int savedScale = SettingsService.Instance.Current.ScalePercent;
+        double scaleFactor = (savedScale >= 80 && savedScale <= 150) ? savedScale / 100.0 : 1.0;
+        var contentH = FloatingContentFrame?.ActualHeight ?? FloatingContentRoot.ActualHeight;
+        var (layoutW, offsetX, bottomMargin, factor) = DisplayHelper.CalculateScaledViewportLayout(
+            viewportW, viewportH, contentH, scaleFactor);
+
+        FloatingContentRoot.Width = layoutW;
+        FloatingScaleTransform.ScaleX = factor;
+        FloatingScaleTransform.ScaleY = factor;
+        FloatingContentRoot.Margin = new Thickness(offsetX, 0, 0, bottomMargin);
+    }
+
+    private void FloatingScrollViewer_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        UpdateFloatingViewportLayout();
+    }
+
+    private void FloatingContentFrame_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        UpdateFloatingViewportLayout();
+    }
+
+    private void FloatingContentRoot_BringIntoViewRequested(UIElement sender, BringIntoViewRequestedEventArgs args)
+    {
+        var r = args.TargetRect;
+        if (!double.IsNaN(r.X) && r.X != 0)
+        {
+            args.TargetRect = new Windows.Foundation.Rect(0, r.Y, Math.Min(1.0, Math.Max(0.0, r.Width)), r.Height);
         }
     }
 

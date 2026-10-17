@@ -94,19 +94,8 @@ public partial class App : Application
             }
             catch { }
 
-            _window = new MainWindow();
-            GlobalExceptionHandler.Initialize(_window.DispatcherQueue);
-            _window.Activate();
-
-            _ = Services.JumpListService.InitializeAsync();
-
-            // Parse every launch argument. The Explorer shell verbs pass:
-            //   DiskMasterWinUI.exe --tab Recovery --recover "<path>"
-            //   DiskMasterWinUI.exe --tab NtfsPermissions --path "<path>"
-            //   DiskMasterWinUI.exe --tab NetworkTools --share "<path>"
-            //   DiskMasterWinUI.exe --tab WimDeploy --image "<path>"
-            //   DiskMasterWinUI.exe --tab DiskTools --drive "<path>"
             var cmd = Environment.GetCommandLineArgs();
+            bool startInBackground = false;
             string? tabTag = null;
             string? ntfsPath = null;
             string? sharePath = null;
@@ -115,7 +104,15 @@ public partial class App : Application
 
             for (int i = 0; i < cmd.Length; i++)
             {
-                if (cmd[i] == "--tab" && i + 1 < cmd.Length)
+                if (cmd[i].Equals("--background", StringComparison.OrdinalIgnoreCase) ||
+                    cmd[i].Equals("/background", StringComparison.OrdinalIgnoreCase) ||
+                    cmd[i].Equals("-background", StringComparison.OrdinalIgnoreCase) ||
+                    cmd[i].Equals("--minimized", StringComparison.OrdinalIgnoreCase) ||
+                    cmd[i].Equals("/minimized", StringComparison.OrdinalIgnoreCase))
+                {
+                    startInBackground = true;
+                }
+                else if (cmd[i] == "--tab" && i + 1 < cmd.Length)
                 {
                     tabTag = cmd[++i];
                 }
@@ -140,6 +137,17 @@ public partial class App : Application
                     drivePath = cmd[++i];
                 }
             }
+
+            _window = new MainWindow();
+            GlobalExceptionHandler.Initialize(_window.DispatcherQueue);
+            _window.Activate();
+
+            if (startInBackground && string.IsNullOrEmpty(PendingRecoverPath) && string.IsNullOrEmpty(ntfsPath) && string.IsNullOrEmpty(sharePath) && string.IsNullOrEmpty(imagePath) && string.IsNullOrEmpty(drivePath) && string.IsNullOrEmpty(tabTag))
+            {
+                _window.MinimizeToTrayOnStartup();
+            }
+
+            _ = Services.JumpListService.InitializeAsync();
 
             if (!string.IsNullOrEmpty(PendingRecoverPath))
             {

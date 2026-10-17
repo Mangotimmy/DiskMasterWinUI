@@ -70,6 +70,12 @@ public sealed partial class AvatarCompanionControl : UserControl
         StartBlinking();
         ApplySavedSettings();
 
+        if (this.Parent is FrameworkElement parentFe)
+        {
+            parentFe.SizeChanged -= ParentFe_SizeChanged;
+            parentFe.SizeChanged += ParentFe_SizeChanged;
+        }
+
         // Initial welcome speech after a brief delay
         var initTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000) };
         initTimer.Tick += (_, _) =>
@@ -80,8 +86,17 @@ public sealed partial class AvatarCompanionControl : UserControl
         initTimer.Start();
     }
 
+    private void ParentFe_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        AutoDetectAndSnapToEdge();
+    }
+
     private void AvatarCompanionControl_Unloaded(object sender, RoutedEventArgs e)
     {
+        if (this.Parent is FrameworkElement parentFe)
+        {
+            parentFe.SizeChanged -= ParentFe_SizeChanged;
+        }
         _breathTimer?.Stop();
         _blinkTimer?.Stop();
         _blinkAnimTimer?.Stop();
@@ -97,6 +112,7 @@ public sealed partial class AvatarCompanionControl : UserControl
         {
             AvatarPositionTransform.X = settings.CompanionOffsetX;
             AvatarPositionTransform.Y = settings.CompanionOffsetY;
+            AutoDetectAndSnapToEdge();
         }
         else
         {
@@ -361,11 +377,7 @@ public sealed partial class AvatarCompanionControl : UserControl
 
             if (_hasDragged)
             {
-                var s = SettingsService.Instance.Current;
-                s.CompanionPosition = "Free";
-                s.CompanionOffsetX = AvatarPositionTransform.X;
-                s.CompanionOffsetY = AvatarPositionTransform.Y;
-                SettingsService.Instance.Save();
+                SnapDraggedPositionToNearestEdge(announce: true);
             }
             else
             {
@@ -374,6 +386,137 @@ public sealed partial class AvatarCompanionControl : UserControl
             }
 
             e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// Automatically detects the 2D helper's visual position in the parent container
+    /// and snaps it cleanly to the Left or Right edge so it never blocks central UI content.
+    /// </summary>
+    public void SnapDraggedPositionToNearestEdge(bool announce = false)
+    {
+        if (this.Parent is not FrameworkElement parentFe || parentFe.ActualWidth <= 0 || parentFe.ActualHeight <= 0)
+        {
+            var s = SettingsService.Instance.Current;
+            s.CompanionPosition = "BottomRight";
+            s.CompanionOffsetX = 0;
+            s.CompanionOffsetY = 0;
+            SettingsService.Instance.Save();
+            return;
+        }
+
+        try
+        {
+            var transform = this.TransformToVisual(parentFe);
+            var centerPt = transform.TransformPoint(new Point(this.ActualWidth / 2.0, this.ActualHeight / 2.0));
+
+            string targetDock = ResolveTargetDockEdge(centerPt.X, centerPt.Y, parentFe.ActualWidth, parentFe.ActualHeight);
+
+            SetDockPosition(targetDock, save: true);
+
+            if (announce)
+            {
+                bool snapLeft = targetDock.EndsWith("Left", StringComparison.Ordinal);
+                var sideLabel = snapLeft ? "左側邊緣" : "右側邊緣";
+                Say($"📌 已自動感應並貼齊停靠至視窗{sideLabel}！", 2500);
+            }
+        }
+        catch
+        {
+            SetDockPosition("BottomRight", save: true);
+        }
+    }
+
+    /// <summary>
+    /// Pure geometric resolver that determines whether the 2D helper should dock to
+    /// TopLeft, BottomLeft, TopRight, or BottomRight based on its visual center and container bounds.
+    /// </summary>
+    public static string ResolveTargetDockEdge(double centerX, double centerY, double containerWidth, double containerHeight, bool isRightSplitOpen = false)
+    {
+        if (containerWidth <= 0 || containerHeight <= 0)
+        {
+            return isRightSplitOpen ? "BottomLeft" : "BottomRight";
+        }
+
+        bool snapLeft = isRightSplitOpen || (centerX < (containerWidth / 2.0));
+        bool snapTop = centerY >= 0 && centerY < (containerHeight * 0.42);
+
+        return (snapLeft, snapTop) switch
+        {
+            (true, true) => "TopLeft",
+            (true, false) => "BottomLeft",
+            (false, true) => "TopRight",
+            _ => "BottomRight"
+        };
+    }
+
+    /// <summary>
+    /// Automatically detects window bounds, DPI/compact state, and active split-screen docks
+    /// to keep the 2D helper cleanly docked on the left or right edge without overlapping key content.
+    /// </summary>
+    public void AutoDetectAndSnapToEdge(bool isRightSplitOpen = false, bool announce = false)
+    {
+        var s = SettingsService.Instance.Current;
+        var pos = s.CompanionPosition;
+
+        if (this.Parent is FrameworkElement parentFe && parentFe.ActualWidth > 0)
+        {
+            // Automatically scale down slightly on narrow windows so the companion never crowds the page
+            double baseScale = Math.Clamp(s.CompanionScale, 0.5, 1.8);
+            double effectiveScale = parentFe.ActualWidth < 1050
+                ? Math.Min(baseScale, 0.80)
+                : baseScale;
+            AvatarScaleTransform.ScaleX = effectiveScale;
+            AvatarScaleTransform.ScaleY = effectiveScale;
+        }
+
+        if (pos == "AutoEdge" || pos == "Free" || string.IsNullOrWhiteSpace(pos))
+        {
+            // When Right split-screen dock is open, dock to BottomLeft so the right split pane isn't obstructed;
+            // otherwise dock to BottomRight.
+            string resolvedDock = isRightSplitOpen ? "BottomLeft" : "BottomRight";
+            ApplyDockAlignment(resolvedDock);
+            if (announce)
+            {
+                Say(isRightSplitOpen
+                    ? "🤖 偵測到右側分屏開啟，已自動切換停靠至左下角！"
+                    : "🤖 智慧貼邊模式：已自動停靠於視窗右側邊緣！", 2800);
+            }
+        }
+        else
+        {
+            ApplyDockAlignment(pos);
+        }
+    }
+
+    private void ApplyDockAlignment(string dock)
+    {
+        AvatarPositionTransform.X = 0;
+        AvatarPositionTransform.Y = 0;
+
+        switch (dock)
+        {
+            case "BottomLeft":
+                HorizontalAlignment = HorizontalAlignment.Left;
+                VerticalAlignment = VerticalAlignment.Bottom;
+                Margin = new Thickness(20, 0, 0, 36);
+                break;
+            case "TopRight":
+                HorizontalAlignment = HorizontalAlignment.Right;
+                VerticalAlignment = VerticalAlignment.Top;
+                Margin = new Thickness(0, 48, 20, 0);
+                break;
+            case "TopLeft":
+                HorizontalAlignment = HorizontalAlignment.Left;
+                VerticalAlignment = VerticalAlignment.Top;
+                Margin = new Thickness(20, 48, 0, 0);
+                break;
+            case "BottomRight":
+            default:
+                HorizontalAlignment = HorizontalAlignment.Right;
+                VerticalAlignment = VerticalAlignment.Bottom;
+                Margin = new Thickness(0, 0, 20, 36);
+                break;
         }
     }
 
@@ -415,33 +558,22 @@ public sealed partial class AvatarCompanionControl : UserControl
     // ── Dock Positioning ──
     public void SetDockPosition(string dock, bool save = true)
     {
-        AvatarPositionTransform.X = 0;
-        AvatarPositionTransform.Y = 0;
-
-        switch (dock)
+        if (dock == "AutoEdge")
         {
-            case "BottomLeft":
-                HorizontalAlignment = HorizontalAlignment.Left;
-                VerticalAlignment = VerticalAlignment.Bottom;
-                Margin = new Thickness(24, 0, 0, 36);
-                break;
-            case "TopRight":
-                HorizontalAlignment = HorizontalAlignment.Right;
-                VerticalAlignment = VerticalAlignment.Top;
-                Margin = new Thickness(0, 48, 24, 0);
-                break;
-            case "TopLeft":
-                HorizontalAlignment = HorizontalAlignment.Left;
-                VerticalAlignment = VerticalAlignment.Top;
-                Margin = new Thickness(24, 48, 0, 0);
-                break;
-            case "BottomRight":
-            default:
-                HorizontalAlignment = HorizontalAlignment.Right;
-                VerticalAlignment = VerticalAlignment.Bottom;
-                Margin = new Thickness(0, 0, 24, 36);
-                break;
+            if (save)
+            {
+                var s = SettingsService.Instance.Current;
+                s.CompanionPosition = "AutoEdge";
+                s.CompanionOffsetX = 0;
+                s.CompanionOffsetY = 0;
+                SettingsService.Instance.Save();
+            }
+            bool rightSplitOpen = MainWindow.CurrentInstance?.IsRightDockOpen ?? false;
+            AutoDetectAndSnapToEdge(rightSplitOpen, announce: save);
+            return;
         }
+
+        ApplyDockAlignment(dock);
 
         if (save)
         {
@@ -468,11 +600,12 @@ public sealed partial class AvatarCompanionControl : UserControl
     }
 
     // ── Context Menu Actions ──
+    private void Dock_AutoEdge_Click(object sender, RoutedEventArgs e) => SetDockPosition("AutoEdge");
     private void Dock_BottomRight_Click(object sender, RoutedEventArgs e) => SetDockPosition("BottomRight");
     private void Dock_BottomLeft_Click(object sender, RoutedEventArgs e) => SetDockPosition("BottomLeft");
     private void Dock_TopRight_Click(object sender, RoutedEventArgs e) => SetDockPosition("TopRight");
     private void Dock_TopLeft_Click(object sender, RoutedEventArgs e) => SetDockPosition("TopLeft");
-    private void ResetPosition_Click(object sender, RoutedEventArgs e) => SetDockPosition("BottomRight");
+    private void ResetPosition_Click(object sender, RoutedEventArgs e) => SetDockPosition("AutoEdge");
 
     private void Size_Mini_Click(object sender, RoutedEventArgs e) => SetScale(0.70);
     private void Size_Normal_Click(object sender, RoutedEventArgs e) => SetScale(1.0);

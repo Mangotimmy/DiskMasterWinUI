@@ -165,11 +165,20 @@ public sealed partial class MainWindow : Window
 
         AppWindow.Closing += (sender, args) =>
         {
-            if (SettingsService.Instance.Current.CloseToTray)
+            if (SettingsService.Instance.Current.CloseToTray && !TrayService.IsExplicitExit)
             {
                 args.Cancel = true;
                 TrayService.MinimizeToTray();
                 WindowsNotificationService.Instance.ShowNotification("DiskMaster Pro", LocalizationService.Instance["CloseToTrayNotice"] ?? "已縮小至系統匣後台執行", "EasyMode");
+            }
+        };
+
+        this.Closed += (sender, args) =>
+        {
+            if (SettingsService.Instance.Current.CloseToTray && !TrayService.IsExplicitExit)
+            {
+                args.Handled = true;
+                TrayService.MinimizeToTray();
             }
         };
 
@@ -216,6 +225,7 @@ public sealed partial class MainWindow : Window
 
         CurrentInstance = this;
         ApplyBackgroundAndCompanion();
+        ExplorerWatchdogService.Instance.Start();
 
         SettingsService.Instance.SettingsChanged += () =>
         {
@@ -321,6 +331,18 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Minimizes the application window to the system tray on startup when launched with --background.
+    /// </summary>
+    public void MinimizeToTrayOnStartup()
+    {
+        try
+        {
+            TrayService.MinimizeToTray();
+        }
+        catch { }
+    }
+
     private void HandleQuickAction(string action)
     {
         switch (action)
@@ -384,6 +406,8 @@ public sealed partial class MainWindow : Window
                 AdminHelper.RestartAsAdmin();
                 break;
             case "Exit":
+                TrayService.IsExplicitExit = true;
+                ExplorerWatchdogService.Instance.Stop();
                 TrayService.Dispose();
                 AppWindow.Destroy();
                 Application.Current.Exit();
@@ -942,6 +966,8 @@ public sealed partial class MainWindow : Window
         return Math.Clamp(insertIndex, 0, MainTabs.TabItems.Count);
     }
 
+    public bool IsRightDockOpen => !string.IsNullOrEmpty(_rightDockTag);
+
     public void DockToRight(string tag)
     {
         if (string.IsNullOrEmpty(tag)) return;
@@ -973,6 +999,7 @@ public sealed partial class MainWindow : Window
 
         UpdateFloatingManagerUI();
         SaveCustomTabOrder();
+        CompanionControl?.AutoDetectAndSnapToEdge(isRightSplitOpen: true, announce: true);
     }
 
     public void CloseRightDock(bool reinsertToTabs = true)
@@ -994,6 +1021,7 @@ public sealed partial class MainWindow : Window
         }
         UpdateFloatingManagerUI();
         SaveCustomTabOrder();
+        CompanionControl?.AutoDetectAndSnapToEdge(isRightSplitOpen: false, announce: false);
     }
 
     public void DockToBottom(string tag)
@@ -2091,22 +2119,60 @@ public sealed partial class MainWindow : Window
         };
         AddHiddenAccel(exportDiagAccel);
 
-        // Ctrl+L for Clear Log
+        // Ctrl+L for Clear Log (with Undo backup via Ctrl+Z)
         var clearLogAccel = new KeyboardAccelerator { Key = VirtualKey.L, Modifiers = VirtualKeyModifiers.Control };
         clearLogAccel.Invoked += (s, e) =>
         {
             var currentTag = (MainTabs.SelectedItem as TabViewItem)?.Tag?.ToString();
             switch (currentTag)
             {
-                case "EasyMode": _easyModePage?.ViewModel.ClearLogCommand.Execute(null); break;
-                case "WimDeploy": if (_wimDeployPage != null) _wimDeployPage.ViewModel.DeployLog = ""; break;
-                case "DiskTools": if (_diskToolsPage != null) _diskToolsPage.ViewModel.OutputLog = ""; break;
-                case "AdvancedMode": _advancedModePage?.ViewModel.ClearFullLogCommand.Execute(null); break;
-                case "SystemOptimizer": if (_systemOptimizerPage != null) _systemOptimizerPage.ViewModel.ConsoleLog = ""; break;
+                case "EasyMode":
+                    if (_easyModePage != null && !string.IsNullOrEmpty(_easyModePage.ViewModel.OutputLog))
+                    {
+                        var snap = _easyModePage.ViewModel.OutputLog;
+                        UndoCutManager.PushUndo("清除簡易模式紀錄", () => _easyModePage.ViewModel.OutputLog = snap);
+                        _easyModePage.ViewModel.ClearLogCommand.Execute(null);
+                    }
+                    break;
+                case "WimDeploy":
+                    if (_wimDeployPage != null && !string.IsNullOrEmpty(_wimDeployPage.ViewModel.DeployLog))
+                    {
+                        var snap = _wimDeployPage.ViewModel.DeployLog;
+                        UndoCutManager.PushUndo("清除 WIM 部署紀錄", () => _wimDeployPage.ViewModel.DeployLog = snap);
+                        _wimDeployPage.ViewModel.DeployLog = "";
+                    }
+                    break;
+                case "DiskTools":
+                    if (_diskToolsPage != null && !string.IsNullOrEmpty(_diskToolsPage.ViewModel.OutputLog))
+                    {
+                        var snap = _diskToolsPage.ViewModel.OutputLog;
+                        UndoCutManager.PushUndo("清除磁碟工具紀錄", () => _diskToolsPage.ViewModel.OutputLog = snap);
+                        _diskToolsPage.ViewModel.OutputLog = "";
+                    }
+                    break;
+                case "AdvancedMode":
+                    if (_advancedModePage != null && !string.IsNullOrEmpty(_advancedModePage.ViewModel.FullLog))
+                    {
+                        var snap = _advancedModePage.ViewModel.FullLog;
+                        UndoCutManager.PushUndo("清除進階模式紀錄", () => _advancedModePage.ViewModel.FullLog = snap);
+                        _advancedModePage.ViewModel.ClearFullLogCommand.Execute(null);
+                    }
+                    break;
+                case "SystemOptimizer":
+                    if (_systemOptimizerPage != null && !string.IsNullOrEmpty(_systemOptimizerPage.ViewModel.ConsoleLog))
+                    {
+                        var snap = _systemOptimizerPage.ViewModel.ConsoleLog;
+                        UndoCutManager.PushUndo("清除系統優化紀錄", () => _systemOptimizerPage.ViewModel.ConsoleLog = snap);
+                        _systemOptimizerPage.ViewModel.ConsoleLog = "";
+                    }
+                    break;
             }
             e.Handled = true;
         };
         NormalView.KeyboardAccelerators.Add(clearLogAccel);
+
+        // Global & per-page Ctrl+Z (Undo) and Ctrl+X (Cut) support across all 14 pages
+        UndoCutManager.Attach(NormalView, () => ContentFrame.Content as Page);
 
         // Ctrl+, for Settings
         var settingsAccel = new KeyboardAccelerator { Key = (VirtualKey)188, Modifiers = VirtualKeyModifiers.Control };
@@ -2311,14 +2377,14 @@ public sealed partial class MainWindow : Window
     public void UpdateViewportLayout()
     {
         if (ContentScrollViewer == null || ContentRoot == null) return;
-        var factor = Math.Clamp(_currentZoom, 0.7, 1.8);
         var viewportW = ContentScrollViewer.ActualWidth;
         var viewportH = ContentScrollViewer.ActualHeight;
         if (viewportW <= 0) return;
 
-        // Browser Viewport logic:
-        // LayoutWidth = (ActualWidth - padding) / factor
-        var layoutW = Math.Max(360, (viewportW - 4) / factor);
+        var contentH = ContentFrame?.ActualHeight ?? ContentRoot.ActualHeight;
+        var (layoutW, offsetX, bottomMargin, factor) = DisplayHelper.CalculateScaledViewportLayout(
+            viewportW, viewportH, contentH, _currentZoom);
+
         ContentRoot.Width = layoutW;
         RootScaleTransform.ScaleX = factor;
         RootScaleTransform.ScaleY = factor;
@@ -2328,21 +2394,38 @@ public sealed partial class MainWindow : Window
             ContentScrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
             var layoutH = Math.Max(520, (viewportH - 4) / factor);
             ContentRoot.Height = layoutH;
-            ContentRoot.Margin = new Thickness(0);
+            ContentRoot.Margin = new Thickness(offsetX, 0, 0, 0);
         }
         else
         {
             ContentScrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
             ContentRoot.ClearValue(FrameworkElement.HeightProperty);
-            var contentH = ContentFrame?.ActualHeight ?? ContentRoot.ActualHeight;
-            if (factor > 1.0 && contentH > 0)
-            {
-                ContentRoot.Margin = new Thickness(0, 0, 0, (contentH * (factor - 1.0)) + 30);
-            }
-            else
-            {
-                ContentRoot.Margin = new Thickness(0);
-            }
+            ContentRoot.Margin = new Thickness(offsetX, 0, 0, bottomMargin);
+        }
+
+        if (ContentScrollViewer.HorizontalOffset != 0)
+        {
+            ContentScrollViewer.ChangeView(0, null, null, disableAnimation: true);
+        }
+
+        CompanionControl?.AutoDetectAndSnapToEdge(IsRightDockOpen, announce: false);
+    }
+
+    private void ContentScrollViewer_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
+    {
+        if (ContentScrollViewer != null && ContentScrollViewer.HorizontalOffset != 0)
+        {
+            ContentScrollViewer.ChangeView(0, null, null, disableAnimation: true);
+        }
+    }
+
+    private void ContentRoot_BringIntoViewRequested(UIElement sender, BringIntoViewRequestedEventArgs args)
+    {
+        // Keep vertical BringIntoView working while clamping horizontal X to 0 so <100% scaled viewports never scroll horizontally
+        var r = args.TargetRect;
+        if (!double.IsNaN(r.X) && r.X != 0)
+        {
+            args.TargetRect = new Windows.Foundation.Rect(0, r.Y, Math.Min(1.0, Math.Max(0.0, r.Width)), r.Height);
         }
     }
 

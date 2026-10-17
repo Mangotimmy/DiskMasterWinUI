@@ -62,7 +62,7 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
                         <StackPanel Spacing="16" Margin="0,0,16,20">
 
-                            <!-- Live Resource Cards (CPU, RAM, GPU, LAN, Disk Active & Throughput, Disk Response Latency) -->
+                            <!-- Live Resource Cards (CPU, RAM with DDR4/DDR5 & MHz, GPU with Graphics API & VRAM, LAN) -->
                             <!-- 1. CPU & RAM Resource Cards -->
                             <Grid ColumnSpacing="16">
                                 <Grid.ColumnDefinitions>
@@ -72,44 +72,80 @@
 
                                 <!-- 1. CPU Card -->
                                 <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                                        CornerRadius="8" Padding="16">
+                                        BorderBrush="#4038BDF8" BorderThickness="1.5"
+                                        CornerRadius="12" Padding="18,16">
                                     <StackPanel Spacing="12">
-                                        <Grid>
+                                        <Grid ColumnSpacing="10">
                                             <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
-                                            <StackPanel Grid.Column="0" Spacing="2">
-                                                <TextBlock Text="處理器使用率 (CPU Total)" FontWeight="SemiBold" FontSize="14" />
-                                                <TextBlock Text="即時多核心處理器總負載" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <Border Grid.Column="0" Background="#2038BDF8" BorderBrush="#6038BDF8" BorderThickness="1"
+                                                    CornerRadius="8" Width="38" Height="38" VerticalAlignment="Center">
+                                                <FontIcon Glyph="&#xE950;" FontSize="18" Foreground="#38BDF8" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock Text="處理器使用率 (CPU Total)" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" />
+                                                    <Border Background="#2038BDF8" BorderBrush="#6638BDF8" BorderThickness="1" CornerRadius="6" Padding="7,2">
+                                                        <TextBlock Text="Multi-Core" FontSize="10" FontWeight="Bold" Foreground="#38BDF8" />
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock Text="即時多核心處理器總負載與執行緒排程監控" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                             </StackPanel>
-                                            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.CurrentMetrics.DisplayCpuPercent, Mode=OneWay}"
-                                                       FontSize="24" FontWeight="Bold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.CurrentMetrics.DisplayCpuPercent, Mode=OneWay}"
+                                                       FontSize="26" FontWeight="ExtraBold" Foreground="#38BDF8" VerticalAlignment="Center" />
                                         </Grid>
-                                        <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.CpuUsagePercent, Mode=OneWay}" Maximum="100" Height="8" />
+                                        <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.CpuUsagePercent, Mode=OneWay}"
+                                                     Maximum="100" Height="8" CornerRadius="4" Foreground="#38BDF8" />
                                     </StackPanel>
                                 </Border>
 
-                                <!-- 2. RAM Card -->
+                                <!-- 2. RAM Card (with SMBIOS DDR4/DDR5 Memory Type & Clock Speed MHz Badges) -->
                                 <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                                        CornerRadius="8" Padding="16">
+                                        BorderBrush="#40FBBF24" BorderThickness="1.5"
+                                        CornerRadius="12" Padding="18,16">
                                     <StackPanel Spacing="12">
-                                        <Grid>
+                                        <Grid ColumnSpacing="10">
                                             <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
-                                            <StackPanel Grid.Column="0" Spacing="2">
-                                                <TextBlock Text="實體記憶體使用率 (RAM)" FontWeight="SemiBold" FontSize="14" />
-                                                <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.DisplayRamDetail, Mode=OneWay}"
-                                                           FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <Border Grid.Column="0" Background="#20FBBF24" BorderBrush="#60FBBF24" BorderThickness="1"
+                                                    CornerRadius="8" Width="38" Height="38" VerticalAlignment="Center">
+                                                <FontIcon Glyph="&#xE964;" FontSize="18" Foreground="#FBBF24" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <TextBlock Text="實體記憶體 (RAM)" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" />
+                                                    <!-- DDR4 / DDR5 Type Badge -->
+                                                    <Border Background="#28FBBF24" BorderBrush="#99FBBF24" BorderThickness="1" CornerRadius="6" Padding="7,2"
+                                                            ToolTipService.ToolTip="SMBIOS 偵測之實體記憶體代數規格 (DDR4 / DDR5 / LPDDR5)">
+                                                        <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.RamMemoryType, Mode=OneWay}"
+                                                                   FontSize="10" FontWeight="ExtraBold" Foreground="#FBBF24" />
+                                                    </Border>
+                                                    <!-- Clock Speed (MHz) Badge -->
+                                                    <Border Background="#2010B981" BorderBrush="#8010B981" BorderThickness="1" CornerRadius="6" Padding="7,2"
+                                                            ToolTipService.ToolTip="目前記憶體運作頻率 (Configured Clock Speed MHz)">
+                                                        <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.DisplayRamSpeed, Mode=OneWay}"
+                                                                   FontSize="10" FontWeight="ExtraBold" Foreground="#34D399" />
+                                                    </Border>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.DisplayRamDetail, Mode=OneWay}"
+                                                               FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                    <TextBlock Text="·" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                    <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.RamSpecSummary, Mode=OneWay}"
+                                                               FontSize="11" FontWeight="SemiBold" Foreground="#FBBF24" />
+                                                </StackPanel>
                                             </StackPanel>
-                                            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.CurrentMetrics.DisplayRamPercent, Mode=OneWay}"
-                                                       FontSize="24" FontWeight="Bold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.CurrentMetrics.DisplayRamPercent, Mode=OneWay}"
+                                                       FontSize="26" FontWeight="ExtraBold" Foreground="#FBBF24" VerticalAlignment="Center" />
                                         </Grid>
-                                        <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.RamUsagePercent, Mode=OneWay}" Maximum="100" Height="8" />
+                                        <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.RamUsagePercent, Mode=OneWay}"
+                                                     Maximum="100" Height="8" CornerRadius="4" Foreground="#FBBF24" />
                                     </StackPanel>
                                 </Border>
                             </Grid>
@@ -121,67 +157,86 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
 
-                                <!-- 3. GPU Card -->
+                                <!-- 3. GPU Card (with Active Graphics API DX12/Vulkan/DX11 & Dedicated VRAM) -->
                                 <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                                        CornerRadius="8" Padding="16">
-                                    <StackPanel Spacing="12">
-                                        <Grid>
+                                        BorderBrush="#40C084FC" BorderThickness="1.5"
+                                        CornerRadius="12" Padding="18,16">
+                                    <StackPanel Spacing="10">
+                                        <Grid ColumnSpacing="10">
                                             <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
-                                            <StackPanel Grid.Column="0" Spacing="2">
+                                            <Border Grid.Column="0" Background="#20C084FC" BorderBrush="#60C084FC" BorderThickness="1"
+                                                    CornerRadius="8" Width="38" Height="38" VerticalAlignment="Center">
+                                                <FontIcon Glyph="&#xE790;" FontSize="18" Foreground="#C084FC" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                                                 <StackPanel Orientation="Horizontal" Spacing="6">
-                                                    <FontIcon Glyph="&#xE790;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                                                    <TextBlock Text="圖形處理器 (GPU 3D Engine)" FontWeight="SemiBold" FontSize="14" />
+                                                    <TextBlock Text="圖形處理器 (GPU Engine)" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" />
+                                                    <Border Background="#28C084FC" BorderBrush="#99C084FC" BorderThickness="1" CornerRadius="6" Padding="7,2"
+                                                            ToolTipService.ToolTip="前景作用中圖形渲染 API (DirectX 12 / DX11 / Vulkan / OpenGL)">
+                                                        <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.ActiveGraphicsApi, Mode=OneWay}"
+                                                                   FontSize="10" FontWeight="ExtraBold" Foreground="#E9D5FF" />
+                                                    </Border>
                                                 </StackPanel>
                                                 <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.GpuModelName, Mode=OneWay}"
-                                                           FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                           FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
                                                 <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.DisplayGpuMemory, Mode=OneWay}"
-                                                           FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                           FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                                             </StackPanel>
-                                            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.CurrentMetrics.DisplayGpuPercent, Mode=OneWay}"
-                                                       FontSize="24" FontWeight="Bold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.CurrentMetrics.DisplayGpuPercent, Mode=OneWay}"
+                                                       FontSize="26" FontWeight="ExtraBold" Foreground="#C084FC" VerticalAlignment="Center" />
                                         </Grid>
-                                        <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.GpuUsagePercent, Mode=OneWay}" Maximum="100" Height="8" />
+                                        <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.GpuUsagePercent, Mode=OneWay}"
+                                                     Maximum="100" Height="8" CornerRadius="4" Foreground="#C084FC" />
                                     </StackPanel>
                                 </Border>
 
                                 <!-- 4. LAN / Network Card -->
                                 <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                                        CornerRadius="8" Padding="16">
-                                    <StackPanel Spacing="12">
-                                        <Grid>
+                                        BorderBrush="#4034D399" BorderThickness="1.5"
+                                        CornerRadius="12" Padding="18,16">
+                                    <StackPanel Spacing="10">
+                                        <Grid ColumnSpacing="10">
                                             <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
-                                            <StackPanel Grid.Column="0" Spacing="2">
+                                            <Border Grid.Column="0" Background="#2034D399" BorderBrush="#6034D399" BorderThickness="1"
+                                                    CornerRadius="8" Width="38" Height="38" VerticalAlignment="Center">
+                                                <FontIcon Glyph="&#xE968;" FontSize="18" Foreground="#34D399" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                                                 <StackPanel Orientation="Horizontal" Spacing="6">
-                                                    <FontIcon Glyph="&#xE968;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                                                    <TextBlock Text="網路卡傳輸速率 (LAN / Wi-Fi)" FontWeight="SemiBold" FontSize="14" />
+                                                    <TextBlock Text="網路卡傳輸速率 (LAN / Wi-Fi)" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" />
+                                                    <Border Background="#2034D399" BorderBrush="#6634D399" BorderThickness="1" CornerRadius="6" Padding="7,2">
+                                                        <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.NetAdapterSpeedDisplay, Mode=OneWay}"
+                                                                   FontSize="10" FontWeight="Bold" Foreground="#34D399" />
+                                                    </Border>
                                                 </StackPanel>
                                                 <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.NetAdapterName, Mode=OneWay}"
                                                            FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.NetAdapterSpeedDisplay, Mode=OneWay}"
-                                                           FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.NetThroughputDisplay, Mode=OneWay}"
+                                                           FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                                             </StackPanel>
-                                            <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Right" VerticalAlignment="Center">
-                                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                                    <TextBlock Text="⬇️" FontSize="11" />
+                                            <StackPanel Grid.Column="2" Spacing="2" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
+                                                    <TextBlock Text="⬇" FontSize="12" Foreground="#34D399" FontWeight="Bold" />
                                                     <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.NetDownloadRateDisplay, Mode=OneWay}"
-                                                               FontSize="13" FontWeight="Bold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                               FontSize="14" FontWeight="ExtraBold" Foreground="#34D399" />
                                                 </StackPanel>
-                                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                                    <TextBlock Text="⬆️" FontSize="11" />
+                                                <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
+                                                    <TextBlock Text="⬆" FontSize="12" Foreground="#94A3B8" FontWeight="Bold" />
                                                     <TextBlock Text="{x:Bind ViewModel.CurrentMetrics.NetUploadRateDisplay, Mode=OneWay}"
                                                                FontSize="13" FontWeight="Bold" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                                 </StackPanel>
                                             </StackPanel>
                                         </Grid>
-                                        <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.NetDownloadSpeedBps, Mode=OneWay}" Maximum="125000000" Height="8" />
+                                        <ProgressBar Value="{x:Bind ViewModel.CurrentMetrics.NetDownloadSpeedBps, Mode=OneWay}"
+                                                     Maximum="125000000" Height="8" CornerRadius="4" Foreground="#34D399" />
                                     </StackPanel>
                                 </Border>
                             </Grid>

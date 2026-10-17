@@ -371,11 +371,18 @@ public partial class SystemPerformanceViewModel : ObservableObject
 
         if (item.IsSystemProtected)
         {
-            StatusMessage = $"Protected process {item.ProcessName} (PID {item.Pid}) cannot be terminated.";
+            StatusMessage = $"🛡️ 系統核心保護程序 {item.ProcessName} (PID {item.Pid}) 禁止強制終結。";
             return;
         }
 
-        StatusMessage = $"Terminating PID {item.Pid} ({item.ProcessName}) and child tree...";
+        bool confirmed = await Helpers.DialogHelper.ConfirmDestructiveOperationAsync(
+            WindowHelper.GetXamlRoot(),
+            "強制終結進程樹 (Kill Process Tree)",
+            $"確定要強制終結進程「{item.ProcessName}」(PID: {item.Pid}) 及其所有子程序嗎？未儲存的資料可能會遺失。",
+            $"{item.ProcessName} (PID {item.Pid})");
+        if (!confirmed) return;
+
+        StatusMessage = $"正在強制終結 PID {item.Pid} ({item.ProcessName}) 及其子程序樹...";
         var (ok, msg) = await _perfService.KillProcessTreeAsync(item.Pid);
         StatusMessage = msg;
         await RefreshProcessesCoreAsync(forceWmicRefresh: true);
@@ -384,7 +391,14 @@ public partial class SystemPerformanceViewModel : ObservableObject
     [RelayCommand]
     public async Task KillAllNotRespondingAsync()
     {
-        StatusMessage = "Terminating all unresponsive processes...";
+        bool confirmed = await Helpers.DialogHelper.ConfirmDestructiveOperationAsync(
+            WindowHelper.GetXamlRoot(),
+            "一鍵終結所有無響應程式",
+            "確定要掃描並強制終結目前系統中所有失去回應 (Not Responding) 的應用程式嗎？",
+            "All Not-Responding Processes");
+        if (!confirmed) return;
+
+        StatusMessage = "正在強制終結所有無響應程式...";
         var (ok, msg) = await _perfService.KillAllNotRespondingAsync();
         StatusMessage = msg;
         await RefreshProcessesCoreAsync(forceWmicRefresh: true);

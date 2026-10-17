@@ -72,7 +72,7 @@
                                                 <TextBlock Text="FPSHEAVEN &amp; MMCSS" FontSize="11" FontWeight="SemiBold" />
                                             </Border>
                                         </StackPanel>
-                                        <TextBlock x:Name="HeroSubtitle" Text="一鍵同步調校：CPU 量子時間分配 (0x26)、啟用終極效能電源計畫、解鎖 100% 前台算力 (SystemResponsiveness=0)、關閉網路節流防 Ping 突增、關閉 Game DVR 背景錄影負擔、開啟 HAGS 硬體加速與 1:1 感應器零延遲。"
+                                        <TextBlock x:Name="HeroSubtitle" Text="一鍵同步調校：CPU 量子時間分配 (0x26)、啟用終極效能電源計畫、優化前台算力保留 (SystemResponsiveness=10)、關閉網路節流防 Ping 突增、關閉 Game DVR 背景錄影負擔、開啟 HAGS 硬體加速與 1:1 感應器零延遲。"
                                                    Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                     </StackPanel>
                                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
@@ -107,9 +107,14 @@
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
-                                            <StackPanel Grid.Column="0" Spacing="2">
-                                                <TextBlock x:Name="GameDvrTitle" Text="停用 Game DVR / Xbox Game Bar" FontWeight="SemiBold" />
-                                                <TextBlock x:Name="GameDvrDesc" Text="徹底關閉背景錄影與快照虛擬層，釋放顯卡與 CPU 資源。" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <StackPanel Grid.Column="0" Spacing="3">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock x:Name="GameDvrTitle" Text="停用 Game DVR / Xbox Game Bar (GameDVR_Enabled = 0)" FontWeight="SemiBold" />
+                                                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,1">
+                                                        <TextBlock Text="HKCU\System\GameConfigStore" FontFamily="Consolas" FontSize="10" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock x:Name="GameDvrDesc" Text="寫入 GameDVR_Enabled = 0 (REG_DWORD) 與 AppCaptureEnabled = 0，徹底關閉背景錄影虛擬層以釋放 CPU/RAM/GPU 資源 (建議重開機生效)。" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                             </StackPanel>
                                             <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsGameDvrDisabled, Mode=OneWay}"
                                                           Toggled="GameDvr_Toggled" />
@@ -433,6 +438,70 @@
                                         <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsGroupPolicyTelemetryDisabled, Mode=OneWay}"
                                                       Toggled="GroupPolicyTelemetry_Toggled" />
                                     </Grid>
+
+                                    <!-- Switch 4 (Item 7): DPS Service Memory Bloat Fix -->
+                                    <Grid Padding="4,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="3">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock x:Name="DpsServiceLabel" Text="停用 DPS 診斷原則服務防記憶體膨脹 (DPS Start = 4)" FontWeight="SemiBold" />
+                                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,1">
+                                                    <TextBlock Text="HKLM\SYSTEM\CurrentControlSet\Services\DPS" FontFamily="Consolas" FontSize="10" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock x:Name="DpsServiceDesc" Text="設定 Start = 4 (Disabled) 並停止 Diagnostic Policy Service，防止背景疑難排解監控引發 svchost 記憶體無限膨脹與 CPU 尖峰。" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                            <TextBlock Text="{x:Bind ViewModel.DpsServiceStatusText, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        </StackPanel>
+                                        <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsDpsServiceDisabled, Mode=OneWay}"
+                                                      Toggled="DpsService_Toggled" />
+                                    </Grid>
+
+                                    <!-- Switch 5 (Item 5): L2TP/IPsec VPN NAT-T Fix -->
+                                    <Grid Padding="4,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="3">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock x:Name="L2tpVpnLabel" Text="L2TP/IPsec VPN NAT 穿透連線修復 (AssumeUDPEncapsulationContextOnSendRule = 2)" FontWeight="SemiBold" />
+                                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,1">
+                                                    <TextBlock Text="HKLM\SYSTEM\CurrentControlSet\Services\PolicyAgent" FontFamily="Consolas" FontSize="10" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock x:Name="L2tpVpnDesc" Text="在 PolicyAgent 建立 REG_DWORD 值 AssumeUDPEncapsulationContextOnSendRule = 2，徹底解決位於路由器 NAT 後方時 L2TP/IPsec VPN 無法連線 (錯誤 789 / 809) 問題。修改後重開機生效。" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                            <TextBlock Text="{x:Bind ViewModel.L2tpVpnNatRuleDisplay, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        </StackPanel>
+                                        <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsL2tpVpnNatFixEnabled, Mode=OneWay}"
+                                                      Toggled="L2tpVpnNatFix_Toggled" />
+                                    </Grid>
+
+                                    <!-- Panel 6 (Item 9): DiagTrack Service Turn Off / Turn On -->
+                                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12,10" Margin="0,4,0,0">
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Spacing="3">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <FontIcon Glyph="&#xE72E;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                    <TextBlock x:Name="DiagTrackCardTitle" Text="DiagTrack 遙測追蹤服務控制 (Connected User Experiences and Telemetry)" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                                <TextBlock x:Name="DiagTrackCardDesc" Text="一鍵執行 `sc stop DiagTrack &amp; sc config DiagTrack start=disabled` 徹底關閉微軟背景診斷追蹤服務，釋放背景 I/O 與頻寬。關閉後 Windows Update 依然完全正常運作！" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                                <TextBlock Text="{x:Bind ViewModel.DiagTrackStatusText, Mode=OneWay}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <Button Content="🛑 Turn Off (停用 DiagTrack)" Command="{x:Bind ViewModel.TurnOffDiagTrackCommand}"
+                                                        Style="{StaticResource AccentButtonStyle}" Padding="12,6" />
+                                                <Button Content="▶️ Turn On (恢復啟用)" Command="{x:Bind ViewModel.TurnOnDiagTrackCommand}"
+                                                        Padding="12,6" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
@@ -778,38 +847,284 @@
                     </ScrollViewer>
                 </TabViewItem>
 
+                <!-- ════ Tab 3.5: 檔案總管、右鍵選單與圖示自訂 (Explorer, Context Menu & Icons) ════ -->
+                <TabViewItem x:Name="TabExplorerShell" Header="🗂️ 檔案總管、右鍵與圖示 (Explorer &amp; Icons)" IsClosable="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                        <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
+
+                            <!-- Card 1 (Item 14 & Item 13): Explorer.exe Auto-Recovery Watchdog & Icon Cache Reset -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource AccentFillColorDefaultBrush}" BorderThickness="1.5"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon Grid.Column="0" Glyph="&#xEC50;" FontSize="24" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock x:Name="WatchdogCardTitle" Text="🛡️ Explorer.exe 檔案總管背景自動守護與救援服務 (Auto-Recovery Watchdog)" FontWeight="Bold" FontSize="15" />
+                                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="8,2">
+                                                    <TextBlock Text="{x:Bind ViewModel.ExplorerWatchdogStatusBadge, Mode=OneWay}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock x:Name="WatchdogCardDesc" Text="當 Windows 檔案總管 (explorer.exe) 因外掛衝突崩潰、無回應或被意外終止導致黑畫面與工作列消失時，背景守護服務將自動偵測並秒速重啟恢復桌面。"
+                                                       Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                            <TextBlock Text="{x:Bind ViewModel.ExplorerWatchdogRecoverySummary, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Content="🔄 手動重啟檔案總管" Command="{x:Bind ViewModel.RestartExplorerManuallyCommand}" VerticalAlignment="Center" />
+                                        <ToggleSwitch Grid.Column="3" IsOn="{x:Bind ViewModel.IsExplorerWatchdogEnabled, Mode=OneWay}"
+                                                      OnContent="自動救援開啟" OffContent="已暫停"
+                                                      Toggled="ExplorerWatchdog_Toggled" VerticalAlignment="Center" />
+                                    </Grid>
+
+                                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12,10">
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Grid.Column="0" Glyph="&#xEB9F;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="🖼️ 重設與重建檔案總管圖示快取 (Reset Icon &amp; Thumbnail Cache)" FontWeight="SemiBold" />
+                                                <TextBlock Text="修復桌面白紙圖示、破圖或自訂圖示未更新。提供「免重啟即時刷新 (ie4uinit -show)」與「徹底清除 IconCache.db 重建」雙模式。"
+                                                           Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                                <TextBlock Text="{x:Bind ViewModel.IconCacheStatus, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                                           Visibility="{x:Bind ViewModel.IconCacheStatus, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}" />
+                                            </StackPanel>
+                                            <Button Grid.Column="2" Content="⚡ 免重啟刷新圖示" Command="{x:Bind ViewModel.QuickRefreshShellIconsCommand}" VerticalAlignment="Center" />
+                                            <Button Grid.Column="3" Content="🧹 徹底清除重建圖示快取" Command="{x:Bind ViewModel.RebuildIconCacheCommand}"
+                                                    IsEnabled="{x:Bind ViewModel.IsRebuildingIconCache, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}"
+                                                    Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Card 2 (Item 11): Switch Right-Click Menu Layout & Fix Slow Right-Click -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon Grid.Column="0" Glyph="&#xE8A9;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Spacing="2">
+                                            <TextBlock x:Name="ContextMenuCardTitle" Text="🖱️ 右鍵選單版面切換與右鍵轉圈卡頓修復 (Context Menu Layout &amp; Delay Fix)" FontWeight="SemiBold" FontSize="15" />
+                                            <TextBlock x:Name="ContextMenuCardDesc" Text="一鍵在「Windows 10 經典完整右鍵選單 (直接顯示 7-Zip/解壓縮/重新命名等完整功能)」與「Windows 11 現代簡潔選單」之間自由切換，並修復右鍵轉圈延遲。"
+                                                       Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10,4" VerticalAlignment="Center">
+                                            <TextBlock Text="{x:Bind ViewModel.ContextMenuStyleBadge, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        </Border>
+                                    </Grid>
+
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button Grid.Column="0" Command="{x:Bind ViewModel.SwitchToClassicContextMenuCommand}"
+                                                Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" Padding="12,8">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="⚡ 切換為 Windows 10 經典完整右鍵選單" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                                <TextBlock Text="免點「顯示更多選項」，一次展開所有功能" FontSize="11" HorizontalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Column="1" Command="{x:Bind ViewModel.SwitchToModernContextMenuCommand}"
+                                                HorizontalAlignment="Stretch" Padding="12,8">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="🪟 切換為 Windows 11 現代簡潔右鍵選單" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                                <TextBlock Text="還原系統預設圓角摺疊式選單" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Column="2" Command="{x:Bind ViewModel.FixSlowRightClickMenuCommand}"
+                                                HorizontalAlignment="Stretch" Padding="12,8">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="🚀 一鍵修復右鍵選單轉圈與延遲" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                                <TextBlock Text="MenuShowDelay=0 + 清理失效右鍵擴充項" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Card 3 (Item 12 - Part A): Folder Optimization (Fix Slow Folder Loading) & Folder Picture -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon Grid.Column="0" Glyph="&#xE8B7;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Spacing="2">
+                                            <TextBlock x:Name="FolderOptCardTitle" Text="📂 資料夾載入加速最佳化與資料夾圖片設定 (Folder Customize &amp; Slow Loading Fix)" FontWeight="SemiBold" FontSize="15" />
+                                            <TextBlock x:Name="FolderOptCardDesc" Text="解決下載區或大型資料夾開啟時上方綠條緩慢讀條、卡死轉圈問題。支援全域鎖定「一般項目 (General items)」或針對指定資料夾與所有子資料夾套用最佳化範本與封面圖片。"
+                                                       Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Content="🧹 重設全系統檢視記憶 (ShellBags)" Command="{x:Bind ViewModel.ResetShellBagsAndEnableFastFoldersCommand}" VerticalAlignment="Center" />
+                                        <ToggleSwitch Grid.Column="3" IsOn="{x:Bind ViewModel.IsGlobalFastFolderDiscoveryEnabled, Mode=OneWay}"
+                                                      OnContent="全域極速載入" OffContent="系統自動偵測"
+                                                      Toggled="GlobalFastFolder_Toggled" VerticalAlignment="Center" />
+                                    </Grid>
+
+                                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="14" Margin="0,4,0,0">
+                                        <StackPanel Spacing="10">
+                                            <TextBlock Text="指定資料夾「自訂 (Customize)」範本最佳化與封面圖片 (同 Windows 資料夾內容 -> 自訂)：" FontWeight="SemiBold" />
+
+                                            <!-- Target Folder Selector -->
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox Grid.Column="0" Header="目標資料夾路徑 (Target Folder)"
+                                                         Text="{x:Bind ViewModel.TargetCustomizeFolderPath, Mode=TwoWay}"
+                                                         PlaceholderText="例如: C:\Users\YourName\Downloads 或點擊右側瀏覽..." />
+                                                <Button Grid.Column="1" Content="📂 瀏覽資料夾..." Command="{x:Bind ViewModel.BrowseCustomizeFolderCommand}" VerticalAlignment="Bottom" />
+                                            </Grid>
+
+                                            <!-- Optimize this folder for + Also apply to subfolders -->
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="2*" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <ComboBox Grid.Column="0" Header="將此資料夾最佳化為 (Optimize this folder for):"
+                                                          SelectedIndex="{x:Bind ViewModel.SelectedFolderTemplateIndex, Mode=TwoWay}"
+                                                          HorizontalAlignment="Stretch">
+                                                    <ComboBoxItem Content="⚡ 一般項目 (General items - 最速載入，不掃描影音中繼資料)" />
+                                                    <ComboBoxItem Content="📄 文件 (Documents)" />
+                                                    <ComboBoxItem Content="🖼️ 圖片 (Pictures)" />
+                                                    <ComboBoxItem Content="🎵 音樂 (Music)" />
+                                                    <ComboBoxItem Content="🎬 影片 (Videos)" />
+                                                </ComboBox>
+                                                <CheckBox Grid.Column="1" Content="同時套用此範本到所有子資料夾 (Also apply to all subfolders)"
+                                                          IsChecked="{x:Bind ViewModel.ApplyTemplateToSubfolders, Mode=TwoWay}"
+                                                          VerticalAlignment="Bottom" />
+                                            </Grid>
+
+                                            <!-- Folder Picture (Choose File / Restore Default) -->
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox Grid.Column="0" Header="資料夾圖片 (Folder picture - 選填，留空代表預設)"
+                                                         Text="{x:Bind ViewModel.TargetFolderPicturePath, Mode=TwoWay}"
+                                                         PlaceholderText="選擇一張圖片作為資料夾縮圖封面 (Logo=...)..." />
+                                                <Button Grid.Column="1" Content="🖼️ 選擇圖片 (Choose File...)" Command="{x:Bind ViewModel.BrowseFolderPictureCommand}" VerticalAlignment="Bottom" />
+                                                <Button Grid.Column="2" Content="🔄 還原預設圖片" Command="{x:Bind ViewModel.ClearFolderPictureCommand}" VerticalAlignment="Bottom" />
+                                                <Button Grid.Column="3" Content="✅ 套用資料夾最佳化與圖片" Command="{x:Bind ViewModel.ApplyFolderOptimizationCommand}"
+                                                        Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Bottom" Padding="14,6" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Card 4 (Item 12 - Part B): Custom Icon Setting for Folders & File Extensions -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE790;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        <TextBlock x:Name="CustomIconsCardTitle" Text="🎨 資料夾與檔案類型自訂圖示中心 (Custom Icons for Folders &amp; File Types)" FontWeight="SemiBold" FontSize="15" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="CustomIconsCardDesc" Text="為上方的「目標資料夾」或任意「檔案副檔名 (例如 .txt / .mp4 / .log)」更換專屬精美圖示，支援內建 Windows 精選圖示庫與外部 .ico / .exe / .dll 圖示檔。"
+                                               Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+
+                                    <!-- Icon Resource Selector -->
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="1.2*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox Grid.Column="0" Header="內建精選圖示快速套用:"
+                                                  SelectedIndex="{x:Bind ViewModel.SelectedPopularFolderIconIndex, Mode=TwoWay}"
+                                                  SelectionChanged="PopularIconCombo_SelectionChanged"
+                                                  HorizontalAlignment="Stretch">
+                                            <ComboBoxItem Content="⭐ 黃金星標資料夾 (shell32.dll,43)" />
+                                            <ComboBoxItem Content="🛡️ 安全防護資料夾 (imageres.dll,54)" />
+                                            <ComboBoxItem Content="🎮 遊戲與電競目錄 (imageres.dll,186)" />
+                                            <ComboBoxItem Content="💻 開發與程式碼庫 (shell32.dll,13)" />
+                                            <ComboBoxItem Content="🎬 影音多媒體中心 (imageres.dll,108)" />
+                                            <ComboBoxItem Content="☁️ 雲端與網路備份 (imageres.dll,104)" />
+                                            <ComboBoxItem Content="🔒 加密私密保存庫 (shell32.dll,47)" />
+                                            <ComboBoxItem Content="🚀 高速效能工作區 (shell32.dll,316)" />
+                                        </ComboBox>
+                                        <TextBox Grid.Column="1" Header="圖示資源路徑 (IconResource - 路徑,索引)"
+                                                 Text="{x:Bind ViewModel.TargetCustomIconResource, Mode=TwoWay}"
+                                                 PlaceholderText="例如: C:\Windows\System32\shell32.dll,43 或 C:\Icons\my.ico,0" />
+                                        <Button Grid.Column="2" Content="🔍 選擇圖示檔 (.ico/.dll/.exe)..." Command="{x:Bind ViewModel.BrowseCustomIconFileCommand}" VerticalAlignment="Bottom" />
+                                    </Grid>
+
+                                    <!-- Folder Icon vs File Extension Icon Actions -->
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Folder Icon Box -->
+                                        <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock x:Name="FolderIconSectionTitle" Text="📁 資料夾圖示 (Folder icons - 套用至上方選取的目標資料夾)" FontWeight="SemiBold" />
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <Button Content="🎨 變更資料夾圖示 (Change Icon)" Command="{x:Bind ViewModel.ApplyFolderCustomIconCommand}"
+                                                            Style="{StaticResource AccentButtonStyle}" />
+                                                    <Button Content="🔄 還原預設圖示 (Restore Default)" Command="{x:Bind ViewModel.RestoreFolderDefaultIconCommand}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- File Type Icon Box -->
+                                        <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="120" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox x:Name="FileExtensionBox" Grid.Column="0" Header="檔案副檔名" Text="{x:Bind ViewModel.TargetFileExtension, Mode=TwoWay}" PlaceholderText=".txt" />
+                                                <Button Grid.Column="1" Content="📄 套用檔案類型圖示" Command="{x:Bind ViewModel.ApplyFileExtensionIconCommand}"
+                                                        Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Bottom" />
+                                                <Button Grid.Column="2" Content="🔄 還原預設" Command="{x:Bind ViewModel.RestoreFileExtensionIconCommand}"
+                                                        VerticalAlignment="Bottom" />
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabViewItem>
+
                 <!-- ════ Tab 4: 登錄檔備份與還原 (Backup & Restore) ════ -->
                 <TabViewItem x:Name="TabBackup" Header="💾 登錄檔備份與還原 (Backup &amp; Restore)" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
                         <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
-
-                            <!-- 🖼️ Windows 圖示與縮圖快取修復 (Explorer Icon & Thumbnail Cache Rebuilder) -->
-                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                                    CornerRadius="8" Padding="16">
-                                <Grid ColumnSpacing="14">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <FontIcon Grid.Column="0" Glyph="&#xEB9F;" FontSize="24" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
-                                    <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
-                                        <TextBlock Text="🖼️ Windows 檔案總管圖示與縮圖快取深度修復" FontWeight="SemiBold" FontSize="15" />
-                                        <TextBlock Text="當桌面或資料夾圖示變為空白白紙、破圖損壞或關聯顯示錯誤時，一鍵安全結束檔案總管並完整清除 IconCache.db 與現代 iconcache*/thumbcache* 資料庫。"
-                                                   Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                                        <TextBlock Text="{x:Bind ViewModel.IconCacheStatus, Mode=OneWay}"
-                                                   FontSize="11" Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                                                   Visibility="{x:Bind ViewModel.IconCacheStatus, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                        <ProgressRing IsActive="{x:Bind ViewModel.IsRebuildingIconCache, Mode=OneWay}" Width="20" Height="20" />
-                                        <Button Content="⚡ 一鍵徹底重建圖示快取" Command="{x:Bind ViewModel.RebuildIconCacheCommand}"
-                                                IsEnabled="{x:Bind ViewModel.IsRebuildingIconCache, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}"
-                                                Style="{StaticResource AccentButtonStyle}" Padding="14,8" />
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
 
                             <!-- Backup Actions Bar -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"

@@ -60,8 +60,20 @@
         </Border>
 
         <!-- Page Content Frame -->
-        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-            <Frame x:Name="FloatingContentFrame" />
+        <ScrollViewer x:Name="FloatingScrollViewer" Grid.Row="2"
+                      HorizontalScrollBarVisibility="Hidden"
+                      HorizontalScrollMode="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalContentAlignment="Left"
+                      VerticalContentAlignment="Top"
+                      SizeChanged="FloatingScrollViewer_SizeChanged">
+            <Grid x:Name="FloatingContentRoot" RenderTransformOrigin="0,0" HorizontalAlignment="Left" VerticalAlignment="Top"
+                  BringIntoViewRequested="FloatingContentRoot_BringIntoViewRequested">
+                <Grid.RenderTransform>
+                    <ScaleTransform x:Name="FloatingScaleTransform" ScaleX="1.0" ScaleY="1.0" />
+                </Grid.RenderTransform>
+                <Frame x:Name="FloatingContentFrame" SizeChanged="FloatingContentFrame_SizeChanged" HorizontalAlignment="Stretch" />
+            </Grid>
         </ScrollViewer>
     </Grid>
 </Window>

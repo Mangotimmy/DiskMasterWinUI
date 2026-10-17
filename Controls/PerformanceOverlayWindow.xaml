@@ -8,45 +8,65 @@
     Title="DiskMaster Performance HUD"
     mc:Ignorable="d">
 
-    <Grid x:Name="OverlayRoot" Background="Transparent">
-        <!-- Outer Glowing Container -->
-        <Border x:Name="HudContainer" Margin="4"
-                Background="#EE0B0F19"
-                BorderBrush="#5538BDF8"
-                BorderThickness="1.5"
-                CornerRadius="12"
-                Padding="12,10">
+    <Window.SystemBackdrop>
+        <DesktopAcrylicBackdrop />
+    </Window.SystemBackdrop>
 
-            <StackPanel Spacing="8">
+    <Grid x:Name="OverlayRoot" Background="Transparent" Loaded="OverlayRoot_Loaded">
+        <!-- Outer Glowing Container -->
+        <Border x:Name="HudContainer" Margin="0"
+                Background="#200B0F19"
+                BorderBrush="#8038BDF8"
+                BorderThickness="1.5"
+                CornerRadius="8"
+                Padding="12,8"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                PointerPressed="HudContainer_PointerPressed">
+
+            <StackPanel Spacing="7">
                 <!-- ═══ Drag Handle & Header Bar ═══ -->
-                <Grid x:Name="HeaderBar" PointerPressed="DragRegion_PointerPressed" Background="Transparent">
+                <Grid x:Name="HeaderBar" Background="Transparent" ColumnSpacing="6">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Grid Grid.Column="0" ColumnSpacing="6" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
                         <!-- FPS Badge (Gaming Counter) -->
-                        <Border Background="#2510B981" BorderBrush="#8010B981" BorderThickness="1" CornerRadius="6" Padding="6,2">
-                            <StackPanel Orientation="Horizontal" Spacing="4">
-                                <TextBlock Text="🎮" FontSize="11" />
-                                <TextBlock x:Name="FpsCounterText" Text="60 FPS" FontWeight="Bold" FontSize="12" Foreground="#34D399" />
+                        <Border Grid.Column="0" Background="#2810B981" BorderBrush="#9910B981" BorderThickness="1" CornerRadius="6" Padding="7,2">
+                            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                <TextBlock Text="🎮" FontSize="11" VerticalAlignment="Center" />
+                                <TextBlock x:Name="FpsCounterText" Text="60 FPS" FontWeight="Bold" FontSize="12" Foreground="#34D399" VerticalAlignment="Center" />
                             </StackPanel>
                         </Border>
 
-                        <TextBlock Text="PERF HUD" FontWeight="Black" FontSize="11" Foreground="#94A3B8" VerticalAlignment="Center" CharacterSpacing="50" />
-                        <TextBlock Text="📌" FontSize="10" ToolTipService.ToolTip="最上層置頂中" VerticalAlignment="Center" />
-                    </StackPanel>
+                        <!-- Active Graphics API Badge (DX12 / DX11 / Vulkan / OpenGL) -->
+                        <Border Grid.Column="1" x:Name="GraphicsApiBadge" Background="#28C084FC" BorderBrush="#99C084FC" BorderThickness="1" CornerRadius="6" Padding="7,2"
+                                ToolTipService.ToolTip="前景程式使用的圖形渲染 API (DirectX 12 / DX11 / Vulkan / OpenGL)">
+                            <TextBlock x:Name="GraphicsApiText" Text="DX12" FontWeight="ExtraBold" FontSize="11" Foreground="#E9D5FF" VerticalAlignment="Center" />
+                        </Border>
+
+                        <TextBlock Grid.Column="2" x:Name="HudSubtitleText" Text="PERF HUD" FontWeight="Black" FontSize="10"
+                                   Foreground="#94A3B8" VerticalAlignment="Center" CharacterSpacing="30"
+                                   TextTrimming="CharacterEllipsis" MaxLines="1" />
+                    </Grid>
 
                     <!-- Control Action Buttons -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
                         <Button x:Name="CompactToggleBtn" Click="CompactToggle_Click"
-                                Padding="5,2" CornerRadius="4" Background="Transparent" BorderThickness="0"
+                                Padding="6,2" CornerRadius="4" Background="Transparent" BorderThickness="0"
                                 ToolTipService.ToolTip="切換簡潔條狀 / 完整卡片模式">
                             <TextBlock x:Name="CompactToggleIcon" Text="⊟" FontSize="12" Foreground="#94A3B8" />
                         </Button>
                         <Button Click="CloseBtn_Click"
-                                Padding="5,2" CornerRadius="4" Background="Transparent" BorderThickness="0"
+                                Padding="6,2" CornerRadius="4" Background="Transparent" BorderThickness="0"
                                 ToolTipService.ToolTip="關閉置頂懸浮窗">
                             <TextBlock Text="✕" FontSize="11" FontWeight="Bold" Foreground="#EF4444" />
                         </Button>
@@ -56,87 +76,99 @@
                 <!-- ═══ Expanded Mode: Full Resource Metrics ═══ -->
                 <StackPanel x:Name="ExpandedViewPanel" Spacing="6">
                     <!-- CPU Metric Row -->
-                    <Grid>
+                    <Grid ColumnSpacing="6">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="58" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="96" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="5" Width="60">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                             <TextBlock Text="⚡" FontSize="11" />
-                            <TextBlock Text="CPU" FontSize="11" FontWeight="SemiBold" Foreground="#38BDF8" />
+                            <TextBlock Text="CPU" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" />
                         </StackPanel>
-                        <ProgressBar Grid.Column="1" x:Name="CpuProgress" Maximum="100" Value="0" Height="5" Margin="8,0"
-                                     Foreground="#38BDF8" Background="#2038BDF8" CornerRadius="3" />
-                        <TextBlock Grid.Column="2" x:Name="CpuText" Text="0.0%" FontSize="11" FontWeight="Bold" Foreground="#F8FAFC" Width="45" TextAlignment="Right" />
+                        <ProgressBar Grid.Column="1" x:Name="CpuProgress" Maximum="100" Value="0" Height="6"
+                                     Foreground="#38BDF8" Background="#2638BDF8" CornerRadius="3" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2" x:Name="CpuText" Text="0.0%" FontSize="11" FontWeight="Bold" Foreground="#F8FAFC" TextAlignment="Right" VerticalAlignment="Center" />
                     </Grid>
 
-                    <!-- GPU Metric Row -->
-                    <Grid>
+                    <!-- GPU Metric Row (Usage % + VRAM + API) -->
+                    <Grid ColumnSpacing="6">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="58" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="96" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="5" Width="60">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                             <TextBlock Text="🎮" FontSize="11" />
-                            <TextBlock Text="GPU" FontSize="11" FontWeight="SemiBold" Foreground="#C084FC" />
+                            <TextBlock Text="GPU" FontSize="11" FontWeight="Bold" Foreground="#C084FC" />
                         </StackPanel>
-                        <ProgressBar Grid.Column="1" x:Name="GpuProgress" Maximum="100" Value="0" Height="5" Margin="8,0"
-                                     Foreground="#C084FC" Background="#20C084FC" CornerRadius="3" />
-                        <TextBlock Grid.Column="2" x:Name="GpuText" Text="0.0%" FontSize="11" FontWeight="Bold" Foreground="#F8FAFC" Width="45" TextAlignment="Right" />
+                        <ProgressBar Grid.Column="1" x:Name="GpuProgress" Maximum="100" Value="0" Height="6"
+                                     Foreground="#C084FC" Background="#26C084FC" CornerRadius="3" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2" x:Name="GpuText" Text="0.0% · 0.0G" FontSize="11" FontWeight="Bold" Foreground="#F8FAFC" TextAlignment="Right" VerticalAlignment="Center" />
                     </Grid>
 
-                    <!-- RAM Metric Row -->
-                    <Grid>
+                    <!-- RAM Metric Row (Usage % + DDR Type/MHz) -->
+                    <Grid ColumnSpacing="6">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="58" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="96" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="5" Width="60">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                             <TextBlock Text="💾" FontSize="11" />
-                            <TextBlock Text="RAM" FontSize="11" FontWeight="SemiBold" Foreground="#FBBF24" />
+                            <TextBlock x:Name="RamLabelText" Text="RAM" FontSize="11" FontWeight="Bold" Foreground="#FBBF24" />
                         </StackPanel>
-                        <ProgressBar Grid.Column="1" x:Name="RamProgress" Maximum="100" Value="0" Height="5" Margin="8,0"
-                                     Foreground="#FBBF24" Background="#20FBBF24" CornerRadius="3" />
-                        <TextBlock Grid.Column="2" x:Name="RamText" Text="0.0%" FontSize="11" FontWeight="Bold" Foreground="#F8FAFC" Width="45" TextAlignment="Right" />
+                        <ProgressBar Grid.Column="1" x:Name="RamProgress" Maximum="100" Value="0" Height="6"
+                                     Foreground="#FBBF24" Background="#26FBBF24" CornerRadius="3" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2" x:Name="RamText" Text="0.0%" FontSize="11" FontWeight="Bold" Foreground="#F8FAFC" TextAlignment="Right" VerticalAlignment="Center" />
                     </Grid>
 
                     <!-- NET / LAN Metric Row -->
-                    <Grid>
+                    <Grid ColumnSpacing="6">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="58" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="5" Width="60">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                             <TextBlock Text="🌐" FontSize="11" />
-                            <TextBlock Text="LAN" FontSize="11" FontWeight="SemiBold" Foreground="#34D399" />
+                            <TextBlock Text="LAN" FontSize="11" FontWeight="Bold" Foreground="#34D399" />
                         </StackPanel>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="8,0" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                             <TextBlock x:Name="NetDownText" Text="⬇ 0 KB/s" FontSize="10" Foreground="#34D399" FontWeight="SemiBold" />
                             <TextBlock x:Name="NetUpText" Text="⬆ 0 KB/s" FontSize="10" Foreground="#94A3B8" />
                         </StackPanel>
-                        <TextBlock Grid.Column="2" x:Name="NetTotalText" Text="連線中" FontSize="10" Foreground="#64748B" Width="45" TextAlignment="Right" />
+                        <TextBlock Grid.Column="2" x:Name="NetTotalText" Text="連線中" FontSize="10" Foreground="#64748B" TextAlignment="Right" VerticalAlignment="Center" />
                     </Grid>
+
+                    <!-- Hardware Footer Line (GPU Model + Foreground App + DDR Speed) -->
+                    <Border Background="#14FFFFFF" CornerRadius="6" Padding="8,4" Margin="0,2,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" x:Name="GpuModelFooterText" Text="GPU Ready" FontSize="10" Foreground="#94A3B8" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" x:Name="RamSpecFooterText" Text="DDR" FontSize="10" FontWeight="SemiBold" Foreground="#FBBF24" Margin="6,0,0,0" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
                 </StackPanel>
 
                 <!-- ═══ Compact Mode: Single Horizontal Strip ═══ -->
-                <StackPanel x:Name="CompactViewPanel" Orientation="Horizontal" Spacing="10" Visibility="Collapsed">
+                <StackPanel x:Name="CompactViewPanel" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
                     <StackPanel Orientation="Horizontal" Spacing="3">
                         <TextBlock Text="⚡" FontSize="10" />
-                        <TextBlock x:Name="CompactCpuText" Text="25%" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" />
+                        <TextBlock x:Name="CompactCpuText" Text="0%" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" />
                     </StackPanel>
                     <TextBlock Text="|" Foreground="#334155" FontSize="10" />
                     <StackPanel Orientation="Horizontal" Spacing="3">
                         <TextBlock Text="🎮" FontSize="10" />
-                        <TextBlock x:Name="CompactGpuText" Text="38%" FontSize="11" FontWeight="Bold" Foreground="#C084FC" />
+                        <TextBlock x:Name="CompactGpuText" Text="0%" FontSize="11" FontWeight="Bold" Foreground="#C084FC" />
                     </StackPanel>
                     <TextBlock Text="|" Foreground="#334155" FontSize="10" />
                     <StackPanel Orientation="Horizontal" Spacing="3">
                         <TextBlock Text="💾" FontSize="10" />
-                        <TextBlock x:Name="CompactRamText" Text="52%" FontSize="11" FontWeight="Bold" Foreground="#FBBF24" />
+                        <TextBlock x:Name="CompactRamText" Text="0%" FontSize="11" FontWeight="Bold" Foreground="#FBBF24" />
                     </StackPanel>
                     <TextBlock Text="|" Foreground="#334155" FontSize="10" />
                     <StackPanel Orientation="Horizontal" Spacing="3">

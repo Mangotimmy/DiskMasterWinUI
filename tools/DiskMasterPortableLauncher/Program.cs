@@ -38,17 +38,10 @@ internal static class Program
         {
             var assembly = Assembly.GetExecutingAssembly();
 
-            // 1. Determine execution and cache directory
+            // 1. Determine a writable execution and cache directory (falls back to Temp / LocalLow if LocalAppData is denied)
             var isWinPe = string.Equals(Environment.GetEnvironmentVariable("SystemDrive"), "X:", StringComparison.OrdinalIgnoreCase)
                           || Environment.CurrentDirectory.StartsWith("X:", StringComparison.OrdinalIgnoreCase);
 
-            var baseCacheDir = isWinPe
-                ? Path.Combine(Path.GetTempPath(), "DiskMaster_PE")
-                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DiskMaster_Portable");
-
-            Directory.CreateDirectory(baseCacheDir);
-
-            // Determine unique version tag based on launcher file write time
             var launcherPath = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "DiskMaster_Portable.exe");
             StripZoneIdentifier(launcherPath);
             var launcherTicks = File.Exists(launcherPath) ? File.GetLastWriteTimeUtc(launcherPath).Ticks : 0;
@@ -57,12 +50,14 @@ internal static class Program
             var elevationSuffix = IsElevated() ? "_admin" : string.Empty;
             var versionTag = (launcherTicks > 0 ? $"app_{launcherTicks}" : "app_latest") + elevationSuffix;
 
+            var baseCacheDir = ResolveWritableCacheDir(isWinPe);
             var versionDir = Path.Combine(baseCacheDir, versionTag);
             var targetExePath = Path.Combine(versionDir, TargetExeName);
+            var targetDllPath = Path.Combine(versionDir, "DiskMasterWinUI.dll");
             var readyMarker = Path.Combine(versionDir, ".extracted");
 
-            // Check if extraction is needed
-            var needsExtract = !File.Exists(targetExePath) || !File.Exists(readyMarker);
+            // Check if extraction is needed (also verify DiskMasterWinUI.dll exists)
+            var needsExtract = !File.Exists(targetExePath) || !File.Exists(targetDllPath) || !File.Exists(readyMarker);
 
             if (needsExtract)
             {
@@ -75,7 +70,7 @@ internal static class Program
                 try
                 {
                     // Another instance may have finished extracting while we waited.
-                    if (!File.Exists(targetExePath) || !File.Exists(readyMarker))
+                    if (!File.Exists(targetExePath) || !File.Exists(targetDllPath) || !File.Exists(readyMarker))
                     {
                         try
                         {
@@ -139,11 +134,27 @@ internal static class Program
                 psi.Verb = "runas";
             }
 
-            using var proc = Process.Start(psi);
-            if (proc == null)
+            try
             {
-                ShowError($"啟動主程式失敗:\n{targetExePath}");
-                return 1;
+                using var proc = Process.Start(psi);
+                if (proc == null)
+                {
+                    ShowError($"啟動主程式失敗:\n{targetExePath}");
+                    return 1;
+                }
+            }
+            catch (System.ComponentModel.Win32Exception w32Ex) when (w32Ex.NativeErrorCode == 1223)
+            {
+                // User cancelled UAC prompt
+                return 0;
+            }
+            catch (System.ComponentModel.Win32Exception w32Ex)
+            {
+                ShowError(
+                    $"無法啟動 DiskMaster Pro 主程式 (Win32 錯誤碼 {w32Ex.NativeErrorCode}):\n{w32Ex.Message}\n\n" +
+                    $"目標路徑:\n{targetExePath}\n\n" +
+                    "若遭受防毒軟體即時保護誤判攔截，請先執行目錄下的 Install-Certificate.cmd 或將快取目錄加入防毒排除清單。");
+                return w32Ex.NativeErrorCode;
             }
 
             // Launcher exits immediately; child app continues independently
@@ -153,6 +164,59 @@ internal static class Program
         {
             ShowError($"DiskMaster Portable 啟動異常:\n\n{ex.Message}\n\n{ex.StackTrace}");
             return -1;
+        }
+    }
+
+    private static string ResolveWritableCacheDir(bool isWinPe)
+    {
+        var candidates = new List<string>();
+        if (isWinPe)
+        {
+            candidates.Add(Path.Combine(Path.GetTempPath(), "DiskMaster_PE"));
+        }
+        else
+        {
+            var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (!string.IsNullOrWhiteSpace(localAppData))
+            {
+                candidates.Add(Path.Combine(localAppData, "DiskMaster_Portable"));
+            }
+
+            candidates.Add(Path.Combine(Path.GetTempPath(), "DiskMaster_Portable"));
+
+            var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (!string.IsNullOrWhiteSpace(userProfile))
+            {
+                candidates.Add(Path.Combine(userProfile, "AppData", "LocalLow", "DiskMaster_Portable"));
+            }
+        }
+
+        candidates.Add(Path.Combine(AppContext.BaseDirectory, ".DiskMaster_Portable_Cache"));
+
+        foreach (var candidate in candidates)
+        {
+            if (IsDirectoryWritable(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return candidates[0];
+    }
+
+    private static bool IsDirectoryWritable(string dirPath)
+    {
+        try
+        {
+            Directory.CreateDirectory(dirPath);
+            var probeDir = Path.Combine(dirPath, $".probe_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(probeDir);
+            Directory.Delete(probeDir, recursive: false);
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 

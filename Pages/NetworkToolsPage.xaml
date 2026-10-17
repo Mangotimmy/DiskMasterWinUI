@@ -1513,6 +1513,31 @@
                                 </Border>
                             </Grid>
 
+                            <!-- 🔐 L2TP/IPsec VPN 連線錯誤 789/809 終極修復 (PolicyAgent NAT-T Fix) -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="2">
+                                            <TextBlock Text="🔐 L2TP/IPsec VPN 無法連線修復 (AssumeUDPEncapsulationContextOnSendRule = 2)" FontWeight="Bold" FontSize="14" />
+                                            <TextBlock Text="修復 Windows 10/11 連線至 NAT 路由器後方 L2TP/IPsec VPN 伺服器時卡在「正在連線」或報錯 789 / 809 的問題。寫入 HKLM\SYSTEM\CurrentControlSet\Services\PolicyAgent 下 AssumeUDPEncapsulationContextOnSendRule = 2 (REG_DWORD)，重開機後生效。"
+                                                       Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <Button Content="⚡ 一鍵套用 L2TP NAT-T 修復 (設為 2)" Command="{x:Bind ViewModel.ApplyL2tpVpnNatTFixCommand}" Style="{StaticResource AccentButtonStyle}" Padding="12,6" />
+                                            <Button Content="↩️ 還原預設" Command="{x:Bind ViewModel.RestoreL2tpVpnNatTDefaultCommand}" Padding="10,6" />
+                                            <Button Content="🔄 狀態" Command="{x:Bind ViewModel.RefreshL2tpVpnNatTStatusCommand}" Padding="10,6" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock Text="{x:Bind ViewModel.L2tpVpnNatTStatusText, Mode=OneWay}" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                </StackPanel>
+                            </Border>
+
                         </StackPanel>
                     </ScrollViewer>
                 </TabViewItem>

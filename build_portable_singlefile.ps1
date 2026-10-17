@@ -34,10 +34,27 @@ if (-not (Test-Path $outputDir)) {
     New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 }
 
+# Normalize NTFS DACL and Mandatory Integrity Level (Medium) so sandboxed workspaces never
+# stamp Low Mandatory Level onto built executables (which causes Error 5 Access Denied on launch).
+& icacls $projectDir /setintegritylevel "(OI)(CI)M" /C 2>$null | Out-Null
+& icacls $outputDir /reset /T /C 2>$null | Out-Null
+& icacls $outputDir /setintegritylevel "(OI)(CI)M" /T /C 2>$null | Out-Null
+
 # 1. Ensure publish directory is fresh
 Write-Host "`n[1/6] Publishing main WinUI 3 project ($Architecture)..." -ForegroundColor Yellow
 dotnet publish "$projectDir\DiskMasterWinUI.csproj" -c Release -r $Architecture --self-contained true -o $publishDir
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path "$publishDir\DiskMasterWinUI.exe")) {
+    throw "Failed to publish DiskMasterWinUI.csproj (exit code $LASTEXITCODE) or DiskMasterWinUI.exe is missing in $publishDir"
+}
+
+$nativeHostBuilder = "$projectDir\tools\Build-NativeHost.ps1"
+if (Test-Path $nativeHostBuilder) {
+    Write-Host "`n[2/6] Compiling custom Native C++ hostfxr launcher (DiskMasterWinUI.exe)..." -ForegroundColor Yellow
+    & $nativeHostBuilder -OutputExePath "$publishDir\DiskMasterWinUI.exe" -Architecture $Architecture | Out-Null
+}
+
 Copy-Item -Recurse -Force "$projectDir\Scripts" "$publishDir\"
+Copy-Item -Recurse -Force "$projectDir\Assets" "$publishDir\"
 
 # 1.0 Prune unused WindowsAppSDK satellite language folders (keeps en-us, zh-cn, zh-tw, ja-jp)
 $supportedLangs = @('en-us', 'zh-cn', 'zh-tw', 'ja-jp')
@@ -50,12 +67,13 @@ Get-ChildItem -Path $publishDir -Directory | Where-Object {
 # NOT shipped in the portable build: right-click context-menu integration is installer-only.
 # Make sure a stale copy from an earlier installer publish never ends up in the payload.
 Remove-Item "$publishDir\DiskMasterShellHost.exe" -Force -ErrorAction SilentlyContinue
+Remove-Item "$publishDir\Uninstall.exe" -Force -ErrorAction SilentlyContinue
 
 # 2. Sign core internal binaries prior to compression
 if (Test-Path $signScript) {
     Write-Host "`n[3/6] Signing core payload binaries with Authenticode..." -ForegroundColor Yellow
     $signArgs = @{
-        TargetPath = @("$publishDir\DiskMasterWinUI.exe")
+        TargetPath = @("$publishDir\DiskMasterWinUI.exe", "$publishDir\DiskMasterWinUI.dll")
     }
     if ($CertThumbprint) { $signArgs["CertThumbprint"] = $CertThumbprint }
     if ($PfxPath) { $signArgs["PfxPath"] = $PfxPath }
@@ -133,6 +151,8 @@ Copy-Item "$projectDir\tools\Install-Certificate.cmd" "$outputDir\" -Force -Erro
 Copy-Item "$projectDir\tools\Install-Certificate.ps1" "$outputDir\" -Force -ErrorAction SilentlyContinue
 
 Unblock-File $finalExePath -ErrorAction SilentlyContinue
+& icacls $finalExePath /reset /C 2>$null | Out-Null
+& icacls $finalExePath /setintegritylevel Medium /C 2>$null | Out-Null
 
 $exeSizeMb = [math]::Round((Get-Item $finalExePath).Length / 1MB, 2)
 Write-Host "`n=================================================================" -ForegroundColor Green

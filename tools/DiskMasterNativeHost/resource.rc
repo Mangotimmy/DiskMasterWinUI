@@ -1,0 +1,37 @@
+#include <windows.h>
+
+// Application Icon (IDI_APPICON = 1)
+1 ICON "..\\..\\Assets\\AppIcon.ico"
+
+// Application Manifest (RT_MANIFEST = 24, CREATEPROCESS_MANIFEST_RESOURCE_ID = 1)
+1 24 "merged_app.manifest"
+
+// Version Information
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,5,8,0
+ PRODUCTVERSION 1,5,8,0
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS 0x40004L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "DiskMaster Team"
+            VALUE "FileDescription", "DiskMaster Pro - Advanced Windows Disk & Deployment Manager"
+            VALUE "FileVersion", "1.5.8.0"
+            VALUE "InternalName", "DiskMasterWinUI.exe"
+            VALUE "LegalCopyright", "Copyright (C) 2026 DiskMaster Team. All rights reserved."
+            VALUE "OriginalFilename", "DiskMasterWinUI.exe"
+            VALUE "ProductName", "DiskMaster Pro"
+            VALUE "ProductVersion", "1.5.8"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

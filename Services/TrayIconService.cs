@@ -331,6 +331,7 @@ public class TrayIconService : IDisposable
                     QuickActionRequested?.Invoke("Settings");
                     break;
                 case 109:
+                    IsExplicitExit = true;
                     QuickActionRequested?.Invoke("Exit");
                     break;
             }
@@ -341,8 +342,48 @@ public class TrayIconService : IDisposable
         }
     }
 
+    private const uint WM_CLOSE = 0x0010;
+    private const uint WM_SYSCOMMAND = 0x0112;
+    private const int SC_CLOSE = 0xF060;
+    private const int SC_MINIMIZE = 0xF020;
+
+    /// <summary>
+    /// Set to true only when the user explicitly clicks "Exit" from the system tray menu.
+    /// When false and CloseToTray is enabled, WM_CLOSE / SC_CLOSE hides the window to the tray instead of killing the process.
+    /// </summary>
+    public bool IsExplicitExit { get; set; }
+
     private IntPtr WindowSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, UIntPtr dwRefData)
     {
+        if (uMsg == WM_CLOSE && SettingsService.Instance.Current.CloseToTray && !IsExplicitExit)
+        {
+            MinimizeToTray();
+            WindowsNotificationService.Instance.ShowNotification(
+                "DiskMaster Pro",
+                LocalizationService.Instance["CloseToTrayNotice"] ?? "已縮小至系統匣後台執行 (右鍵點擊系統匣圖示可結束程式)",
+                "EasyMode");
+            return IntPtr.Zero;
+        }
+
+        if (uMsg == WM_SYSCOMMAND && !IsExplicitExit)
+        {
+            int cmd = (int)(wParam.ToInt64() & 0xFFF0);
+            if (cmd == SC_CLOSE && SettingsService.Instance.Current.CloseToTray)
+            {
+                MinimizeToTray();
+                WindowsNotificationService.Instance.ShowNotification(
+                    "DiskMaster Pro",
+                    LocalizationService.Instance["CloseToTrayNotice"] ?? "已縮小至系統匣後台執行 (右鍵點擊系統匣圖示可結束程式)",
+                    "EasyMode");
+                return IntPtr.Zero;
+            }
+            if (cmd == SC_MINIMIZE && SettingsService.Instance.Current.MinimizeToTray)
+            {
+                MinimizeToTray();
+                return IntPtr.Zero;
+            }
+        }
+
         if (uMsg == WM_TRAYICON)
         {
             int msg = (int)lParam;

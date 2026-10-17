@@ -196,87 +196,97 @@ public partial class SettingsViewModel : ObservableObject
         RefreshShellIntegrationStatus();
     }
 
+    private bool _isLoadingSettings;
+
     public void LoadSettings()
     {
-        var s = SettingsService.Instance.Current;
-        SelectedTheme = s.Theme;
-        SelectedScale = s.ScalePercent;
-
-        SelectedLanguage = s.Language switch
+        _isLoadingSettings = true;
+        try
         {
-            "zh-CN" => "简体中文 (Simplified Chinese - zh-CN)",
-            "en-US" => "English (United States - en-US)",
-            "ja-JP" => "日本語 (Japanese - ja-JP)",
-            "zh-TW" => "繁體中文 (Traditional Chinese - zh-TW)",
-            _ => "🌐 跟隨 Windows 系統語言 (Auto)"
-        };
+            var s = SettingsService.Instance.Current;
+            SelectedTheme = s.Theme;
+            SelectedScale = s.ScalePercent;
 
-        EnableSafetyConfirmations = s.EnableSafetyConfirmations;
-        DefaultPartitionStyle = s.DefaultPartitionStyle;
-        DefaultFileSystem = s.DefaultFileSystem;
-        DefaultBackupFolder = s.DefaultBackupFolder;
-        MaxLogBufferLines = s.MaxLogBufferLines;
+            SelectedLanguage = s.Language switch
+            {
+                "zh-CN" => "简体中文 (Simplified Chinese - zh-CN)",
+                "en-US" => "English (United States - en-US)",
+                "ja-JP" => "日本語 (Japanese - ja-JP)",
+                "zh-TW" => "繁體中文 (Traditional Chinese - zh-TW)",
+                _ => "🌐 跟隨 Windows 系統語言 (Auto)"
+            };
 
-        BackgroundImagePath = s.BackgroundImagePath;
-        BackgroundOpacity = s.BackgroundOpacity;
-        BackgroundBlur = s.BackgroundBlur;
+            EnableSafetyConfirmations = s.EnableSafetyConfirmations;
+            DefaultPartitionStyle = s.DefaultPartitionStyle;
+            DefaultFileSystem = s.DefaultFileSystem;
+            DefaultBackupFolder = s.DefaultBackupFolder;
+            MaxLogBufferLines = s.MaxLogBufferLines;
 
-        EnableCompanionAvatar = s.EnableCompanionAvatar;
-        CompanionAvatarType = s.CompanionAvatarType;
-        CompanionModelPath = s.CompanionModelPath;
+            BackgroundImagePath = s.BackgroundImagePath;
+            BackgroundOpacity = s.BackgroundOpacity;
+            BackgroundBlur = s.BackgroundBlur;
 
-        EnableGlassTransparency = s.EnableGlassTransparency;
-        CardOpacity = s.CardOpacity;
+            EnableCompanionAvatar = s.EnableCompanionAvatar;
+            CompanionAvatarType = s.CompanionAvatarType;
+            CompanionModelPath = s.CompanionModelPath;
 
-        HttpRangeParallelEnabled = s.HttpRangeParallelEnabled;
-        ParallelThreadCount = s.ParallelThreadCount;
-        ChunkBufferSizeKB = s.ChunkBufferSizeKB;
-        KeepResumeCache = s.KeepResumeCache;
-        GlobalDownloadPath = string.IsNullOrWhiteSpace(s.GlobalDownloadPath) ? WindowsDownloadService.DefaultDownloadDirectory : s.GlobalDownloadPath;
-        ProxyMode = s.ProxyMode;
-        CustomProxyUrl = s.CustomProxyUrl;
-        DownloadTimeoutSeconds = s.DownloadTimeoutSeconds;
-        DownloadMaxRetries = s.DownloadMaxRetries;
+            EnableGlassTransparency = s.EnableGlassTransparency;
+            CardOpacity = s.CardOpacity;
 
-        TcpAutoTuningLevel = s.TcpAutoTuningLevel;
-        TcpCongestionProvider = s.TcpCongestionProvider;
-        TcpEcnEnabled = s.TcpEcnEnabled;
-        TcpRssEnabled = s.TcpRssEnabled;
-        TcpRscEnabled = s.TcpRscEnabled;
-        TcpTimestampsDisabled = s.TcpTimestampsDisabled;
+            HttpRangeParallelEnabled = s.HttpRangeParallelEnabled;
+            ParallelThreadCount = s.ParallelThreadCount;
+            ChunkBufferSizeKB = s.ChunkBufferSizeKB;
+            KeepResumeCache = s.KeepResumeCache;
+            GlobalDownloadPath = string.IsNullOrWhiteSpace(s.GlobalDownloadPath) ? WindowsDownloadService.DefaultDownloadDirectory : s.GlobalDownloadPath;
+            ProxyMode = s.ProxyMode;
+            CustomProxyUrl = s.CustomProxyUrl;
+            DownloadTimeoutSeconds = s.DownloadTimeoutSeconds;
+            DownloadMaxRetries = s.DownloadMaxRetries;
 
-        EnablePromptWindows = s.EnablePromptWindows;
-        CustomFontFamily = string.IsNullOrWhiteSpace(s.CustomFontFamily) ? "Segoe UI Variable" : s.CustomFontFamily;
-        CustomFontScale = s.CustomFontScale > 0 ? s.CustomFontScale : 100;
+            TcpAutoTuningLevel = s.TcpAutoTuningLevel;
+            TcpCongestionProvider = s.TcpCongestionProvider;
+            TcpEcnEnabled = s.TcpEcnEnabled;
+            TcpRssEnabled = s.TcpRssEnabled;
+            TcpRscEnabled = s.TcpRscEnabled;
+            TcpTimestampsDisabled = s.TcpTimestampsDisabled;
 
-        IsEasyMode = s.IsEasyMode;
-        AutoCheckUpdates = s.AutoCheckUpdates;
-        UpdateFrequency = s.UpdateFrequency ?? "Daily";
-        MinimizeToTray = s.MinimizeToTray;
-        CloseToTray = s.CloseToTray;
-        EnableTaskbarFlash = s.EnableTaskbarFlash;
-        EnableAudioFeedback = s.EnableAudioFeedback;
-        EnableWindowsNotificationCenter = s.EnableWindowsNotificationCenter;
+            EnablePromptWindows = s.EnablePromptWindows;
+            CustomFontFamily = string.IsNullOrWhiteSpace(s.CustomFontFamily) ? "Segoe UI Variable" : s.CustomFontFamily;
+            CustomFontScale = s.CustomFontScale > 0 ? s.CustomFontScale : 100;
 
-        EnableDebugLogging = s.EnableDebugLogging;
-        DebugLogService.Instance.IsEnabled = s.EnableDebugLogging;
-        UpdateDebugLogStats();
+            IsEasyMode = s.IsEasyMode;
+            AutoCheckUpdates = s.AutoCheckUpdates;
+            UpdateFrequency = s.UpdateFrequency ?? "Daily";
+            MinimizeToTray = s.MinimizeToTray;
+            CloseToTray = s.CloseToTray;
+            EnableTaskbarFlash = s.EnableTaskbarFlash;
+            EnableAudioFeedback = s.EnableAudioFeedback;
+            EnableWindowsNotificationCenter = s.EnableWindowsNotificationCenter;
 
-        EnableCustomTabReorder = s.EnableCustomTabReorder;
-        SelectedNotificationSoundScheme = (s.NotificationSoundScheme ?? "Default") switch
+            EnableDebugLogging = s.EnableDebugLogging;
+            DebugLogService.Instance.IsEnabled = s.EnableDebugLogging;
+            UpdateDebugLogStats();
+
+            EnableCustomTabReorder = s.EnableCustomTabReorder;
+            SelectedNotificationSoundScheme = (s.NotificationSoundScheme ?? "Default") switch
+            {
+                "Chimes" => "清脆風鈴 (Chimes)",
+                "Ding" => "晶瑩提示 (Ding)",
+                "Tada" => "經典號角 (Tada)",
+                "Crystal" => "柔和水晶 (Crystal)",
+                "Custom" => "自訂音效檔案 (.wav)",
+                _ => "預設系統音效 (System Default)"
+            };
+            CustomNotificationSoundPath = s.CustomNotificationSoundPath ?? "";
+            IsCustomNotificationSoundVisible = SelectedNotificationSoundScheme.Contains("自訂");
+            LoadTabOrderItems();
+
+            RefreshLocalizedOptions();
+        }
+        finally
         {
-            "Chimes" => "清脆風鈴 (Chimes)",
-            "Ding" => "晶瑩提示 (Ding)",
-            "Tada" => "經典號角 (Tada)",
-            "Crystal" => "柔和水晶 (Crystal)",
-            "Custom" => "自訂音效檔案 (.wav)",
-            _ => "預設系統音效 (System Default)"
-        };
-        CustomNotificationSoundPath = s.CustomNotificationSoundPath ?? "";
-        IsCustomNotificationSoundVisible = SelectedNotificationSoundScheme.Contains("自訂");
-        LoadTabOrderItems();
-
-        RefreshLocalizedOptions();
+            _isLoadingSettings = false;
+        }
     }
 
     public void RefreshLocalizedOptions()
@@ -338,6 +348,7 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     public void SaveSettings()
     {
+        if (_isLoadingSettings) return;
         var s = SettingsService.Instance.Current;
         s.Theme = SelectedTheme;
         s.ScalePercent = SelectedScale;
@@ -424,6 +435,19 @@ public partial class SettingsViewModel : ObservableObject
         SettingsService.Instance.Save();
         StatusMessage = LocalizationService.T("設定已成功儲存！", "设置已成功保存！", "Settings saved successfully!", "設定が正常に保存されました！");
     }
+
+    partial void OnCloseToTrayChanged(bool value) => SaveSettings();
+    partial void OnMinimizeToTrayChanged(bool value) => SaveSettings();
+    partial void OnEnableSafetyConfirmationsChanged(bool value) => SaveSettings();
+    partial void OnEnableTaskbarFlashChanged(bool value) => SaveSettings();
+    partial void OnEnableAudioFeedbackChanged(bool value) => SaveSettings();
+    partial void OnEnableWindowsNotificationCenterChanged(bool value) => SaveSettings();
+    partial void OnEnableCompanionAvatarChanged(bool value) => SaveSettings();
+    partial void OnEnableGlassTransparencyChanged(bool value) => SaveSettings();
+    partial void OnEnablePromptWindowsChanged(bool value) => SaveSettings();
+    partial void OnEnableCustomTabReorderChanged(bool value) => SaveSettings();
+    partial void OnAutoCheckUpdatesChanged(bool value) => SaveSettings();
+    partial void OnIsEasyModeChanged(bool value) => SaveSettings();
 
     partial void OnSelectedNotificationSoundSchemeChanged(string value)
     {

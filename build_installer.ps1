@@ -20,7 +20,7 @@ $projectDir = $PSScriptRoot
 Set-Location $projectDir
 
 $versionFile = Join-Path $projectDir "Directory.Build.props"
-$appVersion = "1.5.1"
+$appVersion = "1.5.8"
 if (Test-Path $versionFile) {
     [xml]$xmlProps = Get-Content $versionFile
     $appVersion = $xmlProps.Project.PropertyGroup.Version
@@ -48,9 +48,25 @@ if (-not (Test-Path $outputDir)) {
     New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 }
 
+# Normalize NTFS DACL and Mandatory Integrity Level (Medium) so sandboxed workspaces never
+# stamp Low Mandatory Level onto built executables (which causes Error 5 Access Denied on launch).
+& icacls $projectDir /setintegritylevel "(OI)(CI)M" /C 2>$null | Out-Null
+& icacls $outputDir /reset /T /C 2>$null | Out-Null
+& icacls $outputDir /setintegritylevel "(OI)(CI)M" /T /C 2>$null | Out-Null
+
 # 1. Ensure publish directory is fresh
 Write-Host "`n[1/6] Publishing main WinUI 3 project ($Architecture)..." -ForegroundColor Yellow
 dotnet publish "$projectDir\DiskMasterWinUI.csproj" -c Release -r $Architecture --self-contained true -o $publishDir
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path "$publishDir\DiskMasterWinUI.exe")) {
+    throw "Failed to publish DiskMasterWinUI.csproj (exit code $LASTEXITCODE) or DiskMasterWinUI.exe is missing in $publishDir"
+}
+
+$nativeHostBuilder = "$projectDir\tools\Build-NativeHost.ps1"
+if (Test-Path $nativeHostBuilder) {
+    Write-Host "`n[1.05/6] Compiling custom Native C++ hostfxr launcher (DiskMasterWinUI.exe)..." -ForegroundColor Yellow
+    & $nativeHostBuilder -OutputExePath "$publishDir\DiskMasterWinUI.exe" -Architecture $Architecture | Out-Null
+}
+
 Copy-Item -Recurse -Force "$projectDir\Scripts" "$publishDir\"
 Copy-Item -Recurse -Force "$projectDir\Assets" "$publishDir\"
 
@@ -110,7 +126,7 @@ if (Test-Path $shellHostProj) {
 # 2. Sign inner binaries if not already signed
 if (Test-Path $signScript) {
     Write-Host "`n[3/6] Verifying & signing payload binaries..." -ForegroundColor Yellow
-    $targetsToSign = @("$publishDir\DiskMasterWinUI.exe")
+    $targetsToSign = @("$publishDir\DiskMasterWinUI.exe", "$publishDir\DiskMasterWinUI.dll")
     if (Test-Path "$publishDir\Uninstall.exe") {
         $targetsToSign += "$publishDir\Uninstall.exe"
     }
@@ -244,6 +260,8 @@ Copy-Item "$projectDir\tools\Install-Certificate.cmd" "$outputDir\" -Force -Erro
 Copy-Item "$projectDir\tools\Install-Certificate.ps1" "$outputDir\" -Force -ErrorAction SilentlyContinue
 
 Unblock-File $finalExePath -ErrorAction SilentlyContinue
+& icacls $finalExePath /reset /C 2>$null | Out-Null
+& icacls $finalExePath /setintegritylevel Medium /C 2>$null | Out-Null
 
 $exeSizeMb = [math]::Round((Get-Item $finalExePath).Length / 1MB, 2)
 Write-Host "`n=================================================================" -ForegroundColor Green

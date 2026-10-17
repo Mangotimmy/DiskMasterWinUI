@@ -1,12 +1,14 @@
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using DiskMasterWinUI.Helpers;
 
 namespace DiskMasterWinUI.Services;
 
 /// <summary>
 /// Service for rebuilding and repairing corrupted or blank Windows Explorer icon and thumbnail caches.
-/// Cleanly terminates explorer.exe, removes IconCache.db and modern iconcache*/thumbcache* databases,
+/// Cleanly terminates explorer.exe (while suppressing ExplorerWatchdogService), removes IconCache.db
+/// and modern iconcache*/thumbcache* databases, invokes ie4uinit.exe -show + SHChangeNotify,
 /// and restarts explorer.exe to trigger automatic OS-level icon index regeneration.
 /// </summary>
 public class IconCacheRepairService
@@ -14,19 +16,58 @@ public class IconCacheRepairService
     private static readonly Lazy<IconCacheRepairService> _instance = new(() => new IconCacheRepairService());
     public static IconCacheRepairService Instance => _instance.Value;
 
+    [DllImport("shell32.dll")]
+    private static extern void SHChangeNotify(int wEventId, int uFlags, IntPtr dwItem1, IntPtr dwItem2);
+
+    private const int SHCNE_ASSOCCHANGED = 0x08000000;
+    private const int SHCNF_IDLIST = 0x0000;
+
     public record IconRepairResult(bool Success, string Message, int DeletedFilesCount);
+
+    /// <summary>
+    /// Refreshes shell icon associations and triggers ie4uinit.exe without killing explorer.exe.
+    /// </summary>
+    public static void NotifyShellIconChange()
+    {
+        try
+        {
+            SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+        }
+        catch { }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "ie4uinit.exe",
+                Arguments = "-show",
+                CreateNoWindow = true,
+                UseShellExecute = false
+            });
+        }
+        catch { }
+    }
 
     /// <summary>
     /// Executes the full icon cache purge and explorer restart pipeline.
     /// </summary>
     public async Task<IconRepairResult> RebuildIconCacheAsync(IProgress<string>? progress = null)
     {
+        ExplorerWatchdogService.Instance.SuppressAutoRestartFor(TimeSpan.FromSeconds(12));
+
         return await Task.Run(async () =>
         {
             int deletedCount = 0;
             try
             {
-                progress?.Report("正在強制關閉 Windows 檔案總管 (explorer.exe)...");
+                progress?.Report("正在呼叫 ie4uinit.exe 準備刷新殼層圖示索引...");
+                try
+                {
+                    await ProcessHelper.RunProcessAsync("ie4uinit.exe", "-show");
+                }
+                catch { }
+
+                progress?.Report("正在安全關閉 Windows 檔案總管 (explorer.exe)...");
                 DebugLogService.Instance.Info("Terminating explorer.exe...", "IconCacheRepair");
 
                 // 1. Terminate explorer.exe
@@ -107,11 +148,11 @@ public class IconCacheRepairService
                 catch (Exception ex)
                 {
                     DebugLogService.Instance.Error("Failed to launch explorer.exe", ex, "IconCacheRepair");
-                    // Fallback
                     try { await ProcessHelper.RunProcessAsync("cmd.exe", "/c start explorer.exe"); } catch { }
                 }
 
-                await Task.Delay(1000);
+                await Task.Delay(900);
+                NotifyShellIconChange();
                 progress?.Report("圖示快取重建完成！");
 
                 return new IconRepairResult(
@@ -123,7 +164,6 @@ public class IconCacheRepairService
             catch (Exception ex)
             {
                 DebugLogService.Instance.Error("Rebuild error", ex, "IconCacheRepair");
-                // Ensure explorer is running in case of exception
                 try { Process.Start(new ProcessStartInfo("explorer.exe") { UseShellExecute = true }); } catch { }
                 return new IconRepairResult(false, $"❌ 重建圖示快取過程發生錯誤: {ex.Message}", deletedCount);
             }

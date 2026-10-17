@@ -125,6 +125,80 @@ public partial class SystemOptimizerViewModel : ObservableObject
     [ObservableProperty] private bool _isDisablePagingExecutive;
     [ObservableProperty] private bool _isGroupPolicyTelemetryDisabled;
 
+    // ── Item 5, 7, 9: L2TP/IPsec VPN NAT-T Fix, DPS Memory Bloat & DiagTrack Service ──
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(L2tpVpnNatRuleDisplay))]
+    private bool _isL2tpVpnNatFixEnabled;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(L2tpVpnNatRuleDisplay))]
+    private int _l2tpVpnNatRuleValue;
+
+    public string L2tpVpnNatRuleDisplay => L2tpVpnNatRuleValue switch
+    {
+        2 => "✅ 2 (REG_DWORD: 支援伺服器與客戶端雙向 NAT 穿透 - 已修復)",
+        1 => "⚠️ 1 (僅支援伺服器端 NAT)",
+        _ => "⚪ 0 (未設定 - L2TP/IPsec 經由路由器 NAT 時易發生 789/809 錯誤)"
+    };
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DpsServiceStatusText))]
+    private bool _isDpsServiceDisabled;
+
+    public string DpsServiceStatusText => IsDpsServiceDisabled
+        ? "🛡️ 已停用 (Start = 4，已杜絕背景診斷服務記憶體膨脹)"
+        : "⚪ 預設啟用中 (Start = 2，背景持續監控可能造成 svchost 記憶體飆高)";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DiagTrackStatusText))]
+    private bool _isDiagTrackDisabled;
+
+    public string DiagTrackStatusText => IsDiagTrackDisabled
+        ? "🛡️ 已徹底關閉 (sc config DiagTrack start=disabled，Windows Update 正常運作)"
+        : "⚠️ 運作中 (Connected User Experiences and Telemetry 持續背景收集遙測)";
+
+    // ── Item 11, 12, 13, 14: Explorer Context Menu, Folder Optimization, Custom Icons & Watchdog ──
+    private readonly FolderAndIconCustomizerService _folderCustomizer = new();
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ContextMenuStyleBadge))]
+    private bool _isClassicContextMenu;
+
+    public string ContextMenuStyleBadge => IsClassicContextMenu
+        ? "⚡ Windows 10 經典完整右鍵選單 (免點「顯示更多選項」)"
+        : "🪟 Windows 11 現代簡潔右鍵選單 (預設摺疊)";
+
+    [ObservableProperty] private bool _isRightClickSpeedOptimized;
+    [ObservableProperty] private bool _isGlobalFastFolderDiscoveryEnabled;
+
+    // Folder Customize (Optimize this folder for + subfolders + folder picture)
+    [ObservableProperty] private string _targetCustomizeFolderPath = "";
+    [ObservableProperty] private int _selectedFolderTemplateIndex = 0; // 0=Generic(General items), 1=Documents, 2=Pictures, 3=Music, 4=Videos
+    [ObservableProperty] private bool _applyTemplateToSubfolders = true;
+    [ObservableProperty] private string _targetFolderPicturePath = "";
+
+    // Custom Icon for Folders & File Extensions
+    [ObservableProperty] private string _targetCustomIconResource = @"C:\Windows\System32\shell32.dll,43";
+    [ObservableProperty] private int _selectedPopularFolderIconIndex = 0;
+    [ObservableProperty] private string _targetFileExtension = ".txt";
+
+    // Explorer Auto-Recovery Watchdog (Item 14)
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ExplorerWatchdogStatusBadge))]
+    private bool _isExplorerWatchdogEnabled = true;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ExplorerWatchdogStatusBadge))]
+    private bool _isExplorerCurrentlyAlive = true;
+
+    [ObservableProperty] private string _explorerWatchdogRecoverySummary = "尚未觸發自動救援 (0 次)";
+
+    public string ExplorerWatchdogStatusBadge => !IsExplorerWatchdogEnabled
+        ? "⚪ 自動守護已暫停"
+        : IsExplorerCurrentlyAlive
+            ? "🟢 守護運作中 (explorer.exe 正常執行)"
+            : "🟡 偵測到異常關閉，正在自動重啟檔案總管...";
+
     // ── CPU PPM Controls (EPP, Core Parking, Boost) ──
     [ObservableProperty] private int _cpuEppSliderValue = 0;
     [ObservableProperty] private int _cpuCoreParkingMinPercent = 100;
@@ -133,6 +207,15 @@ public partial class SystemOptimizerViewModel : ObservableObject
     public SystemOptimizerViewModel()
     {
         AppendLog("⚡ 系統最佳化與遊戲模式引擎已啟動 (FPSHeaven & PowerPlan Suite)");
+        ExplorerWatchdogService.Instance.StatusChanged += () =>
+        {
+            DispatcherHelper.RunOnUIThread(() =>
+            {
+                IsExplorerWatchdogEnabled = ExplorerWatchdogService.Instance.IsEnabled;
+                IsExplorerCurrentlyAlive = ExplorerWatchdogService.Instance.IsExplorerAlive;
+                ExplorerWatchdogRecoverySummary = ExplorerWatchdogService.Instance.LastRecoveryTimeText;
+            });
+        };
     }
 
     private void AppendLog(string message)
@@ -176,13 +259,25 @@ public partial class SystemOptimizerViewModel : ObservableObject
             };
             IsPowerThrottlingDisabled = _optimizer.GetPowerThrottlingDisabled();
             SystemResponsivenessValue = _optimizer.GetSystemResponsiveness();
-            IsSystemResponsivenessZero = SystemResponsivenessValue == 0;
+            IsSystemResponsivenessZero = SystemResponsivenessValue <= 10;
             IsNetworkThrottlingDisabled = _optimizer.GetNetworkThrottlingDisabled();
             IsGameDvrDisabled = _optimizer.GetGameDvrDisabled();
             IsHagsEnabled = _optimizer.GetHagsStatus();
             IsNagleDisabled = _optimizer.GetNagleDisabled();
             IsDisablePagingExecutive = _optimizer.GetDisablePagingExecutive();
             IsGroupPolicyTelemetryDisabled = _optimizer.GetTelemetryDisabled();
+
+            // Items 5, 7, 9, 11, 12, 14
+            L2tpVpnNatRuleValue = _optimizer.GetL2tpVpnNatRuleValue();
+            IsL2tpVpnNatFixEnabled = L2tpVpnNatRuleValue == 2;
+            IsDpsServiceDisabled = _optimizer.GetDpsServiceDisabled();
+            IsDiagTrackDisabled = _optimizer.GetDiagTrackDisabled();
+            IsClassicContextMenu = _folderCustomizer.IsClassicContextMenuEnabled();
+            IsRightClickSpeedOptimized = _folderCustomizer.IsRightClickSpeedOptimized();
+            IsGlobalFastFolderDiscoveryEnabled = _folderCustomizer.IsGlobalFastFolderDiscoveryEnabled();
+            IsExplorerWatchdogEnabled = ExplorerWatchdogService.Instance.IsEnabled;
+            IsExplorerCurrentlyAlive = ExplorerWatchdogService.CheckExplorerRunning();
+            ExplorerWatchdogRecoverySummary = ExplorerWatchdogService.Instance.LastRecoveryTimeText;
 
             IsGamingModeEnabled = (SelectedCpuPresetIndex == 0 || SelectedCpuPresetIndex == 1)
                                   && IsSystemResponsivenessZero
@@ -536,8 +631,7 @@ public partial class SystemOptimizerViewModel : ObservableObject
     [RelayCommand]
     public async Task ToggleSystemResponsivenessAsync()
     {
-        await _optimizer.CreatePreTweakBackupAsync("Before_SystemResponsiveness");
-        int target = IsSystemResponsivenessZero ? 20 : 0;
+        int target = IsSystemResponsivenessZero ? 20 : 10;
         await SetSystemResponsivenessValueAsync(target);
     }
 
@@ -551,13 +645,13 @@ public partial class SystemOptimizerViewModel : ObservableObject
             RevertSwitch(() =>
             {
                 SystemResponsivenessValue = previousResponsiveness;
-                IsSystemResponsivenessZero = previousResponsiveness == 0;
+                IsSystemResponsivenessZero = previousResponsiveness <= 10;
             });
             ReportTuningNotApplied($"MMCSS SystemResponsiveness = {val}%");
             return;
         }
         SystemResponsivenessValue = val;
-        IsSystemResponsivenessZero = (val == 0);
+        IsSystemResponsivenessZero = val <= 10;
         string modeName = val switch
         {
             0 => "極限電競 (0% 保留，100% 前台獨占)",
@@ -1549,6 +1643,381 @@ public partial class SystemOptimizerViewModel : ObservableObject
             StatusMessage = msg;
         }
         catch (Exception ex) { AppendLog($"[ERROR] {ex.Message}"); }
+        finally { IsLoading = false; }
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  Item 5, 7, 9: L2TP/IPsec VPN NAT-T Fix, DPS & DiagTrack
+    // ══════════════════════════════════════════════════════════
+
+    [RelayCommand]
+    public async Task ToggleL2tpVpnNatFixAsync()
+    {
+        await _optimizer.CreatePreTweakBackupAsync("Before_L2tpVpnNatFix");
+        bool target = !IsL2tpVpnNatFixEnabled;
+        if (!_optimizer.SetL2tpVpnNatFix(target))
+        {
+            RevertSwitch(() => IsL2tpVpnNatFixEnabled = !target);
+            ReportTuningNotApplied("L2TP/IPsec VPN NAT-T (AssumeUDPEncapsulationContextOnSendRule = 2)");
+            return;
+        }
+
+        L2tpVpnNatRuleValue = _optimizer.GetL2tpVpnNatRuleValue();
+        IsL2tpVpnNatFixEnabled = L2tpVpnNatRuleValue == 2;
+        string msg = target
+            ? "✅ 已寫入 HKLM\\SYSTEM\\CurrentControlSet\\Services\\PolicyAgent\\AssumeUDPEncapsulationContextOnSendRule = 2 (REG_DWORD)！重新開機後即可修復 L2TP/IPsec VPN NAT 連線失敗。"
+            : "🔄 已移除 AssumeUDPEncapsulationContextOnSendRule 鍵值，還原為 Windows 預設。";
+        AppendLog($"[{DateTime.Now:HH:mm:ss}] 🌐 {msg}");
+        StatusMessage = msg;
+        AudioFeedbackService.PlaySuccess();
+    }
+
+    [RelayCommand]
+    public async Task ToggleDpsServiceAsync()
+    {
+        await _optimizer.CreatePreTweakBackupAsync("Before_DpsService");
+        bool targetDisable = !IsDpsServiceDisabled;
+        if (targetDisable)
+        {
+            var confirmed = await DialogHelper.ConfirmDestructiveOperationAsync(
+                WindowHelper.GetXamlRoot(),
+                "停用 DPS 診斷原則服務 (Disable Diagnostic Policy Service)",
+                "即將將 HKLM\\SYSTEM\\CurrentControlSet\\Services\\DPS 的 Start 設為 4 (Disabled) 並停止 DPS 服務。\n這能徹底防止背景疑難排解服務造成的 svchost 記憶體膨脹 (Memory Bloat)，但停用期間 Windows 內建自動疑難排解精靈將暫停運作。\n\n確定要停用 DPS 服務嗎？",
+                "DPS Start=4");
+            if (!confirmed)
+            {
+                RevertSwitch(() => IsDpsServiceDisabled = false);
+                return;
+            }
+        }
+
+        var (ok, msg) = await _optimizer.SetDpsServiceDisabledAsync(targetDisable);
+        if (!ok)
+        {
+            RevertSwitch(() => IsDpsServiceDisabled = !targetDisable);
+            ReportTuningNotApplied("DPS 診斷原則服務 (Start = 4)");
+            return;
+        }
+
+        IsDpsServiceDisabled = targetDisable;
+        AppendLog($"[{DateTime.Now:HH:mm:ss}] 🧠 {msg}");
+        StatusMessage = msg;
+        AudioFeedbackService.PlaySuccess();
+    }
+
+    [RelayCommand]
+    public async Task TurnOffDiagTrackAsync()
+    {
+        var confirmed = await DialogHelper.ConfirmDestructiveOperationAsync(
+            WindowHelper.GetXamlRoot(),
+            "關閉 DiagTrack 遙測服務 (Turn Off DiagTrack)",
+            "即將執行：\n• sc stop DiagTrack\n• sc config DiagTrack start= disabled\n\n關閉 Connected User Experiences and Telemetry 後可消除背景遙測上傳與磁碟/CPU 佔用，且 Windows Update 依然完全正常運作。",
+            "sc stop DiagTrack");
+        if (!confirmed) return;
+
+        await _optimizer.CreatePreTweakBackupAsync("Before_DiagTrackOff");
+        var (ok, msg) = await _optimizer.SetDiagTrackServiceDisabledAsync(true);
+        if (!ok)
+        {
+            ReportTuningNotApplied("DiagTrack 服務關閉 (sc stop DiagTrack)");
+            return;
+        }
+
+        IsDiagTrackDisabled = true;
+        AppendLog($"[{DateTime.Now:HH:mm:ss}] 🛡️ {msg}");
+        StatusMessage = msg;
+        AudioFeedbackService.PlaySuccess();
+    }
+
+    [RelayCommand]
+    public async Task TurnOnDiagTrackAsync()
+    {
+        var (ok, msg) = await _optimizer.SetDiagTrackServiceDisabledAsync(false);
+        if (!ok)
+        {
+            ReportTuningNotApplied("DiagTrack 服務啟用 (sc start DiagTrack)");
+            return;
+        }
+
+        IsDiagTrackDisabled = false;
+        AppendLog($"[{DateTime.Now:HH:mm:ss}] 🔄 {msg}");
+        StatusMessage = msg;
+        AudioFeedbackService.PlaySuccess();
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  Item 11, 12, 13, 14: Explorer, Context Menu, Folders & Icons
+    // ══════════════════════════════════════════════════════════
+
+    [RelayCommand]
+    public async Task SwitchToClassicContextMenuAsync()
+    {
+        IsLoading = true;
+        try
+        {
+            var (ok, msg) = await _folderCustomizer.SetClassicContextMenuAsync(useClassicMenu: true, restartExplorer: true);
+            IsClassicContextMenu = _folderCustomizer.IsClassicContextMenuEnabled();
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🖱️ {msg}");
+            StatusMessage = msg;
+            if (ok) AudioFeedbackService.PlaySuccess();
+        }
+        finally { IsLoading = false; }
+    }
+
+    [RelayCommand]
+    public async Task SwitchToModernContextMenuAsync()
+    {
+        IsLoading = true;
+        try
+        {
+            var (ok, msg) = await _folderCustomizer.SetClassicContextMenuAsync(useClassicMenu: false, restartExplorer: true);
+            IsClassicContextMenu = _folderCustomizer.IsClassicContextMenuEnabled();
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🪟 {msg}");
+            StatusMessage = msg;
+            if (ok) AudioFeedbackService.PlaySuccess();
+        }
+        finally { IsLoading = false; }
+    }
+
+    [RelayCommand]
+    public async Task FixSlowRightClickMenuAsync()
+    {
+        IsLoading = true;
+        try
+        {
+            var (ok, msg, _) = await _folderCustomizer.FixSlowRightClickMenuAsync(restartExplorer: false);
+            IsRightClickSpeedOptimized = _folderCustomizer.IsRightClickSpeedOptimized();
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] ⚡ {msg}");
+            StatusMessage = msg;
+            if (ok) AudioFeedbackService.PlaySuccess();
+        }
+        finally { IsLoading = false; }
+    }
+
+    [RelayCommand]
+    public void ToggleGlobalFastFolderDiscovery()
+    {
+        bool target = !IsGlobalFastFolderDiscoveryEnabled;
+        var (ok, msg) = _folderCustomizer.SetGlobalFastFolderDiscovery(target, resetShellBagsCache: false);
+        if (!ok)
+        {
+            RevertSwitch(() => IsGlobalFastFolderDiscoveryEnabled = !target);
+            StatusMessage = msg;
+            return;
+        }
+        IsGlobalFastFolderDiscoveryEnabled = target;
+        AppendLog($"[{DateTime.Now:HH:mm:ss}] 📂 {msg}");
+        StatusMessage = msg;
+        AudioFeedbackService.PlaySuccess();
+    }
+
+    [RelayCommand]
+    public async Task ResetShellBagsAndEnableFastFoldersAsync()
+    {
+        var confirmed = await DialogHelper.ConfirmDestructiveOperationAsync(
+            WindowHelper.GetXamlRoot(),
+            "重設全部資料夾檢視記憶並鎖定極速載入 (Reset Shell Bags)",
+            "即將清除 Windows Shell Bags 歷史記憶並將全域資料夾預設鎖定為「一般項目 (NotSpecified)」，徹底修復大型資料夾開啟轉圈與綠條讀條卡死問題。\n檔案總管將會自動重啟一次。",
+            "Reset ShellBags");
+        if (!confirmed) return;
+
+        var (ok, msg) = _folderCustomizer.SetGlobalFastFolderDiscovery(enableFastGeneralItems: true, resetShellBagsCache: true);
+        IsGlobalFastFolderDiscoveryEnabled = _folderCustomizer.IsGlobalFastFolderDiscoveryEnabled();
+        await ExplorerWatchdogService.Instance.RestartExplorerManuallyAsync();
+        AppendLog($"[{DateTime.Now:HH:mm:ss}] 🚀 {msg}");
+        StatusMessage = msg;
+        if (ok) AudioFeedbackService.PlaySuccess();
+    }
+
+    [RelayCommand]
+    public async Task BrowseCustomizeFolderAsync()
+    {
+        var path = await FilePickerHelper.PickFolderAsync("選擇要最佳化或自訂圖示的資料夾");
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            TargetCustomizeFolderPath = path;
+            StatusMessage = $"已選取目標資料夾: {path}";
+        }
+    }
+
+    [RelayCommand]
+    public async Task BrowseFolderPictureAsync()
+    {
+        var file = await FilePickerHelper.PickSingleFileAsync([".png", ".jpg", ".jpeg", ".bmp", ".ico"]);
+        if (!string.IsNullOrWhiteSpace(file))
+        {
+            TargetFolderPicturePath = file;
+            StatusMessage = $"已選取資料夾圖片: {file}";
+        }
+    }
+
+    [RelayCommand]
+    public void ClearFolderPicture()
+    {
+        TargetFolderPicturePath = "";
+    }
+
+    [RelayCommand]
+    public async Task ApplyFolderOptimizationAsync()
+    {
+        if (string.IsNullOrWhiteSpace(TargetCustomizeFolderPath))
+        {
+            StatusMessage = "請先選擇或輸入目標資料夾路徑！";
+            AudioFeedbackService.PlayWarning();
+            return;
+        }
+
+        IsLoading = true;
+        try
+        {
+            var templates = FolderAndIconCustomizerService.FolderTemplates;
+            int idx = Math.Clamp(SelectedFolderTemplateIndex, 0, templates.Count - 1);
+            string templateKey = templates[idx].Key;
+            string? logo = string.IsNullOrWhiteSpace(TargetFolderPicturePath) ? "" : TargetFolderPicturePath;
+
+            var (ok, msg, _) = await _folderCustomizer.OptimizeFolderTemplateAsync(
+                TargetCustomizeFolderPath,
+                templateKey,
+                ApplyTemplateToSubfolders,
+                logo);
+
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 📂 {msg}");
+            StatusMessage = msg;
+            if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+        }
+        finally { IsLoading = false; }
+    }
+
+    [RelayCommand]
+    public async Task BrowseCustomIconFileAsync()
+    {
+        var file = await FilePickerHelper.PickSingleFileAsync([".ico", ".exe", ".dll"]);
+        if (!string.IsNullOrWhiteSpace(file))
+        {
+            TargetCustomIconResource = $"{file},0";
+            StatusMessage = $"已選擇自訂圖示來源: {TargetCustomIconResource}";
+        }
+    }
+
+    [RelayCommand]
+    public void SelectPopularIconPreset()
+    {
+        var presets = FolderAndIconCustomizerService.PopularFolderIcons;
+        int idx = Math.Clamp(SelectedPopularFolderIconIndex, 0, presets.Count - 1);
+        TargetCustomIconResource = presets[idx].IconResource;
+    }
+
+    [RelayCommand]
+    public async Task ApplyFolderCustomIconAsync()
+    {
+        if (string.IsNullOrWhiteSpace(TargetCustomizeFolderPath))
+        {
+            StatusMessage = "請先選擇要變更圖示的目標資料夾！";
+            AudioFeedbackService.PlayWarning();
+            return;
+        }
+
+        IsLoading = true;
+        try
+        {
+            var (ok, msg) = await _folderCustomizer.SetFolderCustomIconAsync(
+                TargetCustomizeFolderPath,
+                TargetCustomIconResource,
+                ApplyTemplateToSubfolders);
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🎨 {msg}");
+            StatusMessage = msg;
+            if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+        }
+        finally { IsLoading = false; }
+    }
+
+    [RelayCommand]
+    public async Task RestoreFolderDefaultIconAsync()
+    {
+        if (string.IsNullOrWhiteSpace(TargetCustomizeFolderPath))
+        {
+            StatusMessage = "請先選擇要還原預設圖示的目標資料夾！";
+            AudioFeedbackService.PlayWarning();
+            return;
+        }
+
+        IsLoading = true;
+        try
+        {
+            var (ok, msg) = await _folderCustomizer.SetFolderCustomIconAsync(
+                TargetCustomizeFolderPath,
+                iconResource: null,
+                ApplyTemplateToSubfolders);
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🔄 {msg}");
+            StatusMessage = msg;
+            if (ok) AudioFeedbackService.PlaySuccess();
+        }
+        finally { IsLoading = false; }
+    }
+
+    [RelayCommand]
+    public void ApplyFileExtensionIcon()
+    {
+        var (ok, msg) = _folderCustomizer.SetFileExtensionCustomIcon(TargetFileExtension, TargetCustomIconResource);
+        AppendLog($"[{DateTime.Now:HH:mm:ss}] 📄 {msg}");
+        StatusMessage = msg;
+        if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+    }
+
+    [RelayCommand]
+    public void RestoreFileExtensionIcon()
+    {
+        var (ok, msg) = _folderCustomizer.SetFileExtensionCustomIcon(TargetFileExtension, iconResource: null);
+        AppendLog($"[{DateTime.Now:HH:mm:ss}] 🔄 {msg}");
+        StatusMessage = msg;
+        if (ok) AudioFeedbackService.PlaySuccess();
+    }
+
+    [RelayCommand]
+    public void QuickRefreshShellIcons()
+    {
+        IconCacheRepairService.NotifyShellIconChange();
+        string msg = "✅ 已呼叫 SHChangeNotify 與 ie4uinit.exe -show 即時刷新桌面與資料夾圖示 (免重啟檔案總管)！";
+        IconCacheStatus = msg;
+        StatusMessage = msg;
+        AppendLog($"[{DateTime.Now:HH:mm:ss}] 🖼️ {msg}");
+        AudioFeedbackService.PlaySuccess();
+    }
+
+    [RelayCommand]
+    public void ToggleExplorerWatchdog()
+    {
+        bool target = !IsExplorerWatchdogEnabled;
+        ExplorerWatchdogService.Instance.IsEnabled = target;
+        if (target)
+        {
+            ExplorerWatchdogService.Instance.Start(force: true);
+        }
+        else
+        {
+            ExplorerWatchdogService.SetWatchdogGloballyDisabled(true);
+        }
+
+        IsExplorerWatchdogEnabled = target;
+        string msg = target
+            ? "🛡️ 已啟用 Explorer.exe 背景自動守護服務 (當檔案總管崩潰或被強制關閉時將自動重啟恢復桌面)。"
+            : "⚪ 已暫停 Explorer.exe 背景自動守護服務。";
+        AppendLog($"[{DateTime.Now:HH:mm:ss}] {msg}");
+        StatusMessage = msg;
+    }
+
+    [RelayCommand]
+    public async Task RestartExplorerManuallyAsync()
+    {
+        IsLoading = true;
+        try
+        {
+            var (ok, msg) = await ExplorerWatchdogService.Instance.RestartExplorerManuallyAsync();
+            IsExplorerCurrentlyAlive = ExplorerWatchdogService.CheckExplorerRunning();
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🔄 {msg}");
+            StatusMessage = msg;
+            if (ok) AudioFeedbackService.PlaySuccess();
+        }
         finally { IsLoading = false; }
     }
 }

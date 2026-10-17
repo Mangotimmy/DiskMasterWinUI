@@ -24,6 +24,12 @@ public partial class SystemPerformanceService
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool CloseHandle(IntPtr hObject);
 
+    [LibraryImport("user32.dll")]
+    private static partial IntPtr GetForegroundWindow();
+
+    [LibraryImport("user32.dll")]
+    private static partial uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
     private const uint PROCESS_TERMINATE = 0x0001;
 
     private static readonly HashSet<string> ProtectedProcesses = new(StringComparer.OrdinalIgnoreCase)
@@ -101,18 +107,27 @@ public partial class SystemPerformanceService
             catch { }
         }
 
-        // 2. Query Physical Disk & GPU hardware metadata (cached)
+        // 2. Query Physical Disk, GPU, and SMBIOS RAM hardware metadata (cached)
         await EnsurePhysicalDiskCacheAsync();
         await EnsureGpuHardwareCacheAsync();
         snap.GpuModelName = _cachedGpuModelName;
         snap.GpuMemoryTotalMb = _cachedGpuTotalVramMb;
+        snap.RamMemoryType = _cachedRamMemoryType;
+        snap.RamSpeedMhz = _cachedRamSpeedMhz;
+        snap.RamModuleCount = _cachedRamModuleCount;
+        snap.RamSpecSummary = _cachedRamSpecSummary;
+
+        // Detect active Foreground Window Graphics API (DX12 / DX11 / Vulkan / OpenGL / DX9)
+        var (fgApi, fgApp) = DetectForegroundGraphicsApi();
+        snap.ActiveGraphicsApi = fgApi;
+        snap.ForegroundAppName = fgApp;
 
         // 3. CPU, Disk, and GPU Metrics via typeperf sample
         try
         {
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
-            const string typeperfCounters = @"""\Processor(_Total)\% Processor Time"" ""\PhysicalDisk(*)\% Disk Time"" ""\PhysicalDisk(*)\Avg. Disk sec/Read"" ""\PhysicalDisk(*)\Avg. Disk sec/Write"" ""\PhysicalDisk(*)\Disk Read Bytes/sec"" ""\PhysicalDisk(*)\Disk Write Bytes/sec"" ""\GPU Engine(*engtype_3D)\Utilization Percentage"" ""\GPU Adapter Memory(*)\Dedicated Usage"" -sc 1";
+            const string typeperfCounters = @"""\Processor(_Total)\% Processor Time"" ""\PhysicalDisk(*)\% Disk Time"" ""\PhysicalDisk(*)\Avg. Disk sec/Read"" ""\PhysicalDisk(*)\Avg. Disk sec/Write"" ""\PhysicalDisk(*)\Disk Read Bytes/sec"" ""\PhysicalDisk(*)\Disk Write Bytes/sec"" ""\GPU Engine(*)\Utilization Percentage"" ""\GPU Adapter Memory(*)\Dedicated Usage"" -sc 1";
             var (outStr, _, code) = await ProcessHelper.RunProcessAsync("typeperf.exe", typeperfCounters, cancellationToken: timeoutCts.Token);
             if (code == 0 && !string.IsNullOrWhiteSpace(outStr))
             {
@@ -127,7 +142,7 @@ public partial class SystemPerformanceService
 
                     int count = Math.Min(headers.Length, values.Length);
                     var diskData = new Dictionary<string, Dictionary<string, double>>(StringComparer.OrdinalIgnoreCase);
-                    double gpuUsageSum = 0;
+                    var gpuEngineSums = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
                     double gpuMemBytesSum = 0;
 
                     for (int i = 0; i < count; i++)
@@ -148,7 +163,13 @@ public partial class SystemPerformanceService
 
                         if (header.Contains("GPU Engine", StringComparison.OrdinalIgnoreCase) && header.Contains("Utilization Percentage", StringComparison.OrdinalIgnoreCase))
                         {
-                            gpuUsageSum += val;
+                            if (val > 0)
+                            {
+                                var engMatch = Regex.Match(header, @"engtype_(?<eng>[A-Za-z0-9_]+)", RegexOptions.IgnoreCase);
+                                string engKey = engMatch.Success ? engMatch.Groups["eng"].Value : "3D";
+                                gpuEngineSums.TryGetValue(engKey, out double prevEng);
+                                gpuEngineSums[engKey] = prevEng + val;
+                            }
                             continue;
                         }
 
@@ -173,7 +194,8 @@ public partial class SystemPerformanceService
                         }
                     }
 
-                    snap.GpuUsagePercent = Math.Clamp(Math.Round(gpuUsageSum, 1), 0.0, 100.0);
+                    double maxGpuEnginePct = gpuEngineSums.Count > 0 ? gpuEngineSums.Values.Max() : 0.0;
+                    snap.GpuUsagePercent = Math.Clamp(Math.Round(maxGpuEnginePct, 1), 0.0, 100.0);
                     if (gpuMemBytesSum > 0)
                     {
                         snap.GpuMemoryUsedMb = (long)(gpuMemBytesSum / (1024 * 1024));
@@ -348,11 +370,20 @@ public partial class SystemPerformanceService
 
     private string _cachedGpuModelName = "GPU";
     private long _cachedGpuTotalVramMb = 0;
+    private string _cachedRamMemoryType = "DDR4/DDR5";
+    private int _cachedRamSpeedMhz = 0;
+    private int _cachedRamModuleCount = 1;
+    private string _cachedRamSpecSummary = "DDR4/DDR5";
     private DateTime _lastGpuCacheTime = DateTime.MinValue;
+
+    private int _lastFgPid = 0;
+    private string _lastFgApi = "DX12";
+    private string _lastFgApp = "Desktop";
+    private DateTime _lastFgApiTime = DateTime.MinValue;
 
     private async Task EnsureGpuHardwareCacheAsync()
     {
-        if (DateTime.Now - _lastGpuCacheTime < TimeSpan.FromMinutes(5) && _cachedGpuTotalVramMb > 0) return;
+        if (DateTime.Now - _lastGpuCacheTime < TimeSpan.FromMinutes(5) && (_cachedGpuTotalVramMb > 0 || _cachedRamSpeedMhz > 0)) return;
 
         await Task.Run(() =>
         {
@@ -369,13 +400,180 @@ public partial class SystemPerformanceService
                         {
                             _cachedGpuTotalVramMb = (long)(ramBytes / (1024 * 1024));
                         }
-                        break;
+                        if (!name.Contains("Basic", StringComparison.OrdinalIgnoreCase) && !name.Contains("Virtual", StringComparison.OrdinalIgnoreCase))
+                        {
+                            break;
+                        }
                     }
                 }
-                _lastGpuCacheTime = DateTime.Now;
+
+                // Read true 64-bit VRAM size from Display Class registry if available (>4GB GPUs cap AdapterRAM at 4095MB in WMI)
+                try
+                {
+                    using var displayClassKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}");
+                    if (displayClassKey != null)
+                    {
+                        foreach (var subName in displayClassKey.GetSubKeyNames())
+                        {
+                            if (!subName.StartsWith("0")) continue;
+                            using var subKey = displayClassKey.OpenSubKey(subName);
+                            if (subKey?.GetValue("HardwareInformation.qwMemorySize") is long qwMem && qwMem > 0)
+                            {
+                                long vramMb = qwMem / (1024 * 1024);
+                                if (vramMb > _cachedGpuTotalVramMb) _cachedGpuTotalVramMb = vramMb;
+                            }
+                            else if (subKey?.GetValue("HardwareInformation.MemorySize") is byte[] memBytes && memBytes.Length >= 8)
+                            {
+                                ulong qw = BitConverter.ToUInt64(memBytes, 0);
+                                long vramMb = (long)(qw / (1024 * 1024));
+                                if (vramMb > _cachedGpuTotalVramMb) _cachedGpuTotalVramMb = vramMb;
+                            }
+                        }
+                    }
+                }
+                catch { }
             }
             catch { }
+
+            // Query SMBIOS Physical Memory Type (DDR4 / DDR5 / LPDDR5) and Clock Speed (MHz)
+            try
+            {
+                using var memSearcher = new System.Management.ManagementObjectSearcher("SELECT SMBIOSMemoryType, MemoryType, ConfiguredClockSpeed, Speed FROM Win32_PhysicalMemory");
+                int sticks = 0;
+                int maxSpeed = 0;
+                string detectedType = "";
+
+                foreach (var obj in memSearcher.Get())
+                {
+                    sticks++;
+                    int smbiosType = Convert.ToInt32(obj["SMBIOSMemoryType"] ?? 0);
+                    int legacyType = Convert.ToInt32(obj["MemoryType"] ?? 0);
+                    int cfgSpeed = Convert.ToInt32(obj["ConfiguredClockSpeed"] ?? 0);
+                    int baseSpeed = Convert.ToInt32(obj["Speed"] ?? 0);
+
+                    int speed = cfgSpeed > 0 ? cfgSpeed : baseSpeed;
+                    if (speed > maxSpeed) maxSpeed = speed;
+
+                    string mapped = MapSmbiosMemoryType(smbiosType, legacyType, speed);
+                    if (!string.IsNullOrEmpty(mapped) && mapped != "DRAM")
+                    {
+                        detectedType = mapped;
+                    }
+                }
+
+                if (sticks > 0) _cachedRamModuleCount = sticks;
+                if (maxSpeed > 0) _cachedRamSpeedMhz = maxSpeed;
+                if (!string.IsNullOrEmpty(detectedType)) _cachedRamMemoryType = detectedType;
+                else if (maxSpeed >= 4800) _cachedRamMemoryType = "DDR5";
+                else if (maxSpeed >= 2133) _cachedRamMemoryType = "DDR4";
+                else if (maxSpeed >= 1066) _cachedRamMemoryType = "DDR3";
+
+                _cachedRamSpecSummary = _cachedRamSpeedMhz > 0
+                    ? $"{_cachedRamMemoryType} @ {_cachedRamSpeedMhz} MHz ({_cachedRamModuleCount} DIMM)"
+                    : $"{_cachedRamMemoryType} ({_cachedRamModuleCount} DIMM)";
+            }
+            catch { }
+
+            _lastGpuCacheTime = DateTime.Now;
         });
+    }
+
+    public static string MapSmbiosMemoryType(int smbiosType, int legacyType, int speedMhz)
+    {
+        return smbiosType switch
+        {
+            34 => "DDR5",
+            35 => "LPDDR5",
+            26 => "DDR4",
+            30 => "LPDDR4",
+            24 => "DDR3",
+            29 => "LPDDR3",
+            21 => "DDR2",
+            22 => "DDR2 FB-DIMM",
+            20 => "DDR",
+            _ => legacyType switch
+            {
+                26 => "DDR4",
+                24 => "DDR3",
+                21 => "DDR2",
+                20 => "DDR",
+                _ => speedMhz >= 4800 ? "DDR5" : speedMhz >= 2133 ? "DDR4" : speedMhz > 0 ? "DDR3" : "DDR4/DDR5"
+            }
+        };
+    }
+
+    /// <summary>
+    /// Detects the active 3D Graphics API (DX12, DX11, Vulkan, OpenGL, DX9) of the foreground process.
+    /// Cached for 2.5 seconds per PID so module inspection adds zero overhead to the HUD timer.
+    /// </summary>
+    public (string GraphicsApi, string AppName) DetectForegroundGraphicsApi()
+    {
+        try
+        {
+            var fgHwnd = GetForegroundWindow();
+            if (fgHwnd == IntPtr.Zero) return (_lastFgApi, _lastFgApp);
+
+            GetWindowThreadProcessId(fgHwnd, out uint pid);
+            if (pid == 0) return (_lastFgApi, _lastFgApp);
+
+            if ((int)pid == _lastFgPid && DateTime.Now - _lastFgApiTime < TimeSpan.FromSeconds(2.5))
+            {
+                return (_lastFgApi, _lastFgApp);
+            }
+
+            using var proc = Process.GetProcessById((int)pid);
+            string procName = string.IsNullOrWhiteSpace(proc.ProcessName) ? "App" : proc.ProcessName;
+
+            if (procName.Equals("DiskMasterWinUI", StringComparison.OrdinalIgnoreCase) ||
+                procName.Equals("dwm", StringComparison.OrdinalIgnoreCase) ||
+                procName.Equals("explorer", StringComparison.OrdinalIgnoreCase))
+            {
+                _lastFgPid = (int)pid;
+                _lastFgApp = procName;
+                _lastFgApi = "DX12";
+                _lastFgApiTime = DateTime.Now;
+                return (_lastFgApi, _lastFgApp);
+            }
+
+            bool hasVulkan = false;
+            bool hasDx12 = false;
+            bool hasDx11 = false;
+            bool hasOpenGl = false;
+            bool hasDx9 = false;
+
+            try
+            {
+                foreach (ProcessModule mod in proc.Modules)
+                {
+                    var modName = mod.ModuleName;
+                    if (string.IsNullOrEmpty(modName)) continue;
+
+                    if (modName.Equals("vulkan-1.dll", StringComparison.OrdinalIgnoreCase)) hasVulkan = true;
+                    else if (modName.Equals("d3d12.dll", StringComparison.OrdinalIgnoreCase) || modName.Equals("d3d12core.dll", StringComparison.OrdinalIgnoreCase)) hasDx12 = true;
+                    else if (modName.Equals("d3d11.dll", StringComparison.OrdinalIgnoreCase)) hasDx11 = true;
+                    else if (modName.Equals("opengl32.dll", StringComparison.OrdinalIgnoreCase)) hasOpenGl = true;
+                    else if (modName.Equals("d3d9.dll", StringComparison.OrdinalIgnoreCase)) hasDx9 = true;
+                }
+            }
+            catch { }
+
+            string api = hasVulkan ? "Vulkan"
+                : hasDx12 ? "DX12"
+                : hasOpenGl && !hasDx11 ? "OpenGL"
+                : hasDx11 ? "DX11"
+                : hasDx9 ? "DX9"
+                : "DX12";
+
+            _lastFgPid = (int)pid;
+            _lastFgApp = procName;
+            _lastFgApi = api;
+            _lastFgApiTime = DateTime.Now;
+            return (api, procName);
+        }
+        catch
+        {
+            return (_lastFgApi, _lastFgApp);
+        }
     }
 
     private DateTime _lastNetSampleTime = DateTime.MinValue;

@@ -30,6 +30,7 @@ public sealed partial class SystemOptimizerPage : Page
         TabGaming.Header = lang switch { "zh-CN" => "🎮 电竞游戏模式", "en-US" => "🎮 Gaming Mode", "ja-JP" => "🎮 ゲーミングモード", _ => "🎮 電競遊戲模式" };
         TabCpu.Header = lang switch { "zh-CN" => "⚡ CPU与调度优先级", "en-US" => "⚡ CPU & Scheduling", "ja-JP" => "⚡ CPU とスケジューリング", _ => "⚡ CPU與排程優先權" };
         TabPower.Header = lang switch { "zh-CN" => "🔋 电源计划与核心唤醒", "en-US" => "🔋 Power Plans & Core Unparking", "ja-JP" => "🔋 電源プランとコアアンパーキング", _ => "🔋 電源計畫與核心喚醒" };
+        TabExplorerShell.Header = lang switch { "zh-CN" => "🗂️ 文件资源管理器、右键与图标", "en-US" => "🗂️ Explorer, Context Menu & Icons", "ja-JP" => "🗂️ エクスプローラー、右クリックとアイコン", _ => "🗂️ 檔案總管、右鍵與圖示" };
         TabBackup.Header = lang switch { "zh-CN" => "💾 注册表备份与还原", "en-US" => "💾 Registry Backup & Restore", "ja-JP" => "💾 レジストリバックアップと復元", _ => "💾 登錄檔備份與還原" };
         TabOneDrive.Header = lang switch { "zh-CN" => "☁️ OneDrive 深度治理与卸载", "en-US" => "☁️ OneDrive Governance & Uninstall", "ja-JP" => "☁️ OneDrive 管理と削除", _ => "☁️ OneDrive 深度治理與卸載" };
         TabDrivers.Header = lang switch { "zh-CN" => "🏎️ OEM 驱动清理 (PnPUtil)", "en-US" => "🏎️ OEM Driver Cleanup (PnPUtil)", "ja-JP" => "🏎️ OEM ドライバの削除 (PnPUtil)", _ => "🏎️ OEM 驅動清理 (PnPUtil)" };
@@ -37,10 +38,10 @@ public sealed partial class SystemOptimizerPage : Page
         HeroTitle.Text = lang switch { "zh-CN" => "电竞极致模式", "en-US" => "Ultra Gaming Mode (1-Click)", "ja-JP" => "ウルトラゲーミングモード", _ => "電競遊戲極致模式" };
         HeroSubtitle.Text = lang switch
         {
-            "zh-CN" => "一键同步调校：CPU 量子时间分配 (0x26)、启用终极效能电源计划、解锁 100% 前台算力 (SystemResponsiveness=0)、关闭网络节流防 Ping 突增、关闭 Game DVR 背景录制、开启 HAGS 硬件加速与 1:1 传感器零延迟。",
-            "en-US" => "1-Click optimization: CPU Quantum Scheduling (0x26), Ultimate Performance Power Plan, 100% Foreground CPU (SystemResponsiveness=0), Network Throttling Disabled, Game DVR Disabled, HAGS enabled, and 1:1 input raw tracking.",
-            "ja-JP" => "ワンクリック最適化：CPU量子スケジューリング (0x26)、究極パフォーマンス電源プラン、フォアグラウンドCPU 100%、ネットワーク絞りを無効化、Game DVR無効、HAGS有効、1:1センサー追跡。",
-            _ => "一鍵同步調校：CPU 量子時間分配 (0x26)、啟用終極效能電源計畫、解鎖 100% 前台算力 (SystemResponsiveness=0)、關閉網路節流防 Ping 突增、關閉 Game DVR 背景錄影負擔、開啟 HAGS 硬體加速與 1:1 感應器零延遲。"
+            "zh-CN" => "一键同步调校：CPU 量子时间分配 (0x26)、启用终极效能电源计划、优化前台算力保留 (SystemResponsiveness=10)、关闭网络节流防 Ping 突增、关闭 Game DVR 背景录制、开启 HAGS 硬件加速与 1:1 传感器零延迟。",
+            "en-US" => "1-Click optimization: CPU Quantum Scheduling (0x26), Ultimate Performance Power Plan, Foreground CPU Priority (SystemResponsiveness=10), Network Throttling Disabled, Game DVR Disabled, HAGS enabled, and 1:1 input raw tracking.",
+            "ja-JP" => "ワンクリック最適化：CPU量子スケジューリング (0x26)、究極パフォーマンス電源プラン、フォアグラウンドCPU優先 (SystemResponsiveness=10)、ネットワーク絞りを無効化、Game DVR無効、HAGS有効、1:1センサー追跡。",
+            _ => "一鍵同步調校：CPU 量子時間分配 (0x26)、啟用終極效能電源計畫、優化前台算力保留 (SystemResponsiveness=10)、關閉網路節流防 Ping 突增、關閉 Game DVR 背景錄影負擔、開啟 HAGS 硬體加速與 1:1 感應器零延遲。"
         };
 
         ApplyGamingBtn.Content = lang switch { "zh-CN" => "🎮 一键应用电竞模式", "en-US" => "🎮 Apply Ultra Gaming Mode", "ja-JP" => "🎮 ゲーミングモードを適用", _ => "🎮 一鍵套用電競模式" };
@@ -81,8 +82,8 @@ public sealed partial class SystemOptimizerPage : Page
         PowerThrottlingLabel.Text = lang switch { "zh-CN" => "禁用 CPU 能耗节流 (PowerThrottlingOff = 1)", "en-US" => "Disable CPU Power Throttling (PowerThrottlingOff = 1)", "ja-JP" => "CPU 電力スロットリングを無効化 (PowerThrottlingOff = 1)", _ => "停用 CPU 能源節流 (PowerThrottlingOff = 1)" };
         PowerThrottlingDesc.Text = lang switch { "zh-CN" => "防止 Windows 10/11 内核对背景线程或非活动游戏窗口强制降频节能。", "en-US" => "Prevents Windows kernel from aggressively throttling background threads or inactive game windows.", "ja-JP" => "Windows カーネルがバックグラウンドスレッドやゲームウィンドウの周波数を低下させるのを防ぎます。", _ => "防止 Windows 10/11 核心對背景執行緒或非活動遊戲視窗強制降頻節能。" };
 
-        SystemResponsivenessLabel.Text = lang switch { "zh-CN" => "100% 前台 CPU 算力分配 (SystemResponsiveness = 0)", "en-US" => "100% Foreground CPU Priority (SystemResponsiveness = 0)", "ja-JP" => "100% フォアグラウンド CPU 優先割り当て (SystemResponsiveness = 0)", _ => "100% 前台 CPU 算力分配 (SystemResponsiveness = 0)" };
-        SystemResponsivenessDesc.Text = lang switch { "zh-CN" => "释放 Windows 原生预留给系统背景服务的 20% CPU 保留份额，全数交由前台游戏享用。", "en-US" => "Unlocks the 20% CPU reservation normally held by background services, dedicating 100% to games.", "ja-JP" => "バックグラウンドサービス用に予約されている20%のCPU割り当てを解放し、全力をフォアグラウンドに集中させます。", _ => "釋放 Windows 原生預留給系統背景服務的 20% CPU 保留份額，全數交由前台遊戲享用。" };
+        SystemResponsivenessLabel.Text = lang switch { "zh-CN" => "前台游戏 CPU 算力保留优化 (SystemResponsiveness = 10% 或 0%)", "en-US" => "Foreground Game CPU Reservation (SystemResponsiveness = 10% or 0%)", "ja-JP" => "フォアグラウンド ゲーム CPU 割り当て最適化 (SystemResponsiveness = 10% / 0%)", _ => "前台遊戲 CPU 算力保留優化 (SystemResponsiveness = 10% 或 0%)" };
+        SystemResponsivenessDesc.Text = lang switch { "zh-CN" => "Windows 原生预留 20% CPU 给低优先级背景服务。EvolveOpt 推荐设为 10% (十进制) 兼顾语音/串流防爆音，或 0% 极限全给游戏。", "en-US" => "Windows reserves 20% CPU for background tasks by default. Set to 10% (decimal) for optimal balance without audio crackle, or 0% for extreme gaming.", "ja-JP" => "Windowsは標準で20%のCPUをバックグラウンド用に予約します。推奨は10%（十進数、音声途切れ防止）、極限ゲーミングは0%です。", _ => "Windows 原生預留 20% CPU 給低優先權背景服務。EvolveOpt 推薦設為 10% (十進位) 兼顧語音/串流防爆音，或 0% 極限全給遊戲。" };
 
         NetworkThrottlingLabel.Text = lang switch { "zh-CN" => "禁用网络数据包限速队列 (NetworkThrottlingIndex = 0xFFFFFFFF)", "en-US" => "Disable Network Packet Throttling (NetworkThrottlingIndex = 0xFFFFFFFF)", "ja-JP" => "ネットワークパケットスロットリングを無効化 (NetworkThrottlingIndex = 0xFFFFFFFF)", _ => "停用網路封包限速佇列 (NetworkThrottlingIndex = 0xFFFFFFFF)" };
         NetworkThrottlingDesc.Text = lang switch { "zh-CN" => "禁用 Windows 在游戏与音频执行期间的网络限速队列，彻底解决网游 Ping 波动与丢包。", "en-US" => "Disables network packet throttling during gaming and multimedia, preventing ping spikes and packet loss.", "ja-JP" => "ゲームやメディア再生中のネットワーク絞り込みを停止し、Pingの乱高下やパケットロスを防ぎます。", _ => "停用 Windows 在遊戲與音訊執行期間的網路限速佇列，徹底解決線上遊戲 Ping 忽高忽低與丟包問題。" };
@@ -105,6 +106,21 @@ public sealed partial class SystemOptimizerPage : Page
 
         OpRecordingLabel.Text = lang switch { "zh-CN" => "系统操作记录 (Operation Recording)", "en-US" => "Operation Recording", "ja-JP" => "操作記録トレース (Operation Recording)", _ => "系統操作記錄 (Operation Recording)" };
         OpRecordingDesc.Text = lang switch { "zh-CN" => "控制 Prefetch 追踪开机与操作磁盘读取模式之记录机制。", "en-US" => "Controls Prefetch tracing of boot and disk read operations.", "ja-JP" => "Prefetch による起動時およびディスク読み取りパターンのトレース記録を制御します。", _ => "控制 Prefetch 追蹤開機與操作磁碟讀取模式之記錄機制。" };
+
+        // Advanced Tweaks Card Localization (Tab 2)
+        AdvTweaksCardTitle.Text = lang switch { "zh-CN" => "⚡ 深度低延迟注册表与组策略优化", "en-US" => "⚡ Low-Latency Registry & Group Policy Tweaks", "ja-JP" => "⚡ 低遅延レジストリ & グループポリシー最適化", _ => "⚡ 深度低延遲登錄檔與群組原則優化" };
+        NagleLabel.Text = lang switch { "zh-CN" => "禁用 Nagle 算法 (TcpAckFrequency = 1 & TCPNoDelay = 1)", "en-US" => "Disable Nagle's Algorithm (TcpAckFrequency = 1 & TCPNoDelay = 1)", "ja-JP" => "Nagle アルゴリズムを無効化 (TcpAckFrequency = 1 & TCPNoDelay = 1)", _ => "停用 Nagle 演算法 (TcpAckFrequency = 1 & TCPNoDelay = 1)" };
+        NagleDesc.Text = lang switch { "zh-CN" => "强制网卡立即发送 TCP 数据包，消除排队等待延迟，大幅降低网游 Ping 与操作抖动。", "en-US" => "Forces network adapter to send TCP packets immediately without buffering delay.", "ja-JP" => "TCPパケットの即時送信を強制し、オンラインゲームのPingとジッターを低減します。", _ => "強制網卡立刻發送 TCP 封包，不進行佇列合併等待，大幅降低線上遊戲連線 Ping 與操作抖動。" };
+        PagingExecLabel.Text = lang switch { "zh-CN" => "内核与驱动锁定于物理内存 (DisablePagingExecutive = 1)", "en-US" => "Lock Kernel & Drivers in RAM (DisablePagingExecutive = 1)", "ja-JP" => "カーネルとドライバを物理メモリに固定 (DisablePagingExecutive = 1)", _ => "核心與驅動鎖定於實體 RAM (DisablePagingExecutive = 1)" };
+        PagingExecDesc.Text = lang switch { "zh-CN" => "禁止 Windows 将系统内核代码与驱动程序分页写入硬盘虚拟内存，确保 100% 在高速 RAM 中运行。", "en-US" => "Prevents paging system kernel and device drivers to disk, keeping them in high-speed RAM.", "ja-JP" => "システムカーネルとドライバがディスクにページングされるのを防ぎ、高速RAMで常駐させます。", _ => "禁止 Windows 將核心系統代碼與驅動程式分頁寫入虛擬記憶體硬碟，確保 100% 於高速 RAM 運行。" };
+        GroupPolicyLabel.Text = lang switch { "zh-CN" => "本地组策略隐私防范 (关闭遥测/开始菜单Bing/P2P上传)", "en-US" => "Group Policy Privacy & Telemetry Guard", "ja-JP" => "グループポリシー プライバシー保護 (テレメトリ/検索無効化)", _ => "本機群組原則隱私防護 (關閉遙測/開始功能表Bing/P2P上傳)" };
+        GroupPolicyDesc.Text = lang switch { "zh-CN" => "关闭 AllowTelemetry、禁用开始菜单网络搜索、关闭传递优化 P2P 后台占用。", "en-US" => "Disables telemetry, start menu web search, and delivery optimization P2P uploads.", "ja-JP" => "テレメトリ、スタートメニューWeb検索、配信最適化P2Pアップロードを停止します。", _ => "關閉 AllowTelemetry、停用開始功能表網路搜尋、關閉傳遞最佳化 P2P 背景佔用。" };
+        DpsServiceLabel.Text = lang switch { "zh-CN" => "禁用 DPS 诊断策略服务防内存膨胀 (DPS Start = 4)", "en-US" => "Disable Diagnostic Policy Service (DPS Start = 4)", "ja-JP" => "DPS 診断ポリシーサービス無効化 (DPS Start = 4)", _ => "停用 DPS 診斷原則服務防記憶體膨脹 (DPS Start = 4)" };
+        DpsServiceDesc.Text = lang switch { "zh-CN" => "设置 Start = 4 (Disabled) 并停止 DPS 服务，防止背景故障排除引发 svchost 内存无限膨胀与 CPU 尖峰。", "en-US" => "Stops and disables DPS to prevent svchost memory leak bloat and background CPU spikes.", "ja-JP" => "DPSサービスを停止・無効化し、svchostのメモリリーク膨張とCPUスパイクを防止します。", _ => "設定 Start = 4 (Disabled) 並停止 Diagnostic Policy Service，防止背景疑難排解監控引發 svchost 記憶體無限膨脹與 CPU 尖峰。" };
+        L2tpVpnLabel.Text = lang switch { "zh-CN" => "L2TP/IPsec VPN NAT 穿透修复 (AssumeUDPEncapsulationContextOnSendRule = 2)", "en-US" => "L2TP/IPsec VPN NAT Traversal Fix (AssumeUDPEncapsulation = 2)", "ja-JP" => "L2TP/IPsec VPN NATトラバーサル修復 (AssumeUDPEncapsulation = 2)", _ => "L2TP/IPsec VPN NAT 穿透連線修復 (AssumeUDPEncapsulationContextOnSendRule = 2)" };
+        L2tpVpnDesc.Text = lang switch { "zh-CN" => "在 PolicyAgent 建立 AssumeUDPEncapsulationContextOnSendRule = 2，彻底解决路由器 NAT 后的 VPN 连线错误 (789/809)。", "en-US" => "Resolves VPN error 789/809 behind NAT routers by allowing UDP encapsulation for IPsec.", "ja-JP" => "NATルーター背後のVPN接続エラー (789/809) を解消するため UDP カプセル化を有効化します。", _ => "在 PolicyAgent 建立 REG_DWORD 值 AssumeUDPEncapsulationContextOnSendRule = 2，徹底解決位於路由器 NAT 後方時 L2TP/IPsec VPN 無法連線 (錯誤 789 / 809) 問題。修改後重開機生效。" };
+        DiagTrackCardTitle.Text = lang switch { "zh-CN" => "DiagTrack 遥测追踪服务控制 (Connected User Experiences and Telemetry)", "en-US" => "DiagTrack Telemetry Service Control", "ja-JP" => "DiagTrack テレメトリ追跡サービス制御", _ => "DiagTrack 遙測追蹤服務控制 (Connected User Experiences and Telemetry)" };
+        DiagTrackCardDesc.Text = lang switch { "zh-CN" => "彻底停止并禁用微软背景诊断遥测服务，释放背景 I/O 与网络带宽。Windows Update 仍可正常更新。", "en-US" => "Stops and disables Microsoft diagnostic telemetry service, saving background disk I/O and bandwidth.", "ja-JP" => "Microsoft 診断テレメトリサービスを停止・無効化し、ディスクI/Oと帯域幅を解放します。", _ => "一鍵執行 `sc stop DiagTrack & sc config DiagTrack start=disabled` 徹底關閉微軟背景診斷追蹤服務，釋放背景 I/O 與頻寬。關閉後 Windows Update 依然完全正常運作！" };
 
         // Tab 3: Power Plans & Wake
         PowerQuickTitle.Text = lang switch { "zh-CN" => "电源配置快速调校与旗舰解锁", "en-US" => "Power Scheme Quick Tuning & Unlocking", "ja-JP" => "電源スキームのクイック設定とロック解除", _ => "電源配置快速調校與旗艦解鎖" };
@@ -138,6 +154,27 @@ public sealed partial class SystemOptimizerPage : Page
         RefreshSleepBlockersBtn.Content = lang switch { "zh-CN" => "🔍 诊断阻挡程序", "en-US" => "🔍 Diagnose Blockers", "ja-JP" => "🔍 阻害プロセスを診断", _ => "🔍 診斷阻擋程序" };
         BatteryReportBtn.Content = lang switch { "zh-CN" => "🔋 生成电池健康报告", "en-US" => "🔋 Battery Report", "ja-JP" => "🔋 バッテリーレポート", _ => "🔋 產生電池健康報告" };
         EnergyReportBtn.Content = lang switch { "zh-CN" => "⚡ 生成能耗诊断报告", "en-US" => "⚡ Energy Report", "ja-JP" => "⚡ エネルギー診断", _ => "⚡ 產生能耗診斷報告" };
+
+        // Tab Headers Localization
+        TabGaming.Header = lang switch { "zh-CN" => "🎮 电竞游戏模式 (Gaming Mode)", "en-US" => "🎮 Ultra Gaming Mode", "ja-JP" => "🎮 ゲーミングモード (Gaming Mode)", _ => "🎮 電競遊戲模式 (Gaming Mode)" };
+        TabCpu.Header = lang switch { "zh-CN" => "⚡ CPU 与程序调度 (CPU & Task)", "en-US" => "⚡ CPU & Quantum Scheduling", "ja-JP" => "⚡ CPU & スケジューリング", _ => "⚡ CPU 與程序排程調優 (CPU & Task)" };
+        TabPower.Header = lang switch { "zh-CN" => "🔋 电源计划与唤醒 (Power Plans)", "en-US" => "🔋 Power Plans & Wake", "ja-JP" => "🔋 電源プラン & 復帰管理", _ => "🔋 電源計畫與極速喚醒 (Power Plans)" };
+        TabExplorerShell.Header = lang switch { "zh-CN" => "🗂️ 资源管理器、右键与图标 (Explorer & Icons)", "en-US" => "🗂️ Explorer, Shell & Icons", "ja-JP" => "🗂️ エクスプローラー & アイコン", _ => "🗂️ 檔案總管、右鍵與圖示 (Explorer & Icons)" };
+        TabBackup.Header = lang switch { "zh-CN" => "💾 注册表备份与还原 (Backup & Restore)", "en-US" => "💾 Registry Backup & Restore", "ja-JP" => "💾 レジストリバックアップ & 復元", _ => "💾 登錄檔備份與還原 (Backup & Restore)" };
+        TabOneDrive.Header = lang switch { "zh-CN" => "☁️ OneDrive 深度治理与卸载", "en-US" => "☁️ OneDrive Governance & Removal", "ja-JP" => "☁️ OneDrive アンインストール & 管理", _ => "☁️ OneDrive 深度治理與卸載" };
+        TabDrivers.Header = lang switch { "zh-CN" => "🏎️ OEM 驱动清理 (PnPUtil)", "en-US" => "🏎️ OEM Drivers Cleanup (PnPUtil)", "ja-JP" => "🏎️ OEM ドライバクリーンアップ", _ => "🏎️ OEM 驅動清理 (PnPUtil)" };
+
+        // Tab 3.5: Explorer & Shell Localization
+        WatchdogCardTitle.Text = lang switch { "zh-CN" => "🛡️ 资源管理器后台自动守护与救援服务 (Auto-Recovery Watchdog)", "en-US" => "🛡️ Explorer Auto-Recovery Watchdog Service", "ja-JP" => "🛡️ エクスプローラー自動復帰ウォッチドッグサービス", _ => "🛡️ Explorer.exe 檔案總管背景自動守護與救援服務 (Auto-Recovery Watchdog)" };
+        WatchdogCardDesc.Text = lang switch { "zh-CN" => "当 Windows 资源管理器 (explorer.exe) 崩溃、无响应或异常终止时，背景守护服务将自动侦测并秒级重启恢复桌面与任务栏。", "en-US" => "When Windows Explorer crashes or freezes, the background watchdog automatically detects and restarts it in seconds.", "ja-JP" => "エクスプローラーがクラッシュまたはフリーズした際、バックグラウンドで即座に検知し自動復帰します。", _ => "當 Windows 檔案總管 (explorer.exe) 因外掛衝突崩潰、無回應或被意外終止導致黑畫面與工作列消失時，背景守護服務將自動偵測並秒速重啟恢復桌面。" };
+        ContextMenuCardTitle.Text = lang switch { "zh-CN" => "🖱️ 右键菜单版面切换与延迟修复 (Context Menu Layout & Delay Fix)", "en-US" => "🖱️ Context Menu Layout Switcher & Latency Fix", "ja-JP" => "🖱️ 右クリックメニューのレイアウト切替 & 遅延解消", _ => "🖱️ 右鍵選單版面切換與右鍵轉圈卡頓修復 (Context Menu Layout & Delay Fix)" };
+        ContextMenuCardDesc.Text = lang switch { "zh-CN" => "一键在「Windows 10 经典完整右键菜单」与「Windows 11 现代折叠菜单」之间自由切换，并修复右键转圈延迟。", "en-US" => "Easily toggle between classic full Windows 10 context menu and modern Windows 11 menu, fixing delay stutters.", "ja-JP" => "Windows 10 クラシックメニューと Windows 11 モダンメニューを切り替え、右クリック時の遅延を解消します。", _ => "一鍵在「Windows 10 經典完整右鍵選單 (直接顯示 7-Zip/解壓縮/重新命名等完整功能)」與「Windows 11 現代簡潔選單」之間自由切換，並修復右鍵轉圈延遲。" };
+        FolderOptCardTitle.Text = lang switch { "zh-CN" => "📂 文件夹载入加速优化与文件夹图片 (Folder Customize & Slow Loading Fix)", "en-US" => "📂 Folder Loading Acceleration & Folder Picture", "ja-JP" => "📂 フォルダ読み込み高速化 & フォルダ画像設定", _ => "📂 資料夾載入加速最佳化與資料夾圖片設定 (Folder Customize & Slow Loading Fix)" };
+        FolderOptCardDesc.Text = lang switch { "zh-CN" => "解决下载区或大型文件夹打开时上方绿条缓慢读条、卡死转圈问题。支持针对指定文件夹与子文件夹应用优化模板与封面。", "en-US" => "Resolves slow green loading bars in heavy folders. Supports applying General Items template and custom pictures to folders.", "ja-JP" => "重いフォルダを開く際の緑のローディングバーの停滞を解消。一般項目テンプレートとカバー画像を適用します。", _ => "解決下載區或大型資料夾開啟時上方綠條緩慢讀條、卡死轉圈問題。支援全域鎖定「一般項目 (General items)」或針對指定資料夾與所有子資料夾套用最佳化範本與封面圖片。" };
+        CustomIconsCardTitle.Text = lang switch { "zh-CN" => "🎨 文件夹与文件类型自定义图标中心", "en-US" => "🎨 Custom Icons for Folders & File Types", "ja-JP" => "🎨 フォルダ・ファイル形式のカスタムアイコン", _ => "🎨 資料夾與檔案類型自訂圖示中心 (Custom Icons for Folders & File Types)" };
+        CustomIconsCardDesc.Text = lang switch { "zh-CN" => "为目标文件夹或任意文件扩展名更换专属精美图标，支持内建 Windows 精选图标库与外部 .ico/.exe/.dll 文件。", "en-US" => "Customize icons for target folders or file extensions with built-in or external .ico/.dll/.exe resources.", "ja-JP" => "対象フォルダやファイル拡張子に専用アイコンを割り当てます。内蔵アイコンや .ico/.dll/.exe に対応。", _ => "為上方的「目標資料夾」或任意「檔案副檔名 (例如 .txt / .mp4 / .log)」更換專屬精美圖示，支援內建 Windows 精選圖示庫與外部 .ico / .exe / .dll 圖示檔。" };
+        FolderIconSectionTitle.Text = lang switch { "zh-CN" => "📁 文件夹图标 (应用至选定目标文件夹)", "en-US" => "📁 Folder Icons (Apply to Selected Target Folder)", "ja-JP" => "📁 フォルダアイコン (選択中フォルダに適用)", _ => "📁 資料夾圖示 (Folder icons - 套用至上方選取的目標資料夾)" };
+        FileExtensionBox.Header = lang switch { "zh-CN" => "文件扩展名", "en-US" => "File Extension", "ja-JP" => "ファイル拡張子", _ => "檔案副檔名" };
 
         // Tab 4: Backup & Restore
         BackupSectionTitle.Text = lang switch { "zh-CN" => "建立备份与系统还原点", "en-US" => "Create Registry Backup & System Restore Point", "ja-JP" => "レジストリバックアップと復元ポイントの作成", _ => "建立備份與系統還原點" };
@@ -374,6 +411,46 @@ public sealed partial class SystemOptimizerPage : Page
         }
     }
 
+    private void DpsService_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically && ViewModel.ToggleDpsServiceCommand.CanExecute(null))
+        {
+            ViewModel.ToggleDpsServiceCommand.Execute(null);
+        }
+    }
+
+    private void L2tpVpnNatFix_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically && ViewModel.ToggleL2tpVpnNatFixCommand.CanExecute(null))
+        {
+            ViewModel.ToggleL2tpVpnNatFixCommand.Execute(null);
+        }
+    }
+
+    private void ExplorerWatchdog_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically)
+        {
+            ViewModel.ToggleExplorerWatchdogCommand.Execute(null);
+        }
+    }
+
+    private void GlobalFastFolder_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically)
+        {
+            ViewModel.ToggleGlobalFastFolderDiscoveryCommand.Execute(null);
+        }
+    }
+
+    private void PopularIconCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically)
+        {
+            ViewModel.SelectPopularIconPresetCommand.Execute(null);
+        }
+    }
+
     private void SelectAllDrivers_Click(object sender, RoutedEventArgs e)
     {
         bool anyUnselected = ViewModel.OemDrivers.Any(d => !d.IsSelected);
@@ -397,6 +474,12 @@ public sealed partial class SystemOptimizerPage : Page
         else if (ReferenceEquals(OptimizerTabView.SelectedItem, TabDrivers) && ViewModel.OemDrivers.Count == 0 && !ViewModel.IsLoadingDrivers)
         {
             ViewModel.RefreshDriversCommand.Execute(null);
+        }
+        else if (ReferenceEquals(OptimizerTabView.SelectedItem, TabExplorerShell))
+        {
+            ViewModel.IsExplorerCurrentlyAlive = ExplorerWatchdogService.CheckExplorerRunning();
+            ViewModel.IsExplorerWatchdogEnabled = ExplorerWatchdogService.Instance.IsEnabled;
+            ViewModel.ExplorerWatchdogRecoverySummary = ExplorerWatchdogService.Instance.LastRecoveryTimeText;
         }
     }
 }

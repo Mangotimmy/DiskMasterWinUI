@@ -25,10 +25,12 @@
     <UserControl.ContextFlyout>
         <MenuFlyout>
             <MenuFlyoutSubItem Text="📌 停靠位置 (Dock Position)">
-                <MenuFlyoutItem Text="↘️ 右下角 (Bottom-Right)" Click="Dock_BottomRight_Click" />
-                <MenuFlyoutItem Text="↙️ 左下角 (Bottom-Left)" Click="Dock_BottomLeft_Click" />
-                <MenuFlyoutItem Text="↗️ 右上角 (Top-Right)" Click="Dock_TopRight_Click" />
-                <MenuFlyoutItem Text="↖️ 左上角 (Top-Left)" Click="Dock_TopLeft_Click" />
+                <MenuFlyoutItem Text="🤖 智慧自動偵測左右貼邊 (Auto Left/Right)" Click="Dock_AutoEdge_Click" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="↘️ 右下角停靠 (Bottom-Right)" Click="Dock_BottomRight_Click" />
+                <MenuFlyoutItem Text="↙️ 左下角停靠 (Bottom-Left)" Click="Dock_BottomLeft_Click" />
+                <MenuFlyoutItem Text="↗️ 右上角停靠 (Top-Right)" Click="Dock_TopRight_Click" />
+                <MenuFlyoutItem Text="↖️ 左上角停靠 (Top-Left)" Click="Dock_TopLeft_Click" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="🔄 重設至預設位置" Click="ResetPosition_Click" />
             </MenuFlyoutSubItem>

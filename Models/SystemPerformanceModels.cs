@@ -35,11 +35,19 @@ public partial class SystemMetricsSnapshot : ObservableObject
     [ObservableProperty] private string _netThroughputDisplay = "0 KB/s";
     [ObservableProperty] private List<DiskPerformanceItem> _disks = new();
 
-    // Real-Time GPU Performance Metrics
+    // Real-Time GPU Performance Metrics & Graphics API
     [ObservableProperty] private double _gpuUsagePercent;
     [ObservableProperty] private long _gpuMemoryUsedMb;
     [ObservableProperty] private long _gpuMemoryTotalMb;
     [ObservableProperty] private string _gpuModelName = "GPU";
+    [ObservableProperty] private string _activeGraphicsApi = "DX12";
+    [ObservableProperty] private string _foregroundAppName = "Desktop";
+
+    // Hardware Memory (RAM) Type & Clock Speed Metrics (SMBIOS)
+    [ObservableProperty] private string _ramMemoryType = "DDR4/DDR5";
+    [ObservableProperty] private int _ramSpeedMhz;
+    [ObservableProperty] private int _ramModuleCount = 1;
+    [ObservableProperty] private string _ramSpecSummary = "偵測中...";
 
     // Real-Time LAN / Network Performance Metrics
     [ObservableProperty] private double _netDownloadSpeedBps;
@@ -56,11 +64,16 @@ public partial class SystemMetricsSnapshot : ObservableObject
     public string DisplayDiskWriteLatency => DiskWriteLatencyMs > 0 ? $"{DiskWriteLatencyMs:F2} ms" : "0.00 ms";
 
     public string DisplayGpuPercent => $"{GpuUsagePercent:F1}%";
-    public string DisplayGpuMemory => GpuMemoryTotalMb > 0 ? $"已用: {GpuMemoryUsedMb:N0} MB / 總計: {GpuMemoryTotalMb:N0} MB" : "讀取中...";
+    public string DisplayGpuMemory => GpuMemoryTotalMb > 0 ? $"已用: {GpuMemoryUsedMb:N0} MB / 總計: {GpuMemoryTotalMb:N0} MB" : $"已用: {GpuMemoryUsedMb:N0} MB";
+    public string DisplayGpuShortVram => GpuMemoryTotalMb > 0
+        ? $"{GpuMemoryUsedMb / 1024.0:F1}/{GpuMemoryTotalMb / 1024.0:F0}G"
+        : $"{GpuMemoryUsedMb}M";
     public double GpuMemoryPercent => GpuMemoryTotalMb > 0 ? Math.Clamp((double)GpuMemoryUsedMb * 100.0 / GpuMemoryTotalMb, 0, 100) : 0;
 
     public long UsedRamMb => Math.Max(0, TotalRamMb - AvailableRamMb);
     public string DisplayRamDetail => TotalRamMb > 0 ? $"已用: {UsedRamMb:N0} MB / 總計: {TotalRamMb:N0} MB" : "讀取中...";
+    public string DisplayRamSpeed => RamSpeedMhz > 0 ? $"{RamSpeedMhz} MHz" : "Auto MHz";
+    public string DisplayRamTypeAndSpeed => RamSpeedMhz > 0 ? $"{RamMemoryType} · {RamSpeedMhz} MHz" : RamMemoryType;
 
     public string DiskLatencyBadge => (DiskReadLatencyMs + DiskWriteLatencyMs) switch
     {
@@ -85,15 +98,23 @@ public partial class SystemMetricsSnapshot : ObservableObject
     }
     partial void OnAvailableRamMbChanged(long value) => OnPropertyChanged(nameof(DisplayRamDetail));
     partial void OnTotalRamMbChanged(long value) => OnPropertyChanged(nameof(DisplayRamDetail));
+    partial void OnRamMemoryTypeChanged(string value) => OnPropertyChanged(nameof(DisplayRamTypeAndSpeed));
+    partial void OnRamSpeedMhzChanged(int value)
+    {
+        OnPropertyChanged(nameof(DisplayRamSpeed));
+        OnPropertyChanged(nameof(DisplayRamTypeAndSpeed));
+    }
     partial void OnGpuUsagePercentChanged(double value) => OnPropertyChanged(nameof(DisplayGpuPercent));
     partial void OnGpuMemoryUsedMbChanged(long value)
     {
         OnPropertyChanged(nameof(DisplayGpuMemory));
+        OnPropertyChanged(nameof(DisplayGpuShortVram));
         OnPropertyChanged(nameof(GpuMemoryPercent));
     }
     partial void OnGpuMemoryTotalMbChanged(long value)
     {
         OnPropertyChanged(nameof(DisplayGpuMemory));
+        OnPropertyChanged(nameof(DisplayGpuShortVram));
         OnPropertyChanged(nameof(GpuMemoryPercent));
     }
 }

@@ -210,13 +210,12 @@ public class SystemOptimizerService
                     key.SetValue("AppCaptureEnabled", disabled ? 0 : 1, RegistryValueKind.DWord);
                 }
             }
-            using (var key = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\GameDVR", writable: true))
+            try
             {
-                if (key != null)
-                {
-                    key.SetValue("AllowGameDVR", disabled ? 0 : 1, RegistryValueKind.DWord);
-                }
+                using var key = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Policies\Microsoft\Windows\GameDVR", writable: true);
+                key?.SetValue("AllowGameDVR", disabled ? 0 : 1, RegistryValueKind.DWord);
             }
+            catch { }
             return true;
         }
         catch { }
@@ -433,6 +432,192 @@ public class SystemOptimizerService
     }
 
     // ══════════════════════════════════════════════════════════
+    //  3.8 L2TP/IPsec VPN NAT-T Fix, DPS Memory Bloat & DiagTrack
+    // ══════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Reads HKLM\SYSTEM\CurrentControlSet\Services\PolicyAgent\AssumeUDPEncapsulationContextOnSendRule.
+    /// 0 = Not configured (default), 1 = Server behind NAT only, 2 = Both Server &amp; Client behind NAT (Recommended VPN Fix).
+    /// </summary>
+    public int GetL2tpVpnNatRuleValue()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\PolicyAgent");
+            if (key != null)
+            {
+                var val = key.GetValue("AssumeUDPEncapsulationContextOnSendRule");
+                if (val is int intVal) return intVal;
+            }
+        }
+        catch { }
+        return 0;
+    }
+
+    public bool GetL2tpVpnNatFixEnabled() => GetL2tpVpnNatRuleValue() == 2;
+
+    /// <summary>
+    /// Configures HKLM\SYSTEM\CurrentControlSet\Services\PolicyAgent\AssumeUDPEncapsulationContextOnSendRule (REG_DWORD = 2)
+    /// to fix L2TP/IPsec VPN connection errors (Error 789 / 809) when the PC or VPN server is behind a NAT router.
+    /// </summary>
+    public bool SetL2tpVpnNatFix(bool enableNatTraversal)
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.CreateSubKey(@"SYSTEM\CurrentControlSet\Services\PolicyAgent", writable: true);
+            if (key != null)
+            {
+                if (enableNatTraversal)
+                {
+                    key.SetValue("AssumeUDPEncapsulationContextOnSendRule", 2, RegistryValueKind.DWord);
+                }
+                else
+                {
+                    try { key.DeleteValue("AssumeUDPEncapsulationContextOnSendRule", throwOnMissingValue: false); } catch { }
+                }
+
+                // Also ensure RasMan\Parameters ProhibitIpSec is 0 when enabling L2TP/IPsec
+                if (enableNatTraversal)
+                {
+                    try
+                    {
+                        using var rasKey = Registry.LocalMachine.CreateSubKey(@"SYSTEM\CurrentControlSet\Services\RasMan\Parameters", writable: true);
+                        rasKey?.SetValue("ProhibitIpSec", 0, RegistryValueKind.DWord);
+                        rasKey?.SetValue("AllowL2TPWeakCrypto", 1, RegistryValueKind.DWord);
+                    }
+                    catch { }
+                }
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
+    /// Checks whether DPS (Diagnostic Policy Service) is disabled (Start = 4) under HKLM\SYSTEM\CurrentControlSet\Services\DPS.
+    /// Disabling DPS prevents background diagnostic troubleshooting memory bloat and svchost CPU/RAM spikes.
+    /// </summary>
+    public bool GetDpsServiceDisabled()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\DPS");
+            if (key != null)
+            {
+                var val = key.GetValue("Start");
+                if (val is int intVal) return intVal == 4;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
+    /// Sets HKLM\SYSTEM\CurrentControlSet\Services\DPS Start = 4 (Disabled) or 2 (Automatic) and stops/starts the service.
+    /// </summary>
+    public async Task<(bool Success, string Message)> SetDpsServiceDisabledAsync(bool disable)
+    {
+        try
+        {
+            int targetStart = disable ? 4 : 2;
+            using (var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\DPS", writable: true))
+            {
+                if (key == null)
+                    return (false, "❌ 無法存取 HKLM\\SYSTEM\\CurrentControlSet\\Services\\DPS (請以系統管理員身分執行)。");
+                key.SetValue("Start", targetStart, RegistryValueKind.DWord);
+            }
+
+            if (disable)
+            {
+                await ProcessHelper.RunProcessAsync("sc.exe", "stop DPS");
+                await ProcessHelper.RunProcessAsync("sc.exe", "config DPS start= disabled");
+                return (true, "✅ 已停用 DPS (Diagnostic Policy Service，Start = 4) 並停止背景服務，徹底消除背景診斷記憶體膨脹！");
+            }
+            else
+            {
+                await ProcessHelper.RunProcessAsync("sc.exe", "config DPS start= auto");
+                await ProcessHelper.RunProcessAsync("sc.exe", "start DPS");
+                return (true, "✅ 已還原 DPS (Diagnostic Policy Service，Start = 2 自動啟動) 並啟動服務。");
+            }
+        }
+        catch (Exception ex)
+        {
+            return (false, $"❌ 設定 DPS 服務失敗 (需要系統管理員權限): {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Checks whether DiagTrack (Connected User Experiences and Telemetry) is disabled (Start = 4).
+    /// </summary>
+    public bool GetDiagTrackDisabled()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\DiagTrack");
+            if (key != null)
+            {
+                var val = key.GetValue("Start");
+                if (val is int intVal) return intVal == 4;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>
+    /// Turns Off ("sc stop DiagTrack &amp; sc config DiagTrack start=disabled") or Turns On
+    /// ("sc config DiagTrack start=auto &amp; sc start DiagTrack") the Connected User Experiences and Telemetry service.
+    /// Windows Update continues to work normally with DiagTrack disabled.
+    /// </summary>
+    public async Task<(bool Success, string Message)> SetDiagTrackServiceDisabledAsync(bool disable)
+    {
+        try
+        {
+            if (disable)
+            {
+                try
+                {
+                    using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\DiagTrack", writable: true);
+                    key?.SetValue("Start", 4, RegistryValueKind.DWord);
+                }
+                catch { }
+
+                var (_, err1, code1) = await ProcessHelper.RunProcessAsync("sc.exe", "stop DiagTrack");
+                var (out2, err2, code2) = await ProcessHelper.RunProcessAsync("sc.exe", "config DiagTrack start= disabled");
+
+                if (code2 == 0 || GetDiagTrackDisabled())
+                {
+                    return (true, "✅ 已執行 `sc stop DiagTrack` 與 `sc config DiagTrack start= disabled`！遙測追蹤服務已徹底關閉 (Windows Update 依然完全正常運作)。");
+                }
+                return (false, $"❌ 關閉 DiagTrack 失敗 (請確認以系統管理員身分執行): {(string.IsNullOrWhiteSpace(err2) ? out2 : err2)}");
+            }
+            else
+            {
+                try
+                {
+                    using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\DiagTrack", writable: true);
+                    key?.SetValue("Start", 2, RegistryValueKind.DWord);
+                }
+                catch { }
+
+                var (out1, err1, code1) = await ProcessHelper.RunProcessAsync("sc.exe", "config DiagTrack start= auto");
+                await ProcessHelper.RunProcessAsync("sc.exe", "start DiagTrack");
+
+                if (code1 == 0 || !GetDiagTrackDisabled())
+                {
+                    return (true, "✅ 已執行 `sc config DiagTrack start= auto` 與 `sc start DiagTrack`！已恢復啟用 DiagTrack 服務。");
+                }
+                return (false, $"❌ 啟用 DiagTrack 失敗 (請確認以系統管理員身分執行): {(string.IsNullOrWhiteSpace(err1) ? out1 : err1)}");
+            }
+        }
+        catch (Exception ex)
+        {
+            return (false, $"❌ 操作 DiagTrack 服務失敗: {ex.Message}");
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════
     //  4. 1-Click Gaming Mode / Restore Factory Defaults
     // ══════════════════════════════════════════════════════════
 
@@ -453,10 +638,10 @@ public class SystemOptimizerService
 
         allApplied &= AppendStep(sb, $"⚡ 設定 Win32PrioritySeparation = 0x{win32PriorityVal:X} ({win32PriorityVal})...", SetWin32PrioritySeparation(win32PriorityVal));
         allApplied &= AppendStep(sb, "⚡ 停用 CPU 能源節流 (PowerThrottlingOff = 1)...", SetPowerThrottlingDisabled(true));
-        allApplied &= AppendStep(sb, "🚀 設定 MMCSS SystemResponsiveness = 0 (100% 前台優先)...", SetSystemResponsiveness(0));
+        allApplied &= AppendStep(sb, "🚀 設定 MMCSS SystemResponsiveness = 10 (保留 10% 系統穩定，90% 專注遊戲防微卡頓)...", SetSystemResponsiveness(10));
         allApplied &= AppendStep(sb, "🌐 停用網路節流佇列 (NetworkThrottlingIndex = 0xFFFFFFFF)...", SetNetworkThrottlingDisabled(true));
         allApplied &= AppendStep(sb, "🎮 提升 MMCSS Games 工作排程為 High Priority...", ConfigureMmcssGamesTask(true));
-        allApplied &= AppendStep(sb, "🛡️ 關閉 Game DVR / Game Bar 背景開銷與啟用全螢幕優化...", SetGameDvrDisabled(true));
+        allApplied &= AppendStep(sb, "🛡️ 關閉 Game DVR / Game Bar 背景錄影開銷 (GameDVR_Enabled = 0)...", SetGameDvrDisabled(true));
         allApplied &= AppendStep(sb, "🖥️ 啟用硬體加速 GPU 排程 (HAGS HwSchMode = 2)...", SetHagsStatus(true));
         allApplied &= AppendStep(sb, "🖱️ 最佳化滑鼠 1:1 感應器追蹤與按鍵零延遲...", ConfigureInputLatency(true));
 
@@ -567,6 +752,20 @@ public class SystemOptimizerService
             // 5. GameConfigStore
             sb.AppendLine(@"[HKEY_CURRENT_USER\System\GameConfigStore]");
             sb.AppendLine($"\"GameDVR_Enabled\"=dword:{(GetGameDvrDisabled() ? 0 : 1):x8}");
+            sb.AppendLine();
+
+            // 6. PolicyAgent (L2TP/IPsec VPN NAT-T)
+            sb.AppendLine(@"[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\PolicyAgent]");
+            sb.AppendLine($"\"AssumeUDPEncapsulationContextOnSendRule\"=dword:{GetL2tpVpnNatRuleValue():x8}");
+            sb.AppendLine();
+
+            // 7. DPS & DiagTrack Services
+            sb.AppendLine(@"[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\DPS]");
+            sb.AppendLine($"\"Start\"=dword:{(GetDpsServiceDisabled() ? 4 : 2):x8}");
+            sb.AppendLine();
+
+            sb.AppendLine(@"[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\DiagTrack]");
+            sb.AppendLine($"\"Start\"=dword:{(GetDiagTrackDisabled() ? 4 : 2):x8}");
             sb.AppendLine();
 
             await File.WriteAllTextAsync(filePath, sb.ToString(), Encoding.Unicode);

@@ -173,28 +173,27 @@ if (-not $cert -and -not [string]::IsNullOrWhiteSpace($CertThumbprint)) {
 if (-not $cert) {
     $allCerts = @(Get-ChildItem -Path Cert:\CurrentUser\My -CodeSigningCert -ErrorAction SilentlyContinue) +
                 @(Get-ChildItem -Path Cert:\LocalMachine\My -CodeSigningCert -ErrorAction SilentlyContinue)
-    
-    # Prioritize valid certificates that have a private key and match "DiskMaster"
+    $trustedRootThumbprints = @(Get-ChildItem -Path Cert:\CurrentUser\Root, Cert:\LocalMachine\Root -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Thumbprint)
+
+    # First priority: already trusted in Root store + has private key + matches DiskMaster
     $validDiskMasterCert = $allCerts | Where-Object { 
         $_.HasPrivateKey -and 
         $_.NotAfter -gt (Get-Date) -and 
-        ($_.Subject -match "DiskMaster" -or $_.FriendlyName -match "DiskMaster") 
+        $_.Subject -match "DiskMaster" -and
+        ($trustedRootThumbprints -contains $_.Thumbprint)
     } | Select-Object -First 1
+
+    if (-not $validDiskMasterCert) {
+        $validDiskMasterCert = $allCerts | Where-Object { 
+            $_.HasPrivateKey -and 
+            $_.NotAfter -gt (Get-Date) -and 
+            $_.Subject -match "DiskMaster"
+        } | Select-Object -First 1
+    }
 
     if ($validDiskMasterCert) {
         $cert = $validDiskMasterCert
         Write-Host "[Cert] Reusing existing DiskMaster certificate: $($cert.Thumbprint)" -ForegroundColor Green
-    }
-    else {
-        # Fallback to any valid unexpired code signing certificate with private key
-        $anyValidCert = $allCerts | Where-Object { 
-            $_.HasPrivateKey -and $_.NotAfter -gt (Get-Date) 
-        } | Select-Object -First 1
-
-        if ($anyValidCert) {
-            $cert = $anyValidCert
-            Write-Host "[Cert] Using available Code Signing certificate: $($cert.Thumbprint) ($($cert.Subject))" -ForegroundColor Green
-        }
     }
 }
 
@@ -228,28 +227,25 @@ if (-not $cert) {
 # 2. Local Trust Registration (Skipped in CI to avoid modal prompts)
 # -------------------------------------------------------------
 if (-not $isCI -and -not $SkipTrust) {
-    try {
-        # Register in CurrentUser TrustedPublisher to eliminate Unknown Publisher dialogs
-        $pubStore = New-Object System.Security.Cryptography.X509Certificates.X509Store "TrustedPublisher", "CurrentUser"
-        $pubStore.Open("ReadWrite")
-        $pubStore.Add($cert)
-        $pubStore.Close()
-        Write-Host "[Trust] Registered certificate in CurrentUser TrustedPublisher store." -ForegroundColor DarkGreen
-    }
-    catch {
-        Write-Verbose "[Trust] Could not add to TrustedPublisher store: $_"
-    }
-
-    try {
-        # Register in CurrentUser Root store
-        $rootStore = New-Object System.Security.Cryptography.X509Certificates.X509Store "Root", "CurrentUser"
-        $rootStore.Open("ReadWrite")
-        $rootStore.Add($cert)
-        $rootStore.Close()
-        Write-Host "[Trust] Registered certificate in CurrentUser Root store." -ForegroundColor DarkGreen
-    }
-    catch {
-        Write-Verbose "[Trust] CurrentUser Root store registration note: $_"
+    foreach ($location in @("CurrentUser", "LocalMachine")) {
+        foreach ($storeName in @("TrustedPublisher", "Root")) {
+            try {
+                $store = New-Object System.Security.Cryptography.X509Certificates.X509Store $storeName, $location
+                $store.Open("ReadWrite")
+                $existing = $store.Certificates.Find([System.Security.Cryptography.X509Certificates.X509FindType]::FindByThumbprint, $cert.Thumbprint, $false)
+                if ($existing -and $existing.Count -gt 0) {
+                    Write-Host "[Trust] Certificate already registered in $location $storeName store." -ForegroundColor DarkGreen
+                }
+                else {
+                    $store.Add($cert)
+                    Write-Host "[Trust] Registered certificate in $location $storeName store." -ForegroundColor DarkGreen
+                }
+                $store.Close()
+            }
+            catch {
+                Write-Verbose "[Trust] Could not add to $location $storeName store: $_"
+            }
+        }
     }
 }
 elseif ($isCI) {

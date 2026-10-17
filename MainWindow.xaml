@@ -530,10 +530,15 @@
 
                         <!-- Central Main Viewport -->
                         <ScrollViewer x:Name="ContentScrollViewer" Grid.Column="0"
-                                      HorizontalScrollBarVisibility="Disabled"
+                                      HorizontalScrollBarVisibility="Hidden"
+                                      HorizontalScrollMode="Disabled"
                                       VerticalScrollBarVisibility="Auto"
+                                      HorizontalContentAlignment="Left"
+                                      VerticalContentAlignment="Top"
+                                      ViewChanged="ContentScrollViewer_ViewChanged"
                                       SizeChanged="ContentScrollViewer_SizeChanged">
-                            <Grid x:Name="ContentRoot" RenderTransformOrigin="0,0" HorizontalAlignment="Stretch">
+                            <Grid x:Name="ContentRoot" RenderTransformOrigin="0,0" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                  BringIntoViewRequested="ContentRoot_BringIntoViewRequested">
                                 <Grid.RenderTransform>
                                     <ScaleTransform x:Name="RootScaleTransform" ScaleX="1.0" ScaleY="1.0" />
                                 </Grid.RenderTransform>

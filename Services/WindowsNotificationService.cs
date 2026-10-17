@@ -48,13 +48,13 @@ public class WindowsNotificationService
     }
 
     /// <summary>
-    /// Registers HKCU\Software\Classes\AppUserModelId\DiskMaster.Pro.Flagship and Start Menu shortcut.
+    /// Registers HKCU\Software\Classes\AppUserModelId\DiskMaster.Pro.Flagship for native Windows 10/11 Toast & Action Center support.
+    /// Does not write .lnk files into Start Menu at runtime so Portable builds remain clean and never trigger AV behavioral heuristics.
     /// </summary>
     private void EnsureAppUserModelIdRegistration()
     {
         try
         {
-            // 1. Register in HKCU for immediate Windows Settings and Action Center recognition
             using var key = Registry.CurrentUser.CreateSubKey($@"Software\Classes\AppUserModelId\{AppUserModelId}", writable: true);
             if (key != null)
             {
@@ -65,22 +65,6 @@ public class WindowsNotificationService
                 }
                 key.SetValue("ShowInSettings", 1, RegistryValueKind.DWord);
             }
-        }
-        catch { }
-
-        // 2. Ensure Start Menu shortcut carries PKEY_AppUserModel_ID
-        try
-        {
-            string startMenuDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "DiskMaster Pro");
-            if (!Directory.Exists(startMenuDir))
-            {
-                Directory.CreateDirectory(startMenuDir);
-            }
-
-            string shortcutPath = Path.Combine(startMenuDir, "DiskMaster Pro.lnk");
-            string exePath = Process.GetCurrentProcess().MainModule?.FileName ?? Path.Combine(AppContext.BaseDirectory, "DiskMasterWinUI.exe");
-
-            CreateOrUpdateShortcutWithAumid(shortcutPath, exePath, AppContext.BaseDirectory, _iconPath, AppUserModelId);
         }
         catch { }
     }
@@ -149,114 +133,4 @@ public class WindowsNotificationService
             _trayFallback?.Invoke(title, message);
         }
     }
-
-    #region Shell Shortcut COM Interop with PKEY_AppUserModel_ID
-
-    private static void CreateOrUpdateShortcutWithAumid(string shortcutPath, string targetPath, string workingDir, string iconPath, string aumid)
-    {
-        try
-        {
-            var link = (IShellLinkW)new ShellLink();
-            link.SetPath(targetPath);
-            link.SetWorkingDirectory(workingDir);
-            if (File.Exists(iconPath))
-            {
-                link.SetIconLocation(iconPath, 0);
-            }
-            link.SetDescription("DiskMaster Pro - Advanced Windows Disk & Deployment Manager");
-
-            var propertyStore = (IPropertyStore)link;
-            var key = new PROPERTYKEY
-            {
-                fmtid = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"),
-                pid = 5
-            };
-
-            var pv = new PROPVARIANT();
-            pv.Init(aumid);
-            propertyStore.SetValue(ref key, ref pv);
-            propertyStore.Commit();
-
-            var persistFile = (IPersistFile)link;
-            persistFile.Save(shortcutPath, true);
-        }
-        catch { }
-    }
-
-    [ComImport]
-    [Guid("00021401-0000-0000-C000-000000000046")]
-    [ClassInterface(ClassInterfaceType.None)]
-    private class ShellLink { }
-
-    [ComImport]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    [Guid("000214F9-0000-0000-C000-000000000046")]
-    private interface IShellLinkW
-    {
-        void GetPath([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder pszFile, int cchMaxPath, IntPtr pfd, uint fFlags);
-        void GetIDList(out IntPtr ppidl);
-        void SetIDList(IntPtr pidl);
-        void GetDescription([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder pszName, int cchMaxName);
-        void SetDescription([MarshalAs(UnmanagedType.LPWStr)] string pszName);
-        void GetWorkingDirectory([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder pszDir, int cchMaxPath);
-        void SetWorkingDirectory([MarshalAs(UnmanagedType.LPWStr)] string pszDir);
-        void GetArguments([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder pszArgs, int cchMaxPath);
-        void SetArguments([MarshalAs(UnmanagedType.LPWStr)] string pszArgs);
-        void GetHotkey(out ushort pwHotkey);
-        void SetHotkey(ushort wHotkey);
-        void GetShowCmd(out int piShowCmd);
-        void SetShowCmd(int iShowCmd);
-        void GetIconLocation([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder pszIconPath, int cchIconPath, out int piIcon);
-        void SetIconLocation([MarshalAs(UnmanagedType.LPWStr)] string pszIconPath, int iIcon);
-        void SetRelativePath([MarshalAs(UnmanagedType.LPWStr)] string pszPathRel, uint dwReserved);
-        void Resolve(IntPtr hwnd, uint fFlags);
-        void SetPath([MarshalAs(UnmanagedType.LPWStr)] string pszFile);
-    }
-
-    [ComImport]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    [Guid("0000010b-0000-0000-C000-000000000046")]
-    private interface IPersistFile
-    {
-        void GetClassID(out Guid pClassID);
-        void IsDirty();
-        void Load([MarshalAs(UnmanagedType.LPWStr)] string pszFileName, uint dwMode);
-        void Save([MarshalAs(UnmanagedType.LPWStr)] string pszFileName, [MarshalAs(UnmanagedType.Bool)] bool fRemember);
-        void SaveCompleted([MarshalAs(UnmanagedType.LPWStr)] string pszFileName);
-        void GetCurFile([Out, MarshalAs(UnmanagedType.LPWStr)] string ppszFileName);
-    }
-
-    [ComImport]
-    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-    [Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99")]
-    private interface IPropertyStore
-    {
-        uint GetCount(out uint cProps);
-        uint GetAt(uint iProp, out PROPERTYKEY pkey);
-        uint GetValue(ref PROPERTYKEY key, out PROPVARIANT pv);
-        uint SetValue(ref PROPERTYKEY key, ref PROPVARIANT pv);
-        uint Commit();
-    }
-
-    [StructLayout(LayoutKind.Sequential, Pack = 4)]
-    private struct PROPERTYKEY
-    {
-        public Guid fmtid;
-        public uint pid;
-    }
-
-    [StructLayout(LayoutKind.Explicit)]
-    private struct PROPVARIANT
-    {
-        [FieldOffset(0)] public ushort vt;
-        [FieldOffset(8)] public IntPtr pwszVal;
-
-        public void Init(string val)
-        {
-            vt = 31; // VT_LPWSTR
-            pwszVal = Marshal.StringToCoTaskMemUni(val);
-        }
-    }
-
-    #endregion
 }
