@@ -1296,7 +1296,7 @@
                                         <Button Grid.Column="3" Content="⚡ 執行設定套用"
                                                 Command="{x:Bind ViewModel.ApplyTcpAutoTuningLevelCommand}"
                                                 Style="{StaticResource AccentButtonStyle}"
-                                                IsEnabled="{x:Bind ViewModel.IsApplyingTcpGlobal, Mode=OneWay, Converter={StaticResource InverseBoolConverter}}"
+                                                IsEnabled="{x:Bind ViewModel.IsApplyingTcpGlobal, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}"
                                                 VerticalAlignment="Bottom" Padding="14,8" />
                                     </Grid>
 
