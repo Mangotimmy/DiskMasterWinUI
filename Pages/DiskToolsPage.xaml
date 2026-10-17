@@ -563,62 +563,526 @@
                 </ScrollViewer>
             </TabViewItem>
 
-            <!-- ── Tab 2: Environment Doctor & In-App Setup ── -->
-            <TabViewItem x:Name="TabEnv" Header="環境健檢與套件補齊 (Environment Doctor)" IsClosable="False">
-                <Grid Margin="0,10,0,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
+            <!-- ── Tab 2: Environment Table Setting & Doctor (環境變數表格、PATH 健檢與系統工具) ── -->
+            <TabViewItem x:Name="TabEnv" Header="🛠️ 環境變數表與套件健檢 (Environment Table &amp; Doctor)" IsClosable="False">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                    <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,24">
 
-                    <TextBlock x:Name="EnvDoctorDesc" Grid.Row="0" Text="自動偵測本機是否具備各項進階磁碟與修復工具。若有缺失，可於應用內一鍵背景下載安裝："
-                               Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="0,0,0,10" />
+                        <!-- Top Filter, Search & Backup Toolbar Card -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="4">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon Glyph="&#xE90F;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                            <TextBlock Text="系統與使用者環境變數表格設定中心 (Environment Table &amp; PATH Manager)"
+                                                       FontWeight="SemiBold" FontSize="16" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <TextBlock x:Name="EnvDoctorDesc"
+                                                   Text="集中檢視與編輯 Windows 系統 (Machine) / 使用者 (User) 環境變數表、拆解並清理 PATH 無效目錄，以及自動偵測並補齊磁碟修復 CLI 工具。"
+                                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Button Content="💾 匯出 JSON 備份"
+                                                Command="{x:Bind ViewModel.ExportEnvironmentBackupCommand}"
+                                                AutomationProperties.Name="匯出環境變數與 PATH JSON 備份"
+                                                ToolTipService.ToolTip="將系統與使用者環境變數及 PATH 明細匯出為 JSON 備份檔" />
+                                        <Button Content="🪟 系統對話框 (sysdm.cpl)"
+                                                Command="{x:Bind ViewModel.OpenWindowsEnvDialogCommand}"
+                                                AutomationProperties.Name="開啟 Windows 原生環境變數對話框"
+                                                ToolTipService.ToolTip="開啟 rundll32.exe sysdm.cpl,EditEnvironmentVariables" />
+                                    </StackPanel>
+                                </Grid>
 
-                    <ListView Grid.Row="1" ItemsSource="{x:Bind ViewModel.ToolItems, Mode=OneWay}"
-                              SelectionMode="None">
-                        <ListView.ItemTemplate>
-                            <DataTemplate x:DataType="services:ToolEnvironmentItem">
-                                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                                        CornerRadius="6" Padding="12" Margin="0,4">
+                                <!-- Filter & Search Row -->
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="220" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox Grid.Column="0" Header="檢視範圍 (Scope Filter)"
+                                              HorizontalAlignment="Stretch"
+                                              ItemsSource="{x:Bind ViewModel.EnvScopeFilterOptions}"
+                                              SelectedItem="{x:Bind ViewModel.EnvScopeFilter, Mode=TwoWay}"
+                                              AutomationProperties.Name="環境變數檢視範圍篩選" />
+                                    <TextBox Grid.Column="1" Header="即時搜尋變數名稱、路徑或工具 (Filter Table)"
+                                             PlaceholderText="🔍 輸入關鍵字（例如 PATH, TEMP, JAVA_HOME, System32, winget）..."
+                                             Text="{x:Bind ViewModel.EnvSearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             AutomationProperties.Name="搜尋環境變數與路徑" />
+                                    <Button Grid.Column="2" Content="🔄 重新載入表格"
+                                            Command="{x:Bind ViewModel.CheckEnvironmentCommand}"
+                                            Style="{StaticResource AccentButtonStyle}"
+                                            VerticalAlignment="Bottom"
+                                            AutomationProperties.Name="重新載入環境變數與工具表格" />
+                                </Grid>
+
+                                <!-- Live Summary Badges -->
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                            CornerRadius="4" Padding="10,4">
+                                        <TextBlock Text="{x:Bind ViewModel.EnvSummaryStatsText, Mode=OneWay}"
+                                                   FontSize="12" FontWeight="SemiBold" />
+                                    </Border>
+                                    <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                            CornerRadius="4" Padding="10,4">
+                                        <TextBlock Text="{x:Bind ViewModel.PathHealthSummaryText, Mode=OneWay}"
+                                                   FontSize="12" FontWeight="SemiBold" />
+                                    </Border>
+                                    <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                            CornerRadius="4" Padding="10,4" HorizontalAlignment="Left">
+                                        <TextBlock Text="{x:Bind ViewModel.ToolHealthSummaryText, Mode=OneWay}"
+                                                   FontSize="12" FontWeight="SemiBold" />
+                                    </Border>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Card 1: Environment Variables Table & In-Place Editor -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE8FD;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                    <TextBlock Text="📋 環境變數資料表設定 (Environment Variables Table)"
+                                               FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" />
+                                </StackPanel>
+
+                                <!-- Table Column Header -->
+                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                        CornerRadius="6" Padding="12,8">
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="135" />
+                                            <ColumnDefinition Width="210" />
                                             <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="115" />
+                                            <ColumnDefinition Width="96" />
                                         </Grid.ColumnDefinitions>
-
-                                        <!-- Status Icon -->
-                                        <FontIcon Grid.Column="0" Glyph="{x:Bind StatusGlyph}"
-                                                  FontSize="22" VerticalAlignment="Center"
-                                                  Foreground="{x:Bind StatusBrush}" />
-
-                                        <!-- Tool Info -->
-                                        <StackPanel Grid.Column="1" Spacing="2">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" FontSize="14" />
-                                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
-                                                        CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
-                                                    <TextBlock Text="{x:Bind PathFound}" FontSize="11"
-                                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                                </Border>
-                                            </StackPanel>
-                                            <TextBlock Text="{x:Bind Description}" Style="{StaticResource CaptionTextBlockStyle}"
-                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                        </StackPanel>
-
-                                        <!-- In-App Winget Setup Button -->
-                                        <Button Grid.Column="2" Content="⬇️ 一鍵下載並安裝"
-                                                Visibility="{x:Bind CanInstallViaWinget, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                Style="{StaticResource AccentButtonStyle}"
-                                                VerticalAlignment="Center"
-                                                Click="InstallTool_Click" />
+                                        <TextBlock Grid.Column="0" Text="範圍 (Scope)" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="1" Text="變數名稱 (Key)" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="2" Text="變數內容與展開路徑 (Value / Expanded)" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="3" Text="狀態 / 長度" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="4" Text="操作" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Right" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     </Grid>
                                 </Border>
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
-                </Grid>
+
+                                <!-- Empty Filter State -->
+                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                        CornerRadius="6" Padding="16"
+                                        Visibility="{x:Bind ViewModel.HasEmptyEnvFilterResult, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Text="找不到符合搜尋條件的環境變數。請清除搜尋關鍵字或切換檢視範圍。"
+                                               HorizontalAlignment="Center"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </Border>
+
+                                <!-- Environment Variables Table Rows -->
+                                <ListView ItemsSource="{x:Bind ViewModel.FilteredEnvVariables, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedEnvVariable, Mode=TwoWay}"
+                                          MaxHeight="300" SelectionMode="Single"
+                                          AutomationProperties.Name="環境變數資料表">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate x:DataType="services:EnvironmentVariableEntry">
+                                            <Grid Padding="8,6" ColumnSpacing="12"
+                                                  BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="135" />
+                                                    <ColumnDefinition Width="210" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="115" />
+                                                    <ColumnDefinition Width="96" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Scope Badge -->
+                                                <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                                        CornerRadius="4" Padding="8,4" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                                    <TextBlock Text="{x:Bind ScopeDisplay}" FontSize="11" FontWeight="SemiBold" />
+                                                </Border>
+
+                                                <!-- Key -->
+                                                <TextBlock Grid.Column="1" Text="{x:Bind Name}"
+                                                           FontFamily="Consolas" FontWeight="SemiBold" FontSize="12"
+                                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                           IsTextSelectionEnabled="True"
+                                                           ToolTipService.ToolTip="{x:Bind Name}" />
+
+                                                <!-- Value & Expanded -->
+                                                <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="{x:Bind Value}"
+                                                               FontFamily="Consolas" FontSize="12"
+                                                               TextTrimming="CharacterEllipsis" MaxLines="1"
+                                                               ToolTipService.ToolTip="{x:Bind Value}" />
+                                                    <TextBlock Text="{x:Bind ExpandedValue}"
+                                                               FontFamily="Consolas" FontSize="11"
+                                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                               TextTrimming="CharacterEllipsis" MaxLines="1"
+                                                               Visibility="{x:Bind HasUnexpandedTokens, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                               ToolTipService.ToolTip="{x:Bind ExpandedValue}" />
+                                                </StackPanel>
+
+                                                <!-- Status + Length -->
+                                                <StackPanel Grid.Column="3" Spacing="2" VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                                        <FontIcon Glyph="{x:Bind StatusGlyph}" FontSize="12" Foreground="{x:Bind StatusBrush}" />
+                                                        <TextBlock Text="{x:Bind StatusBadgeText}" FontSize="11" FontWeight="SemiBold" Foreground="{x:Bind StatusBrush}" />
+                                                    </StackPanel>
+                                                    <TextBlock Text="{x:Bind LengthDisplay}" FontFamily="Consolas" FontSize="10"
+                                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                </StackPanel>
+
+                                                <!-- Row Actions -->
+                                                <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4"
+                                                            HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                    <Button Content="📋" Padding="6,4" FontSize="11"
+                                                            Click="CopyEnvVar_Click"
+                                                            AutomationProperties.Name="複製環境變數鍵值"
+                                                            ToolTipService.ToolTip="複製 KEY=VALUE 到剪貼簿" />
+                                                    <Button Content="🗑️" Padding="6,4" FontSize="11"
+                                                            Click="DeleteEnvVar_Click"
+                                                            AutomationProperties.Name="刪除此環境變數"
+                                                            ToolTipService.ToolTip="刪除此環境變數（需確認）" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+
+                                <!-- Variable Editor Panel -->
+                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                        CornerRadius="6" Padding="14">
+                                    <StackPanel Spacing="10">
+                                        <Grid ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="✏️ 新增 / 編輯環境變數 (點擊上方表格列可帶入編輯，儲存後自動廣播 WM_SETTINGCHANGE)"
+                                                       FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" />
+                                            <Button Grid.Column="1" Content="➕ 清空以新增變數"
+                                                    Command="{x:Bind ViewModel.PrepareNewEnvVariableCommand}"
+                                                    Padding="10,4" FontSize="12"
+                                                    AutomationProperties.Name="清空欄位以新增環境變數" />
+                                        </Grid>
+
+                                        <Grid ColumnSpacing="10" RowSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="210" />
+                                                <ColumnDefinition Width="220" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <ComboBox Grid.Column="0" Header="目標範圍 (Target Scope)"
+                                                      HorizontalAlignment="Stretch"
+                                                      ItemsSource="{x:Bind ViewModel.EnvTargetScopeOptions}"
+                                                      SelectedItem="{x:Bind ViewModel.EditEnvTargetScope, Mode=TwoWay}" />
+
+                                            <TextBox Grid.Column="1" Header="變數名稱 (Variable Name)"
+                                                     Text="{x:Bind ViewModel.EditEnvName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     PlaceholderText="例如 JAVA_HOME"
+                                                     FontFamily="Consolas" />
+
+                                            <TextBox Grid.Column="2" Header="變數內容 (Variable Value)"
+                                                     Text="{x:Bind ViewModel.EditEnvValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     PlaceholderText="輸入值或點擊右側瀏覽路徑..."
+                                                     FontFamily="Consolas" />
+
+                                            <Button Grid.Column="3" Content="📁 資料夾"
+                                                    Command="{x:Bind ViewModel.BrowseEnvValueFolderCommand}"
+                                                    VerticalAlignment="Bottom"
+                                                    AutomationProperties.Name="瀏覽資料夾作為變數內容"
+                                                    ToolTipService.ToolTip="瀏覽並選取資料夾路徑填入變數值" />
+
+                                            <Button Grid.Column="4" Content="📄 檔案"
+                                                    Command="{x:Bind ViewModel.BrowseEnvValueFileCommand}"
+                                                    VerticalAlignment="Bottom"
+                                                    AutomationProperties.Name="瀏覽檔案作為變數內容"
+                                                    ToolTipService.ToolTip="瀏覽並選取檔案路徑填入變數值" />
+                                        </Grid>
+
+                                        <Grid ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox Grid.Column="0" Header="展開預覽 (Expanded Preview)"
+                                                     Text="{x:Bind ViewModel.EditEnvExpandedPreview, Mode=OneWay}"
+                                                     IsReadOnly="True" FontFamily="Consolas" FontSize="12" />
+                                            <Button Grid.Column="1" Content="💾 儲存環境變數變更"
+                                                    Command="{x:Bind ViewModel.SaveEnvVariableCommand}"
+                                                    Style="{StaticResource AccentButtonStyle}"
+                                                    VerticalAlignment="Bottom" Padding="16,8"
+                                                    AutomationProperties.Name="儲存環境變數變更" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Card 2: PATH Directory Breakdown & Validator Table -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="2">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon Glyph="&#xE8B7;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                            <TextBlock Text="🛤️ PATH 執行路徑拆解與健檢表 (PATH Directories Inspector &amp; Cleaner)"
+                                                       FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <TextBlock Text="自動逐項檢查系統與使用者 PATH 目錄是否存在、是否重複，並統計各目錄內的可執行檔 (.exe/.cmd/.bat/.ps1) 數量。"
+                                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="🧹 一鍵清理失效與重複 PATH"
+                                            Click="CleanInvalidPaths_Click"
+                                            VerticalAlignment="Center"
+                                            AutomationProperties.Name="一鍵清理失效與重複的 PATH 目錄"
+                                            ToolTipService.ToolTip="自動移除所選範圍內不存在或重複的 PATH 目錄項目" />
+                                </Grid>
+
+                                <!-- Quick Append Directory to PATH -->
+                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                        CornerRadius="6" Padding="12">
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="210" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox Grid.Column="0" Header="加入目標 (PATH Scope)"
+                                                  HorizontalAlignment="Stretch"
+                                                  ItemsSource="{x:Bind ViewModel.EnvTargetScopeOptions}"
+                                                  SelectedItem="{x:Bind ViewModel.NewPathTargetScope, Mode=TwoWay}" />
+                                        <TextBox Grid.Column="1" Header="新增 PATH 目錄路徑 (Directory to Append)"
+                                                 Text="{x:Bind ViewModel.NewPathDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 PlaceholderText="例如 C:\Tools\bin 或點擊右側瀏覽資料夾..."
+                                                 FontFamily="Consolas" />
+                                        <Button Grid.Column="2" Content="📁 瀏覽..."
+                                                Command="{x:Bind ViewModel.BrowseNewPathFolderCommand}"
+                                                VerticalAlignment="Bottom"
+                                                AutomationProperties.Name="瀏覽要加入 PATH 的資料夾" />
+                                        <Button Grid.Column="3" Content="➕ 加入 PATH"
+                                                Command="{x:Bind ViewModel.AddPathDirectoryCommand}"
+                                                Style="{StaticResource AccentButtonStyle}"
+                                                VerticalAlignment="Bottom"
+                                                AutomationProperties.Name="將資料夾加入 PATH" />
+                                    </Grid>
+                                </Border>
+
+                                <!-- PATH Table Column Header -->
+                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                        CornerRadius="6" Padding="12,8">
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="52" />
+                                            <ColumnDefinition Width="125" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="175" />
+                                            <ColumnDefinition Width="96" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="序號" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="1" Text="範圍 (Scope)" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="2" Text="目錄路徑與展開結果 (Directory Path)" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="3" Text="路徑健檢狀態" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="4" Text="操作" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Right" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </Grid>
+                                </Border>
+
+                                <!-- Empty PATH Filter State -->
+                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                        CornerRadius="6" Padding="16"
+                                        Visibility="{x:Bind ViewModel.HasEmptyPathFilterResult, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Text="找不到符合搜尋條件的 PATH 目錄項目。"
+                                               HorizontalAlignment="Center"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </Border>
+
+                                <!-- PATH Table Rows -->
+                                <ListView ItemsSource="{x:Bind ViewModel.FilteredPathDirectories, Mode=OneWay}"
+                                          SelectedItem="{x:Bind ViewModel.SelectedPathDirectory, Mode=TwoWay}"
+                                          MaxHeight="280" SelectionMode="Single"
+                                          AutomationProperties.Name="PATH 執行路徑資料表">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate x:DataType="services:PathDirectoryEntry">
+                                            <Grid Padding="8,6" ColumnSpacing="12"
+                                                  BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="52" />
+                                                    <ColumnDefinition Width="125" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="175" />
+                                                    <ColumnDefinition Width="96" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <TextBlock Grid.Column="0" Text="{x:Bind IndexDisplay}"
+                                                           FontFamily="Consolas" FontWeight="SemiBold" FontSize="12"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                                                <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                                        CornerRadius="4" Padding="8,4" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                                    <TextBlock Text="{x:Bind ScopeDisplay}" FontSize="11" FontWeight="SemiBold" />
+                                                </Border>
+
+                                                <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="{x:Bind RawPath}"
+                                                               FontFamily="Consolas" FontWeight="SemiBold" FontSize="12"
+                                                               IsTextSelectionEnabled="True"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTipService.ToolTip="{x:Bind RawPath}" />
+                                                    <TextBlock Text="{x:Bind ExpandedPath}"
+                                                               FontFamily="Consolas" FontSize="11"
+                                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTipService.ToolTip="{x:Bind ExpandedPath}" />
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                    <FontIcon Glyph="{x:Bind StatusGlyph}" FontSize="13" Foreground="{x:Bind StatusBrush}" />
+                                                    <TextBlock Text="{x:Bind StatusText}" FontSize="11" FontWeight="SemiBold"
+                                                               Foreground="{x:Bind StatusBrush}" VerticalAlignment="Center" />
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4"
+                                                            HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                    <Button Content="📂" Padding="6,4" FontSize="11"
+                                                            Click="OpenPathDir_Click"
+                                                            IsEnabled="{x:Bind Exists}"
+                                                            AutomationProperties.Name="在檔案總管開啟此目錄"
+                                                            ToolTipService.ToolTip="在檔案總管中開啟此目錄" />
+                                                    <Button Content="🗑️" Padding="6,4" FontSize="11"
+                                                            Click="RemovePathDir_Click"
+                                                            AutomationProperties.Name="從 PATH 移除此目錄"
+                                                            ToolTipService.ToolTip="從 PATH 移除此目錄項目（需確認）" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Card 3: System & Disk CLI Tools Health Table -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE756;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                    <TextBlock Text="🧰 系統核心磁碟與修復 CLI 工具健檢表 (CLI Tools Health &amp; Winget Setup)"
+                                               FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" />
+                                </StackPanel>
+
+                                <!-- CLI Tools Table Header -->
+                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                        CornerRadius="6" Padding="12,8">
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="130" />
+                                            <ColumnDefinition Width="210" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="165" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="環境狀態" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="1" Text="工具名稱 / 執行檔" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="2" Text="功能說明與實際執行檔路徑 (Resolved Path)" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Grid.Column="3" Text="定位 / 一鍵補齊" FontWeight="SemiBold" FontSize="12" HorizontalAlignment="Right" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </Grid>
+                                </Border>
+
+                                <ListView ItemsSource="{x:Bind ViewModel.ToolItems, Mode=OneWay}"
+                                          SelectionMode="None"
+                                          AutomationProperties.Name="系統核心 CLI 工具健檢表">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate x:DataType="services:ToolEnvironmentItem">
+                                            <Grid Padding="8,8" ColumnSpacing="12"
+                                                  BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="130" />
+                                                    <ColumnDefinition Width="210" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="165" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Status Icon + Text Badge (Never color/icon alone) -->
+                                                <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                                        CornerRadius="4" Padding="8,4" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <FontIcon Glyph="{x:Bind StatusGlyph}" FontSize="13" Foreground="{x:Bind StatusBrush}" />
+                                                        <TextBlock Text="{x:Bind StatusText}" FontSize="11" FontWeight="SemiBold" Foreground="{x:Bind StatusBrush}" />
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <!-- Tool Name & Exe -->
+                                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                    <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" FontSize="13" />
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                                                CornerRadius="4" Padding="6,1">
+                                                            <TextBlock Text="{x:Bind ExecutableName}" FontFamily="Consolas" FontSize="11"
+                                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                        </Border>
+                                                        <TextBlock Text="{x:Bind Category}" FontSize="11"
+                                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                </StackPanel>
+
+                                                <!-- Description & Selectable Path -->
+                                                <StackPanel Grid.Column="2" Spacing="3" VerticalAlignment="Center">
+                                                    <TextBlock Text="{x:Bind Description}" FontSize="12" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{x:Bind PathFound}" FontFamily="Consolas" FontSize="11"
+                                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                               IsTextSelectionEnabled="True"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               ToolTipService.ToolTip="{x:Bind PathFound}" />
+                                                </StackPanel>
+
+                                                <!-- Actions: Open Folder or Winget Install -->
+                                                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6"
+                                                            HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                    <Button Content="📂 定位檔案"
+                                                            Visibility="{x:Bind CanOpenFolder, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                            Click="OpenToolFolder_Click"
+                                                            Padding="8,4" FontSize="11"
+                                                            AutomationProperties.Name="在檔案總管中定位此執行檔" />
+                                                    <Button Content="⬇️ Winget 安裝"
+                                                            Visibility="{x:Bind CanInstallViaWinget, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                            Style="{StaticResource AccentButtonStyle}"
+                                                            Click="InstallTool_Click"
+                                                            Padding="10,4" FontSize="11"
+                                                            AutomationProperties.Name="使用 Winget 一鍵下載並安裝此工具" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
             </TabViewItem>
 
             <!-- ── Tab 3: Disk Optimization & Advanced Recovery ── -->

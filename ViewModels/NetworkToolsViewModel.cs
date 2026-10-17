@@ -234,6 +234,26 @@ public partial class NetworkToolsViewModel : ObservableObject
     [ObservableProperty] private string _testPollutionDomain = "github.com";
     [ObservableProperty] private bool _isTestingPollution;
 
+    // ── 9. Global TCP Auto-Tuning & Stack CLI (netsh int tcp set global autotuninglevel) ──
+    private readonly TcpOptimizerService _tcpOptimizerService = new();
+    public List<string> TcpAutoTuningLevels { get; } = ["normal", "experimental", "restricted", "highlyrestricted", "disabled"];
+    [ObservableProperty] private string _tcpAutoTuningLevel = "normal";
+    [ObservableProperty] private string _tcpCongestionProvider = "CUBIC";
+    [ObservableProperty] private string _tcpEcnState = "disabled";
+    [ObservableProperty] private string _tcpRssState = "enabled";
+    [ObservableProperty] private string _tcpRscState = "enabled";
+    [ObservableProperty] private string _tcpTimestampsState = "disabled";
+    [ObservableProperty] private string _tcpGlobalRawOutput = "";
+    [ObservableProperty] private string _tcpGeneratedCommand = "netsh int tcp set global autotuninglevel=normal";
+    [ObservableProperty] private string _tcpStatusMessage = "尚未讀取全域 TCP 自動微調狀態";
+    [ObservableProperty] private bool _isApplyingTcpGlobal;
+
+    partial void OnTcpAutoTuningLevelChanged(string value)
+    {
+        var lvl = string.IsNullOrWhiteSpace(value) ? "normal" : value.Trim().ToLowerInvariant();
+        TcpGeneratedCommand = $"netsh int tcp set global autotuninglevel={lvl}";
+    }
+
     private bool _isInitialized;
     private bool _isLoadingData;
 
@@ -309,8 +329,9 @@ public partial class NetworkToolsViewModel : ObservableObject
             var hostsTask = RefreshHostsAsync();
             var sharesTask = RefreshSharesAsync();
             var rdpTask = RefreshRdpStatusAsync();
+            var tcpTask = RefreshTcpGlobalAsync();
 
-            await Task.WhenAll(nicTask, upnpTask, hostsTask, sharesTask, rdpTask);
+            await Task.WhenAll(nicTask, upnpTask, hostsTask, sharesTask, rdpTask, tcpTask);
             _isInitialized = true;
             StatusMessage = LocalizationService.T("網路工具資料已同步完成", "网络工具数据已同步完成", "Network tools data synchronized", "ネットワークツールの同期完了");
         }
@@ -1380,5 +1401,145 @@ public partial class NetworkToolsViewModel : ObservableObject
         var (ok, msg) = await _dnsPollutionService.ConfigureWindowsDoHAsync();
         StatusMessage = msg;
         if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+    }
+
+    [RelayCommand]
+    public async Task BrowseShareFolderAsync()
+    {
+        var folder = await FilePickerHelper.PickFolderAsync("選擇要共用的資料夾");
+        if (!string.IsNullOrWhiteSpace(folder))
+        {
+            LoadShareFolderTarget(folder);
+        }
+    }
+
+    public void LoadShareFolderTarget(string folderPath)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath)) return;
+        NewSharePath = folderPath;
+        var leaf = System.IO.Path.GetFileName(folderPath.TrimEnd('\\', '/'));
+        if (!string.IsNullOrWhiteSpace(leaf))
+        {
+            NewShareName = leaf.Replace(" ", "_");
+        }
+        NetShareStatusMessage = $"已選取共用資料夾：{folderPath}";
+        StatusMessage = NetShareStatusMessage;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  9. Global TCP Auto-Tuning & Stack CLI Commands
+    //     (netsh int tcp set global autotuninglevel=...)
+    // ══════════════════════════════════════════════════════════
+
+    [RelayCommand]
+    public async Task RefreshTcpGlobalAsync()
+    {
+        try
+        {
+            var settings = await _tcpOptimizerService.GetTcpSettingsAsync();
+            DispatcherHelper.RunOnUIThread(() =>
+            {
+                if (!string.IsNullOrWhiteSpace(settings.AutoTuningLevel))
+                {
+                    TcpAutoTuningLevel = settings.AutoTuningLevel.Trim().ToLowerInvariant();
+                }
+                TcpCongestionProvider = string.IsNullOrWhiteSpace(settings.CongestionProvider) ? "default" : settings.CongestionProvider;
+                TcpEcnState = string.IsNullOrWhiteSpace(settings.EcnCapability) ? "default" : settings.EcnCapability;
+                TcpRssState = string.IsNullOrWhiteSpace(settings.Rss) ? "default" : settings.Rss;
+                TcpRscState = string.IsNullOrWhiteSpace(settings.Rsc) ? "default" : settings.Rsc;
+                TcpTimestampsState = string.IsNullOrWhiteSpace(settings.Timestamps) ? "default" : settings.Timestamps;
+                TcpGlobalRawOutput = string.IsNullOrWhiteSpace(settings.RawGlobalOutput)
+                    ? "(netsh int tcp show global 無輸出)"
+                    : settings.RawGlobalOutput.Trim();
+                TcpStatusMessage = $"目前狀態：AutoTuning={TcpAutoTuningLevel} | 擁塞演算法={TcpCongestionProvider} | ECN={TcpEcnState} | RSS={TcpRssState} | RSC={TcpRscState}";
+            });
+        }
+        catch (Exception ex)
+        {
+            TcpStatusMessage = $"讀取全域 TCP 狀態失敗：{ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    public async Task ApplyTcpAutoTuningLevelAsync(string? level = null)
+    {
+        if (IsApplyingTcpGlobal) return;
+        IsApplyingTcpGlobal = true;
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(level))
+            {
+                TcpAutoTuningLevel = level.Trim().ToLowerInvariant();
+            }
+
+            var targetLevel = string.IsNullOrWhiteSpace(TcpAutoTuningLevel) ? "normal" : TcpAutoTuningLevel.Trim().ToLowerInvariant();
+            TcpStatusMessage = $"正在執行：netsh int tcp set global autotuninglevel={targetLevel} ...";
+            var (ok, msg) = await _tcpOptimizerService.SetAutoTuningLevelAsync(targetLevel);
+            TcpStatusMessage = msg;
+            StatusMessage = msg;
+            if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+            await RefreshTcpGlobalAsync();
+        }
+        finally
+        {
+            IsApplyingTcpGlobal = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task ApplyTcpExtremePresetAsync()
+    {
+        if (IsApplyingTcpGlobal) return;
+        IsApplyingTcpGlobal = true;
+        try
+        {
+            var (ok, msg) = await _tcpOptimizerService.ApplyExtremeThroughputPresetAsync(
+                string.Equals(TcpAutoTuningLevel, "experimental", StringComparison.OrdinalIgnoreCase));
+            TcpStatusMessage = msg;
+            StatusMessage = msg;
+            if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+            await RefreshTcpGlobalAsync();
+        }
+        finally
+        {
+            IsApplyingTcpGlobal = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task RestoreTcpDefaultPresetAsync()
+    {
+        if (IsApplyingTcpGlobal) return;
+        IsApplyingTcpGlobal = true;
+        try
+        {
+            var (ok, msg) = await _tcpOptimizerService.RestoreWindowsDefaultsAsync();
+            TcpStatusMessage = msg;
+            StatusMessage = msg;
+            if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+            await RefreshTcpGlobalAsync();
+        }
+        finally
+        {
+            IsApplyingTcpGlobal = false;
+        }
+    }
+
+    [RelayCommand]
+    public void CopyTcpAutoTuningCmd()
+    {
+        try
+        {
+            var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            dp.SetText(TcpGeneratedCommand);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
+            TcpStatusMessage = $"已複製指令：{TcpGeneratedCommand}";
+            StatusMessage = TcpStatusMessage;
+            AudioFeedbackService.PlaySuccess();
+        }
+        catch (Exception ex)
+        {
+            TcpStatusMessage = $"複製失敗：{ex.Message}";
+        }
     }
 }

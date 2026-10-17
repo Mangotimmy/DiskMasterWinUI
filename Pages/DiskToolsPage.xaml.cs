@@ -38,10 +38,10 @@ public sealed partial class DiskToolsPage : Page
         };
         TabEnv.Header = lang switch
         {
-            "zh-CN" => "环境检查与套件修复",
-            "en-US" => "Environment Doctor",
-            "ja-JP" => "環境診断とパッケージ修復",
-            _ => "環境健檢與套件補齊"
+            "zh-CN" => "🛠️ 环境变量表与套件健检",
+            "en-US" => "🛠️ Environment Table & Doctor",
+            "ja-JP" => "🛠️ 環境変数テーブルと診断",
+            _ => "🛠️ 環境變數表與套件健檢"
         };
         TabOptimize.Header = lang switch
         {
@@ -485,6 +485,90 @@ public sealed partial class DiskToolsPage : Page
         {
             ViewModel.InstallToolCommand.Execute(item);
         }
+    }
+
+    private void OpenToolFolder_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is Services.ToolEnvironmentItem item)
+        {
+            ViewModel.OpenToolFolderCommand.Execute(item);
+        }
+    }
+
+    private void CopyEnvVar_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is Services.EnvironmentVariableEntry entry)
+        {
+            ViewModel.CopyEnvVariableCommand.Execute(entry);
+        }
+    }
+
+    private async void DeleteEnvVar_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is Services.EnvironmentVariableEntry entry)
+        {
+            if (XamlRoot != null)
+            {
+                var dialog = new ContentDialog
+                {
+                    XamlRoot = XamlRoot,
+                    Title = $"確認刪除環境變數 — {entry.Name}",
+                    Content = $"確定要從「{entry.ScopeDisplay}」永久刪除環境變數 [{entry.Name}] 嗎？\n\n目前值：{entry.Value}\n\n建議在刪除重要系統變數前先點擊上方「💾 匯出 JSON 備份」。",
+                    PrimaryButtonText = "確認刪除",
+                    CloseButtonText = "取消",
+                    DefaultButton = ContentDialogButton.Close
+                };
+                if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+            }
+            await ViewModel.DeleteEnvVariableDirectCommand.ExecuteAsync(entry);
+        }
+    }
+
+    private void OpenPathDir_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is Services.PathDirectoryEntry entry)
+        {
+            ViewModel.OpenPathDirectoryInExplorerCommand.Execute(entry);
+        }
+    }
+
+    private async void RemovePathDir_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is Services.PathDirectoryEntry entry)
+        {
+            if (XamlRoot != null)
+            {
+                var dialog = new ContentDialog
+                {
+                    XamlRoot = XamlRoot,
+                    Title = "確認移除 PATH 目錄項目",
+                    Content = $"確定要從「{entry.ScopeDisplay}」移除下列目錄嗎？\n\n{entry.RawPath}\n(展開路徑：{entry.ExpandedPath})",
+                    PrimaryButtonText = "確認移除",
+                    CloseButtonText = "取消",
+                    DefaultButton = ContentDialogButton.Close
+                };
+                if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+            }
+            await ViewModel.RemovePathDirectoryDirectCommand.ExecuteAsync(entry);
+        }
+    }
+
+    private async void CleanInvalidPaths_Click(object sender, RoutedEventArgs e)
+    {
+        if (XamlRoot != null)
+        {
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = "確認清理無效與重複的 PATH 目錄",
+                Content = $"即將掃描並自動移除「{ViewModel.NewPathTargetScope}」中所有不存在於磁碟或重複的 PATH 目錄項目。\n\n是否繼續執行？",
+                PrimaryButtonText = "立即清理",
+                CloseButtonText = "取消",
+                DefaultButton = ContentDialogButton.Close
+            };
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        }
+        await ViewModel.CleanInvalidPathsCommand.ExecuteAsync(null);
     }
 
     private void DeleteShadow_Click(object sender, RoutedEventArgs e)

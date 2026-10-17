@@ -101,6 +101,11 @@
                                     <MenuFlyoutSeparator />
                                     <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
                                     <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="👁️ 隱藏此分頁 (於設定可恢復)" Click="TabContext_HideTab_Click" />
+                                    <MenuFlyoutItem Text="🔁 重設全部分頁預設排序" Click="TabContext_ResetOrder_Click" />
+                                    <MenuFlyoutItem Text="📊 匯出系統診斷報告 [Ctrl+D]" Click="TabContext_ExportDiag_Click" />
+                                    <MenuFlyoutItem Text="🛡️ 以管理員身分重新啟動" Click="AdminRestart_Click" />
                                 </MenuFlyout>
                             </TabViewItem.ContextFlyout>
                         </TabViewItem>
@@ -123,6 +128,11 @@
                                     <MenuFlyoutSeparator />
                                     <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
                                     <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="👁️ 隱藏此分頁 (於設定可恢復)" Click="TabContext_HideTab_Click" />
+                                    <MenuFlyoutItem Text="🔁 重設全部分頁預設排序" Click="TabContext_ResetOrder_Click" />
+                                    <MenuFlyoutItem Text="📊 匯出系統診斷報告 [Ctrl+D]" Click="TabContext_ExportDiag_Click" />
+                                    <MenuFlyoutItem Text="🛡️ 以管理員身分重新啟動" Click="AdminRestart_Click" />
                                 </MenuFlyout>
                             </TabViewItem.ContextFlyout>
                         </TabViewItem>
@@ -145,6 +155,11 @@
                                     <MenuFlyoutSeparator />
                                     <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
                                     <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="👁️ 隱藏此分頁 (於設定可恢復)" Click="TabContext_HideTab_Click" />
+                                    <MenuFlyoutItem Text="🔁 重設全部分頁預設排序" Click="TabContext_ResetOrder_Click" />
+                                    <MenuFlyoutItem Text="📊 匯出系統診斷報告 [Ctrl+D]" Click="TabContext_ExportDiag_Click" />
+                                    <MenuFlyoutItem Text="🛡️ 以管理員身分重新啟動" Click="AdminRestart_Click" />
                                 </MenuFlyout>
                             </TabViewItem.ContextFlyout>
                         </TabViewItem>
@@ -167,6 +182,11 @@
                                     <MenuFlyoutSeparator />
                                     <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
                                     <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="👁️ 隱藏此分頁 (於設定可恢復)" Click="TabContext_HideTab_Click" />
+                                    <MenuFlyoutItem Text="🔁 重設全部分頁預設排序" Click="TabContext_ResetOrder_Click" />
+                                    <MenuFlyoutItem Text="📊 匯出系統診斷報告 [Ctrl+D]" Click="TabContext_ExportDiag_Click" />
+                                    <MenuFlyoutItem Text="🛡️ 以管理員身分重新啟動" Click="AdminRestart_Click" />
                                 </MenuFlyout>
                             </TabViewItem.ContextFlyout>
                         </TabViewItem>
@@ -189,6 +209,11 @@
                                     <MenuFlyoutSeparator />
                                     <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
                                     <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="👁️ 隱藏此分頁 (於設定可恢復)" Click="TabContext_HideTab_Click" />
+                                    <MenuFlyoutItem Text="🔁 重設全部分頁預設排序" Click="TabContext_ResetOrder_Click" />
+                                    <MenuFlyoutItem Text="📊 匯出系統診斷報告 [Ctrl+D]" Click="TabContext_ExportDiag_Click" />
+                                    <MenuFlyoutItem Text="🛡️ 以管理員身分重新啟動" Click="AdminRestart_Click" />
                                 </MenuFlyout>
                             </TabViewItem.ContextFlyout>
                         </TabViewItem>
@@ -211,6 +236,11 @@
                                     <MenuFlyoutSeparator />
                                     <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
                                     <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="👁️ 隱藏此分頁 (於設定可恢復)" Click="TabContext_HideTab_Click" />
+                                    <MenuFlyoutItem Text="🔁 重設全部分頁預設排序" Click="TabContext_ResetOrder_Click" />
+                                    <MenuFlyoutItem Text="📊 匯出系統診斷報告 [Ctrl+D]" Click="TabContext_ExportDiag_Click" />
+                                    <MenuFlyoutItem Text="🛡️ 以管理員身分重新啟動" Click="AdminRestart_Click" />
                                 </MenuFlyout>
                             </TabViewItem.ContextFlyout>
                         </TabViewItem>
@@ -233,6 +263,11 @@
                                     <MenuFlyoutSeparator />
                                     <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
                                     <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="👁️ 隱藏此分頁 (於設定可恢復)" Click="TabContext_HideTab_Click" />
+                                    <MenuFlyoutItem Text="🔁 重設全部分頁預設排序" Click="TabContext_ResetOrder_Click" />
+                                    <MenuFlyoutItem Text="📊 匯出系統診斷報告 [Ctrl+D]" Click="TabContext_ExportDiag_Click" />
+                                    <MenuFlyoutItem Text="🛡️ 以管理員身分重新啟動" Click="AdminRestart_Click" />
                                 </MenuFlyout>
                             </TabViewItem.ContextFlyout>
                         </TabViewItem>
@@ -255,6 +290,11 @@
                                     <MenuFlyoutSeparator />
                                     <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
                                     <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="👁️ 隱藏此分頁 (於設定可恢復)" Click="TabContext_HideTab_Click" />
+                                    <MenuFlyoutItem Text="🔁 重設全部分頁預設排序" Click="TabContext_ResetOrder_Click" />
+                                    <MenuFlyoutItem Text="📊 匯出系統診斷報告 [Ctrl+D]" Click="TabContext_ExportDiag_Click" />
+                                    <MenuFlyoutItem Text="🛡️ 以管理員身分重新啟動" Click="AdminRestart_Click" />
                                 </MenuFlyout>
                             </TabViewItem.ContextFlyout>
                         </TabViewItem>
@@ -277,6 +317,11 @@
                                     <MenuFlyoutSeparator />
                                     <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
                                     <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="👁️ 隱藏此分頁 (於設定可恢復)" Click="TabContext_HideTab_Click" />
+                                    <MenuFlyoutItem Text="🔁 重設全部分頁預設排序" Click="TabContext_ResetOrder_Click" />
+                                    <MenuFlyoutItem Text="📊 匯出系統診斷報告 [Ctrl+D]" Click="TabContext_ExportDiag_Click" />
+                                    <MenuFlyoutItem Text="🛡️ 以管理員身分重新啟動" Click="AdminRestart_Click" />
                                 </MenuFlyout>
                             </TabViewItem.ContextFlyout>
                         </TabViewItem>
@@ -299,6 +344,11 @@
                                     <MenuFlyoutSeparator />
                                     <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
                                     <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="👁️ 隱藏此分頁 (於設定可恢復)" Click="TabContext_HideTab_Click" />
+                                    <MenuFlyoutItem Text="🔁 重設全部分頁預設排序" Click="TabContext_ResetOrder_Click" />
+                                    <MenuFlyoutItem Text="📊 匯出系統診斷報告 [Ctrl+D]" Click="TabContext_ExportDiag_Click" />
+                                    <MenuFlyoutItem Text="🛡️ 以管理員身分重新啟動" Click="AdminRestart_Click" />
                                 </MenuFlyout>
                             </TabViewItem.ContextFlyout>
                         </TabViewItem>
@@ -321,6 +371,11 @@
                                     <MenuFlyoutSeparator />
                                     <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
                                     <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="👁️ 隱藏此分頁 (於設定可恢復)" Click="TabContext_HideTab_Click" />
+                                    <MenuFlyoutItem Text="🔁 重設全部分頁預設排序" Click="TabContext_ResetOrder_Click" />
+                                    <MenuFlyoutItem Text="📊 匯出系統診斷報告 [Ctrl+D]" Click="TabContext_ExportDiag_Click" />
+                                    <MenuFlyoutItem Text="🛡️ 以管理員身分重新啟動" Click="AdminRestart_Click" />
                                 </MenuFlyout>
                             </TabViewItem.ContextFlyout>
                         </TabViewItem>
@@ -343,6 +398,11 @@
                                     <MenuFlyoutSeparator />
                                     <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
                                     <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="👁️ 隱藏此分頁 (於設定可恢復)" Click="TabContext_HideTab_Click" />
+                                    <MenuFlyoutItem Text="🔁 重設全部分頁預設排序" Click="TabContext_ResetOrder_Click" />
+                                    <MenuFlyoutItem Text="📊 匯出系統診斷報告 [Ctrl+D]" Click="TabContext_ExportDiag_Click" />
+                                    <MenuFlyoutItem Text="🛡️ 以管理員身分重新啟動" Click="AdminRestart_Click" />
                                 </MenuFlyout>
                             </TabViewItem.ContextFlyout>
                         </TabViewItem>
@@ -365,6 +425,11 @@
                                     <MenuFlyoutSeparator />
                                     <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
                                     <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="👁️ 隱藏此分頁 (於設定可恢復)" Click="TabContext_HideTab_Click" />
+                                    <MenuFlyoutItem Text="🔁 重設全部分頁預設排序" Click="TabContext_ResetOrder_Click" />
+                                    <MenuFlyoutItem Text="📊 匯出系統診斷報告 [Ctrl+D]" Click="TabContext_ExportDiag_Click" />
+                                    <MenuFlyoutItem Text="🛡️ 以管理員身分重新啟動" Click="AdminRestart_Click" />
                                 </MenuFlyout>
                             </TabViewItem.ContextFlyout>
                         </TabViewItem>
@@ -387,6 +452,11 @@
                                     <MenuFlyoutSeparator />
                                     <MenuFlyoutItem Text="🔄 重新整理此分頁 [F5]" Click="TabContext_Refresh_Click" />
                                     <MenuFlyoutItem Text="📋 複製分頁名稱" Click="TabContext_CopyTitle_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="👁️ 隱藏此分頁 (於設定可恢復)" Click="TabContext_HideTab_Click" />
+                                    <MenuFlyoutItem Text="🔁 重設全部分頁預設排序" Click="TabContext_ResetOrder_Click" />
+                                    <MenuFlyoutItem Text="📊 匯出系統診斷報告 [Ctrl+D]" Click="TabContext_ExportDiag_Click" />
+                                    <MenuFlyoutItem Text="🛡️ 以管理員身分重新啟動" Click="AdminRestart_Click" />
                                 </MenuFlyout>
                             </TabViewItem.ContextFlyout>
                         </TabViewItem>

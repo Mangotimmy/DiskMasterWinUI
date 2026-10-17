@@ -322,21 +322,15 @@ public partial class BootManagerViewModel : ObservableObject
     [RelayCommand]
     public async Task BcdExportAsync()
     {
-        var picker = new Windows.Storage.Pickers.FileSavePicker();
-        var hwnd = WindowHelper.GetWindowHandle();
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-        picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.DocumentsLibrary;
-        picker.FileTypeChoices.Add("BCD Backup File", new List<string> { ".bcd" });
-        picker.SuggestedFileName = $"BCD_Backup_{DateTime.Now:yyyyMMdd_HHmmss}.bcd";
-
-        var file = await picker.PickSaveFileAsync();
-        if (file == null) return;
+        var suggestedName = $"BCD_Backup_{DateTime.Now:yyyyMMdd_HHmmss}.bcd";
+        var filePath = await FilePickerHelper.PickSaveFileAsync(suggestedName, ".bcd", "BCD Backup File");
+        if (string.IsNullOrWhiteSpace(filePath)) return;
 
         try
         {
             IsLoading = true;
-            StatusMessage = $"Exporting BCD to {file.Path}...";
-            var output = await _bootRepair.BcdEditExportAsync(file.Path);
+            StatusMessage = $"Exporting BCD to {filePath}...";
+            var output = await _bootRepair.BcdEditExportAsync(filePath);
             StatusMessage = "BCD exported successfully.";
         }
         catch (Exception ex) { StatusMessage = $"Error: {ex.Message}"; }
@@ -346,21 +340,14 @@ public partial class BootManagerViewModel : ObservableObject
     [RelayCommand]
     public async Task BcdImportAsync()
     {
-        var picker = new Windows.Storage.Pickers.FileOpenPicker();
-        var hwnd = WindowHelper.GetWindowHandle();
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-        picker.ViewMode = Windows.Storage.Pickers.PickerViewMode.List;
-        picker.FileTypeFilter.Add(".bcd");
-        picker.FileTypeFilter.Add("*");
-
-        var file = await picker.PickSingleFileAsync();
-        if (file == null) return;
+        var filePath = await FilePickerHelper.PickSingleFileAsync([".bcd", "*"]);
+        if (string.IsNullOrWhiteSpace(filePath)) return;
 
         try
         {
             IsLoading = true;
-            StatusMessage = $"Importing BCD from {file.Path}...";
-            var output = await _bootRepair.BcdEditImportAsync(file.Path);
+            StatusMessage = $"Importing BCD from {filePath}...";
+            var output = await _bootRepair.BcdEditImportAsync(filePath);
             StatusMessage = "BCD imported successfully.";
             await RefreshEntriesAsync();
         }

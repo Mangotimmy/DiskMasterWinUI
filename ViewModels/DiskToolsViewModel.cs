@@ -91,6 +91,45 @@ public partial class DiskToolsViewModel : ObservableObject
 
     public ObservableCollection<ToolEnvironmentItem> ToolItems { get; } = new();
 
+    // 7b. Environment Variable Table & PATH Directory Table Editor
+    public ObservableCollection<EnvironmentVariableEntry> AllEnvVariables { get; } = new();
+    public ObservableCollection<EnvironmentVariableEntry> FilteredEnvVariables { get; } = new();
+    public ObservableCollection<PathDirectoryEntry> PathDirectories { get; } = new();
+    public ObservableCollection<PathDirectoryEntry> FilteredPathDirectories { get; } = new();
+
+    public ObservableCollection<string> EnvScopeFilterOptions { get; } = new()
+    {
+        "All (系統 + 使用者)",
+        "Machine (系統全域)",
+        "User (目前使用者)",
+        "Process (目前處理程序)"
+    };
+
+    public ObservableCollection<string> EnvTargetScopeOptions { get; } = new()
+    {
+        "User (目前使用者)",
+        "Machine (系統全域 - 需管理員)"
+    };
+
+    [ObservableProperty] private string _envScopeFilter = "All (系統 + 使用者)";
+    [ObservableProperty] private string _envSearchQuery = "";
+    [ObservableProperty] private EnvironmentVariableEntry? _selectedEnvVariable;
+    [ObservableProperty] private PathDirectoryEntry? _selectedPathDirectory;
+
+    [ObservableProperty] private string _editEnvName = "";
+    [ObservableProperty] private string _editEnvValue = "";
+    [ObservableProperty] private string _editEnvExpandedPreview = "";
+    [ObservableProperty] private string _editEnvTargetScope = "User (目前使用者)";
+
+    [ObservableProperty] private string _newPathDirectory = "";
+    [ObservableProperty] private string _newPathTargetScope = "User (目前使用者)";
+
+    [ObservableProperty] private string _envSummaryStatsText = "正在載入環境變數與 PATH 表格...";
+    [ObservableProperty] private string _pathHealthSummaryText = "";
+    [ObservableProperty] private string _toolHealthSummaryText = "";
+    [ObservableProperty] private bool _hasEmptyEnvFilterResult;
+    [ObservableProperty] private bool _hasEmptyPathFilterResult;
+
     // 8. OEM Drivers & VSS Shadows
     public ObservableCollection<OemDriverItem> AllDrivers { get; } = new();
     public ObservableCollection<OemDriverItem> FilteredDrivers { get; } = new();
@@ -218,13 +257,17 @@ public partial class DiskToolsViewModel : ObservableObject
         try
         {
             IsLoading = true;
-            StatusMessage = "Checking system environment and tool availability...";
+            StatusMessage = "Checking system environment, CLI tools, and PATH variables...";
             var items = await _envService.CheckAllToolsAsync();
 
             ToolItems.Clear();
             foreach (var item in items) ToolItems.Add(item);
 
-            StatusMessage = "Environment doctor check completed.";
+            var readyCount = ToolItems.Count(t => t.IsAvailable);
+            ToolHealthSummaryText = $"系統 CLI 工具：{readyCount}/{ToolItems.Count} 項已就緒";
+
+            await LoadEnvironmentTablesAsync();
+            StatusMessage = "Environment doctor & variable tables refreshed.";
         }
         catch (Exception ex)
         {
@@ -234,6 +277,331 @@ public partial class DiskToolsViewModel : ObservableObject
         {
             IsLoading = false;
         }
+    }
+
+    private static string ParseScopeCode(string scopeSelection)
+    {
+        if (string.IsNullOrWhiteSpace(scopeSelection)) return "All";
+        if (scopeSelection.StartsWith("Machine", StringComparison.OrdinalIgnoreCase)) return "Machine";
+        if (scopeSelection.StartsWith("User", StringComparison.OrdinalIgnoreCase)) return "User";
+        if (scopeSelection.StartsWith("Process", StringComparison.OrdinalIgnoreCase)) return "Process";
+        return "All";
+    }
+
+    private static EnvironmentVariableTarget ParseTargetScope(string targetSelection)
+    {
+        if (!string.IsNullOrWhiteSpace(targetSelection) &&
+            targetSelection.StartsWith("Machine", StringComparison.OrdinalIgnoreCase))
+        {
+            return EnvironmentVariableTarget.Machine;
+        }
+        return EnvironmentVariableTarget.User;
+    }
+
+    [RelayCommand]
+    public async Task LoadEnvironmentTablesAsync()
+    {
+        try
+        {
+            var scopeCode = ParseScopeCode(EnvScopeFilter);
+            var varsTask = _envService.GetEnvironmentVariablesAsync(scopeCode);
+            var pathsTask = _envService.GetPathDirectoriesAsync(scopeCode == "Process" ? "All" : scopeCode);
+            await Task.WhenAll(varsTask, pathsTask);
+
+            AllEnvVariables.Clear();
+            foreach (var v in varsTask.Result) AllEnvVariables.Add(v);
+
+            PathDirectories.Clear();
+            foreach (var p in pathsTask.Result) PathDirectories.Add(p);
+
+            ApplyEnvironmentFilter();
+
+            var machineCount = AllEnvVariables.Count(v => v.Scope == "Machine");
+            var userCount = AllEnvVariables.Count(v => v.Scope == "User");
+            var invalidPathCount = PathDirectories.Count(p => !p.Exists || p.IsDuplicate);
+
+            EnvSummaryStatsText = $"共 {AllEnvVariables.Count} 項環境變數（系統 {machineCount} / 使用者 {userCount}）";
+            PathHealthSummaryText = invalidPathCount == 0
+                ? $"✅ PATH 共 {PathDirectories.Count} 個目錄，全部有效且無重複"
+                : $"⚠️ PATH 共 {PathDirectories.Count} 個目錄（發現 {invalidPathCount} 個無效或重複項目，可一鍵清理）";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"載入環境變數表失敗: {ex.Message}";
+        }
+    }
+
+    partial void OnEnvScopeFilterChanged(string value)
+    {
+        _ = LoadEnvironmentTablesAsync();
+    }
+
+    partial void OnEnvSearchQueryChanged(string value)
+    {
+        ApplyEnvironmentFilter();
+    }
+
+    partial void OnSelectedEnvVariableChanged(EnvironmentVariableEntry? value)
+    {
+        if (value == null) return;
+        EditEnvName = value.Name;
+        EditEnvValue = value.Value;
+        EditEnvExpandedPreview = value.ExpandedValue;
+        EditEnvTargetScope = value.Scope == "Machine"
+            ? "Machine (系統全域 - 需管理員)"
+            : "User (目前使用者)";
+    }
+
+    partial void OnEditEnvValueChanged(string value)
+    {
+        EditEnvExpandedPreview = Environment.ExpandEnvironmentVariables(value ?? "");
+    }
+
+    private void ApplyEnvironmentFilter()
+    {
+        var q = EnvSearchQuery?.Trim() ?? "";
+
+        FilteredEnvVariables.Clear();
+        foreach (var v in AllEnvVariables)
+        {
+            if (string.IsNullOrEmpty(q) ||
+                v.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                v.Value.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                v.ExpandedValue.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                v.ScopeDisplay.Contains(q, StringComparison.OrdinalIgnoreCase))
+            {
+                FilteredEnvVariables.Add(v);
+            }
+        }
+        HasEmptyEnvFilterResult = FilteredEnvVariables.Count == 0;
+
+        FilteredPathDirectories.Clear();
+        foreach (var p in PathDirectories)
+        {
+            if (string.IsNullOrEmpty(q) ||
+                p.RawPath.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                p.ExpandedPath.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                p.ScopeDisplay.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                p.StatusText.Contains(q, StringComparison.OrdinalIgnoreCase))
+            {
+                FilteredPathDirectories.Add(p);
+            }
+        }
+        HasEmptyPathFilterResult = FilteredPathDirectories.Count == 0;
+    }
+
+    [RelayCommand]
+    public void PrepareNewEnvVariable()
+    {
+        SelectedEnvVariable = null;
+        EditEnvName = "";
+        EditEnvValue = "";
+        EditEnvExpandedPreview = "";
+        StatusMessage = "已清空編輯欄位，請輸入新環境變數名稱與內容後按「儲存變更」。";
+    }
+
+    [RelayCommand]
+    public async Task BrowseEnvValueFolderAsync()
+    {
+        var folder = await FilePickerHelper.PickFolderAsync();
+        if (!string.IsNullOrWhiteSpace(folder))
+        {
+            EditEnvValue = folder;
+        }
+    }
+
+    [RelayCommand]
+    public async Task BrowseEnvValueFileAsync()
+    {
+        var file = await FilePickerHelper.PickSingleFileAsync(new[] { "*" });
+        if (!string.IsNullOrWhiteSpace(file))
+        {
+            EditEnvValue = file;
+        }
+    }
+
+    [RelayCommand]
+    public async Task SaveEnvVariableAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            var target = ParseTargetScope(EditEnvTargetScope);
+            var (ok, msg) = await _envService.SetEnvironmentVariableAsync(EditEnvName, EditEnvValue, target);
+            AppendLog($"[EnvTable] {msg}");
+            StatusMessage = msg;
+            if (ok)
+            {
+                await LoadEnvironmentTablesAsync();
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task DeleteEnvVariableDirectAsync(EnvironmentVariableEntry? entry)
+    {
+        var targetEntry = entry ?? SelectedEnvVariable;
+        if (targetEntry == null) return;
+
+        try
+        {
+            IsLoading = true;
+            var (ok, msg) = await _envService.DeleteEnvironmentVariableAsync(targetEntry.Name, targetEntry.TargetEnum);
+            AppendLog($"[EnvTable] {msg}");
+            StatusMessage = msg;
+            if (ok)
+            {
+                await LoadEnvironmentTablesAsync();
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public void CopyEnvVariable(EnvironmentVariableEntry? entry)
+    {
+        var targetEntry = entry ?? SelectedEnvVariable;
+        if (targetEntry == null) return;
+        CopyText($"{targetEntry.Name}={targetEntry.Value}");
+        StatusMessage = $"已複製 {targetEntry.Name}={targetEntry.Value}";
+    }
+
+    [RelayCommand]
+    public async Task BrowseNewPathFolderAsync()
+    {
+        var folder = await FilePickerHelper.PickFolderAsync();
+        if (!string.IsNullOrWhiteSpace(folder))
+        {
+            NewPathDirectory = folder;
+        }
+    }
+
+    [RelayCommand]
+    public async Task AddPathDirectoryAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            var target = ParseTargetScope(NewPathTargetScope);
+            var (ok, msg) = await _envService.AddPathDirectoryAsync(NewPathDirectory, target);
+            AppendLog($"[PATH] {msg}");
+            StatusMessage = msg;
+            if (ok)
+            {
+                NewPathDirectory = "";
+                await LoadEnvironmentTablesAsync();
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task RemovePathDirectoryDirectAsync(PathDirectoryEntry? entry)
+    {
+        if (entry == null) return;
+        try
+        {
+            IsLoading = true;
+            var (ok, msg) = await _envService.RemovePathDirectoryAsync(entry.RawPath, entry.TargetEnum);
+            AppendLog($"[PATH] {msg}");
+            StatusMessage = msg;
+            if (ok)
+            {
+                await LoadEnvironmentTablesAsync();
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task CleanInvalidPathsAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            var target = ParseTargetScope(NewPathTargetScope);
+            var (ok, _, msg) = await _envService.CleanInvalidPathDirectoriesAsync(target);
+            AppendLog($"[PATH Clean] {msg}");
+            StatusMessage = msg;
+            if (ok)
+            {
+                await LoadEnvironmentTablesAsync();
+            }
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public void OpenPathDirectoryInExplorer(PathDirectoryEntry? entry)
+    {
+        if (entry == null || string.IsNullOrWhiteSpace(entry.ExpandedPath)) return;
+        if (!Directory.Exists(entry.ExpandedPath))
+        {
+            StatusMessage = $"目錄不存在：{entry.ExpandedPath}";
+            return;
+        }
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"\"{entry.ExpandedPath}\"",
+                UseShellExecute = true
+            });
+        }
+        catch { }
+    }
+
+    [RelayCommand]
+    public async Task ExportEnvironmentBackupAsync()
+    {
+        var savePath = await FilePickerHelper.PickSaveFileAsync(
+            $"DiskMaster_EnvBackup_{DateTime.Now:yyyyMMdd_HHmmss}.json",
+            ".json",
+            "JSON Environment Backup");
+        if (string.IsNullOrWhiteSpace(savePath)) return;
+
+        try
+        {
+            IsLoading = true;
+            var (ok, msg) = await _envService.ExportEnvironmentBackupAsync(savePath);
+            AppendLog($"[EnvBackup] {msg}");
+            StatusMessage = msg;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public void OpenWindowsEnvDialog()
+    {
+        _envService.OpenWindowsEnvironmentDialog();
+        StatusMessage = "已開啟 Windows 系統環境變數對話框 (sysdm.cpl)。";
+    }
+
+    [RelayCommand]
+    public void OpenToolFolder(ToolEnvironmentItem? item)
+    {
+        if (item == null || !item.CanOpenFolder) return;
+        OpenFolderForFile(item.PathFound);
     }
 
     [RelayCommand]
@@ -1360,20 +1728,15 @@ public partial class DiskToolsViewModel : ObservableObject
     [RelayCommand]
     public async Task InstallDriverAsync()
     {
-        var picker = new Windows.Storage.Pickers.FileOpenPicker();
-        var hwnd = WindowHelper.GetWindowHandle();
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-        picker.ViewMode = Windows.Storage.Pickers.PickerViewMode.List;
-        picker.FileTypeFilter.Add(".inf");
-        var file = await picker.PickSingleFileAsync();
-        if (file == null) return;
+        var filePath = await FilePickerHelper.PickSingleFileAsync([".inf"]);
+        if (string.IsNullOrWhiteSpace(filePath)) return;
 
         try
         {
             IsLoading = true;
-            StatusMessage = $"Installing driver from {file.Path}...";
-            var res = await _driverService.InstallDriverAsync(file.Path);
-            AppendLog($"=== Install Driver ({file.Name}) ===\n" + res);
+            StatusMessage = $"Installing driver from {filePath}...";
+            var res = await _driverService.InstallDriverAsync(filePath);
+            AppendLog($"=== Install Driver ({Path.GetFileName(filePath)}) ===\n" + res);
             StatusMessage = "Driver installation complete.";
             await LoadDriversStructuredAsync();
         }

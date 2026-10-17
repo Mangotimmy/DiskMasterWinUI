@@ -323,27 +323,36 @@ public sealed partial class MainWindow : Window
 
     private void HandleQuickAction(string action)
     {
-        TrayService.RestoreFromTray();
         switch (action)
         {
             case "Open":
+                TrayService.RestoreFromTray();
                 break;
             case "EasyMode":
-                NavigateToTag("EasyMode");
+            case "Recovery":
+            case "WimDeploy":
+            case "BootManager":
+            case "DiskTools":
+            case "SystemHealth":
+            case "NtfsPermissions":
+            case "GroupPolicy":
+            case "SystemOptimizer":
+            case "NetworkTools":
+            case "SystemPerformance":
+            case "Settings":
+                TrayService.RestoreFromTray();
+                NavigateToTag(action);
                 break;
             case "Performance":
+                TrayService.RestoreFromTray();
                 NavigateToTag("SystemPerformance");
                 break;
             case "Network":
+                TrayService.RestoreFromTray();
                 NavigateToTag("NetworkTools");
                 break;
-            case "DiskTools":
-                NavigateToTag("DiskTools");
-                break;
-            case "SystemHealth":
-                NavigateToTag("SystemHealth");
-                break;
             case "CleanCache":
+                TrayService.RestoreFromTray();
                 NavigateToTag("SystemHealth");
                 if (_systemHealthPage != null)
                 {
@@ -352,11 +361,27 @@ public sealed partial class MainWindow : Window
                         "QuickAction CleanCache (SystemHealth)");
                 }
                 break;
+            case "TrimMemory":
+                _ = RunGuardedAsync(async () =>
+                {
+                    var perf = new SystemPerformanceService();
+                    var res = await perf.TrimProcessWorkingSetsAsync();
+                    WindowsNotificationService.Instance.ShowNotification("DiskMaster 記憶體最佳化", res, "SystemPerformance");
+                }, "QuickAction TrimMemory");
+                break;
+            case "FlushDns":
+                _ = RunGuardedAsync(async () =>
+                {
+                    var tcp = new TcpOptimizerService();
+                    var msg = await tcp.FlushDnsAsync();
+                    WindowsNotificationService.Instance.ShowNotification("DiskMaster DNS 快取刷新", msg, "NetworkTools");
+                }, "QuickAction FlushDns");
+                break;
             case "ToggleOverlay":
                 DiskMasterWinUI.Controls.PerformanceOverlayWindow.Toggle();
                 break;
-            case "Settings":
-                NavigateToTag("Settings");
+            case "RestartAdmin":
+                AdminHelper.RestartAsAdmin();
                 break;
             case "Exit":
                 TrayService.Dispose();
@@ -1701,6 +1726,37 @@ public sealed partial class MainWindow : Window
             dp.SetText(tab.Header?.ToString() ?? "");
             Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
         }
+    }
+
+    private void TabContext_HideTab_Click(object sender, RoutedEventArgs e)
+    {
+        var tab = GetTabFromSender(sender);
+        var tag = tab?.Tag?.ToString();
+        if (string.IsNullOrEmpty(tag) || tag == "Settings" || MainTabs.TabItems.Count <= 1) return;
+
+        var s = SettingsService.Instance.Current;
+        s.DisabledTabTags ??= new List<string>();
+        if (!s.DisabledTabTags.Contains(tag))
+        {
+            s.DisabledTabTags.Add(tag);
+            SettingsService.Instance.Save();
+            ApplyWorkspacePreset(s.WorkspacePreset ?? "Master");
+        }
+    }
+
+    private void TabContext_ResetOrder_Click(object sender, RoutedEventArgs e)
+    {
+        var s = SettingsService.Instance.Current;
+        s.CustomTabOrder = WorkspaceTabTags["Master"].ToList();
+        s.DisabledTabTags = new List<string>();
+        _logicalTabOrder.Clear();
+        SettingsService.Instance.Save();
+        ApplyWorkspacePreset(s.WorkspacePreset ?? "Master");
+    }
+
+    private async void TabContext_ExportDiag_Click(object sender, RoutedEventArgs e)
+    {
+        await DiagnosticExportService.Instance.ExportReportToFileAsync(autoOpenFile: true);
     }
 
     private async void SmartRefreshCurrentPage()

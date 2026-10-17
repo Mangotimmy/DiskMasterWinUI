@@ -12,6 +12,16 @@ namespace DiskMasterWinUI.ViewModels;
 public partial class SettingsViewModel : ObservableObject
 {
     private readonly TcpOptimizerService _tcpOptimizer = new();
+    private readonly ShellIntegrationService _shellIntegration = new();
+
+    // ── Windows Explorer Right-Click Context Menu Integration ──
+    [ObservableProperty] private bool _shellAllUsersScope = false;
+    [ObservableProperty] private bool _shellEnableRecovery = true;
+    [ObservableProperty] private bool _shellEnableNtfs = true;
+    [ObservableProperty] private bool _shellEnableLanShare = true;
+    [ObservableProperty] private bool _shellEnableImageMount = true;
+    [ObservableProperty] private bool _shellEnableDiskCheck = true;
+    [ObservableProperty] private string _shellStatusSummary = "尚未檢測右鍵選單狀態";
 
     // ── Tab Reordering & Visibility Management ──
     public ObservableCollection<TabOrderItem> TabOrderItems { get; } = new();
@@ -78,6 +88,13 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _tcpRscEnabled = true;
     [ObservableProperty] private bool _tcpTimestampsDisabled = true;
     [ObservableProperty] private string _tcpSettingsSummary = "正在讀取 TCP 協定參數...";
+    [ObservableProperty] private string _tcpCommandPreview = "netsh int tcp set global autotuninglevel=normal";
+
+    partial void OnTcpAutoTuningLevelChanged(string value)
+    {
+        var lvl = string.IsNullOrWhiteSpace(value) ? "normal" : value.Trim().ToLowerInvariant();
+        TcpCommandPreview = $"netsh int tcp set global autotuninglevel={lvl}";
+    }
 
     // ── Prompt Windows & Diagnostics ──
     [ObservableProperty] private bool _enablePromptWindows = true;
@@ -131,7 +148,7 @@ public partial class SettingsViewModel : ObservableObject
     public string[] ProxyModeOptions { get; } = ["System", "Direct", "Custom"];
     public int[] ParallelThreadOptions { get; } = [2, 4, 8, 16, 32];
     public int[] ChunkSizeOptions { get; } = [64, 128, 256, 512, 1024];
-    public string[] TcpAutoTuningOptions { get; } = ["Normal", "Experimental", "Disabled", "Restricted"];
+    public string[] TcpAutoTuningOptions { get; } = ["Normal", "Experimental", "Restricted", "HighlyRestricted", "Disabled"];
     public string[] TcpCongestionOptions { get; } = ["BBR", "CUBIC", "CTCP", "Default"];
 
     public string[] LanguageOptions { get; } =
@@ -173,6 +190,7 @@ public partial class SettingsViewModel : ObservableObject
 
         LocalizationService.Instance.LanguageChanged += RefreshLocalizedOptions;
         _ = RefreshTcpSettingsAsync();
+        RefreshShellIntegrationStatus();
     }
 
     public void LoadSettings()
@@ -780,6 +798,91 @@ public partial class SettingsViewModel : ObservableObject
         catch (Exception ex)
         {
             TcpSettingsSummary = $"查詢失敗: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    public async Task ApplySelectedTcpSettingsAsync()
+    {
+        try
+        {
+            StatusMessage = $"正在執行：{TcpCommandPreview} 與所選 TCP 參數...";
+            var (ok1, msg1) = await _tcpOptimizer.SetAutoTuningLevelAsync(TcpAutoTuningLevel);
+            await _tcpOptimizer.SetCongestionProviderAsync(TcpCongestionProvider);
+            await _tcpOptimizer.SetEcnAsync(TcpEcnEnabled);
+            await _tcpOptimizer.SetRssAsync(TcpRssEnabled);
+            await _tcpOptimizer.SetRscAsync(TcpRscEnabled);
+            await _tcpOptimizer.SetTimestampsAsync(!TcpTimestampsDisabled);
+
+            SaveSettings();
+            StatusMessage = ok1 ? $"✅ {msg1}（並已同步套用 ECN/RSS/RSC/擁塞演算法）" : $"⚠️ {msg1}";
+            await RefreshTcpSettingsAsync();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"套用 TCP 設定失敗: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    public void CopyTcpCommand()
+    {
+        try
+        {
+            var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            dp.SetText(TcpCommandPreview);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
+            StatusMessage = $"已複製指令：{TcpCommandPreview}";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"複製指令失敗: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    public void RefreshShellIntegrationStatus()
+    {
+        try
+        {
+            ShellStatusSummary = _shellIntegration.GetStatusText();
+        }
+        catch (Exception ex)
+        {
+            ShellStatusSummary = $"讀取右鍵選單狀態失敗：{ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    public void InstallShellIntegration()
+    {
+        var res = _shellIntegration.InstallExtended(
+            ShellAllUsersScope,
+            ShellEnableRecovery,
+            ShellEnableNtfs,
+            ShellEnableLanShare,
+            ShellEnableImageMount,
+            ShellEnableDiskCheck);
+        StatusMessage = res.Headline;
+        RefreshShellIntegrationStatus();
+    }
+
+    [RelayCommand]
+    public void UninstallShellIntegration()
+    {
+        var res = _shellIntegration.UninstallAllExtended(ShellAllUsersScope);
+        StatusMessage = res.Headline;
+        RefreshShellIntegrationStatus();
+    }
+
+    [RelayCommand]
+    public async Task BrowseDefaultBackupFolderAsync()
+    {
+        var folder = await FilePickerHelper.PickFolderAsync("選擇預設備份與匯出目錄");
+        if (!string.IsNullOrWhiteSpace(folder))
+        {
+            DefaultBackupFolder = folder;
+            SaveSettings();
         }
     }
 

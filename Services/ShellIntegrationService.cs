@@ -274,6 +274,202 @@ public sealed class ShellIntegrationService
         return list;
     }
 
+    public const string VerbNtfsKeyName = "DiskMasterNtfs";
+    public const string VerbShareKeyName = "DiskMasterShare";
+    public const string VerbImageKeyName = "DiskMasterImage";
+    public const string VerbDiskCheckKeyName = "DiskMasterDiskCheck";
+
+    public static readonly string[] ExtendedNtfsClassPaths =
+    {
+        @"Directory\shell\" + VerbNtfsKeyName,
+        @"Directory\Background\shell\" + VerbNtfsKeyName,
+        @"*\shell\" + VerbNtfsKeyName
+    };
+
+    public static readonly string[] ExtendedShareClassPaths =
+    {
+        @"Directory\shell\" + VerbShareKeyName,
+        @"Directory\Background\shell\" + VerbShareKeyName
+    };
+
+    public static readonly string[] ExtendedImageClassPaths =
+    {
+        @"SystemFileAssociations\.wim\shell\" + VerbImageKeyName,
+        @"SystemFileAssociations\.esd\shell\" + VerbImageKeyName,
+        @"SystemFileAssociations\.iso\shell\" + VerbImageKeyName,
+        @"SystemFileAssociations\.vhd\shell\" + VerbImageKeyName,
+        @"SystemFileAssociations\.vhdx\shell\" + VerbImageKeyName
+    };
+
+    public static readonly string[] ExtendedDiskCheckClassPaths =
+    {
+        @"Drive\shell\" + VerbDiskCheckKeyName
+    };
+
+    public bool IsExtendedVerbInstalled(string firstClassPath, bool allUsers = false)
+    {
+        try
+        {
+            var store = _storeFactory(allUsers);
+            var val = store.GetValue(@"Software\Classes\" + firstClassPath + @"\command", null);
+            return !string.IsNullOrWhiteSpace(val);
+        }
+        catch { return false; }
+    }
+
+    public ShellIntegrationResult InstallExtended(
+        bool allUsers = false,
+        bool enableRecovery = true,
+        bool enableNtfs = true,
+        bool enableLanShare = true,
+        bool enableImageMount = true,
+        bool enableDiskCheck = true)
+    {
+        var result = new ShellIntegrationResult { AllUsers = allUsers };
+        if (allUsers && !IsElevated())
+        {
+            result.Success = false;
+            result.Message = "註冊「所有使用者 (HKLM)」右鍵選單需要系統管理員權限；請改選「目前使用者 (HKCU 免提權)」或以管理員身分重啟。";
+            return result;
+        }
+
+        var appExe = ResolveExistingFile(Environment.ProcessPath)
+                     ?? ResolveExistingFile(Path.Combine(AppContext.BaseDirectory, AppExeName));
+        if (appExe == null)
+        {
+            result.Success = false;
+            result.Message = $"找不到 {AppExeName}，無法註冊右鍵選單。";
+            return result;
+        }
+
+        var launcher = ResolveLauncherOrApp(null, appExe);
+        var store = _storeFactory(allUsers);
+
+        try
+        {
+            // 1. Recovery verb (uses standard Install or removes if unchecked)
+            if (enableRecovery)
+            {
+                var recRes = Install(allUsers, launcherPath: launcher, appExePath: appExe);
+                result.KeysWritten.AddRange(recRes.KeysWritten);
+                result.Log.AddRange(recRes.Log);
+            }
+            else
+            {
+                foreach (var cp in ClassPaths) DeleteKeyTree(store, @"Software\Classes\" + cp, result);
+            }
+
+            // 2. NTFS Permissions & Ownership verb
+            if (enableNtfs)
+            {
+                var args = new[] { "%1", "%V", "%1" };
+                for (int i = 0; i < ExtendedNtfsClassPaths.Length; i++)
+                {
+                    var rel = @"Software\Classes\" + ExtendedNtfsClassPaths[i];
+                    WriteValue(store, rel, null, "DiskMaster NTFS Permissions", result);
+                    WriteValue(store, rel, "MUIVerb", "🛡️ DiskMaster: NTFS 權限與取得所有權", result);
+                    WriteValue(store, rel, "Icon", $"{appExe},0", result);
+                    WriteValue(store, rel, "Position", "Bottom", result);
+                    WriteValue(store, rel + @"\command", null, $"\"{appExe}\" --tab NtfsPermissions --path \"{args[i]}\"", result);
+                }
+            }
+            else
+            {
+                foreach (var cp in ExtendedNtfsClassPaths) DeleteKeyTree(store, @"Software\Classes\" + cp, result);
+            }
+
+            // 3. Quick LAN Share verb
+            if (enableLanShare)
+            {
+                var args = new[] { "%1", "%V" };
+                for (int i = 0; i < ExtendedShareClassPaths.Length; i++)
+                {
+                    var rel = @"Software\Classes\" + ExtendedShareClassPaths[i];
+                    WriteValue(store, rel, null, "DiskMaster Quick LAN Share", result);
+                    WriteValue(store, rel, "MUIVerb", "🖧 DiskMaster: 快速建立區網共用資料夾", result);
+                    WriteValue(store, rel, "Icon", $"{appExe},0", result);
+                    WriteValue(store, rel, "Position", "Bottom", result);
+                    WriteValue(store, rel + @"\command", null, $"\"{appExe}\" --tab NetworkTools --share \"{args[i]}\"", result);
+                }
+            }
+            else
+            {
+                foreach (var cp in ExtendedShareClassPaths) DeleteKeyTree(store, @"Software\Classes\" + cp, result);
+            }
+
+            // 4. WIM / ESD / ISO / VHD / VHDX Mount & Deploy verb
+            if (enableImageMount)
+            {
+                foreach (var cp in ExtendedImageClassPaths)
+                {
+                    var rel = @"Software\Classes\" + cp;
+                    WriteValue(store, rel, null, "DiskMaster Mount or Deploy Image", result);
+                    WriteValue(store, rel, "MUIVerb", "💿 DiskMaster: 掛載 / 部署系統與虛擬磁碟映像", result);
+                    WriteValue(store, rel, "Icon", $"{appExe},0", result);
+                    WriteValue(store, rel, "Position", "Bottom", result);
+                    WriteValue(store, rel + @"\command", null, $"\"{appExe}\" --tab WimDeploy --image \"%1\"", result);
+                }
+            }
+            else
+            {
+                foreach (var cp in ExtendedImageClassPaths) DeleteKeyTree(store, @"Software\Classes\" + cp, result);
+            }
+
+            // 5. Drive S.M.A.R.T. & Disk Check verb
+            if (enableDiskCheck)
+            {
+                foreach (var cp in ExtendedDiskCheckClassPaths)
+                {
+                    var rel = @"Software\Classes\" + cp;
+                    WriteValue(store, rel, null, "DiskMaster Disk Health Check", result);
+                    WriteValue(store, rel, "MUIVerb", "💾 DiskMaster: 磁碟健康與環境檢測", result);
+                    WriteValue(store, rel, "Icon", $"{appExe},0", result);
+                    WriteValue(store, rel, "Position", "Bottom", result);
+                    WriteValue(store, rel + @"\command", null, $"\"{appExe}\" --tab DiskTools --drive \"%V\"", result);
+                }
+            }
+            else
+            {
+                foreach (var cp in ExtendedDiskCheckClassPaths) DeleteKeyTree(store, @"Software\Classes\" + cp, result);
+            }
+
+            result.Success = true;
+            result.Message = $"已成功套用 Windows 檔案總管右鍵選單整合（{(allUsers ? "所有使用者 HKLM" : "目前使用者 HKCU")}，共寫入 {result.KeysWritten.Count} 項設定）。";
+            return result;
+        }
+        catch (Exception ex)
+        {
+            result.Success = false;
+            result.Message = $"套用右鍵選單失敗：{ex.Message}";
+            return result;
+        }
+    }
+
+    public ShellIntegrationResult UninstallAllExtended(bool allUsers = false)
+    {
+        var res = Uninstall(allUsers);
+        try
+        {
+            var store = _storeFactory(allUsers);
+            foreach (var cp in ExtendedNtfsClassPaths) DeleteKeyTree(store, @"Software\Classes\" + cp, res);
+            foreach (var cp in ExtendedShareClassPaths) DeleteKeyTree(store, @"Software\Classes\" + cp, res);
+            foreach (var cp in ExtendedImageClassPaths) DeleteKeyTree(store, @"Software\Classes\" + cp, res);
+            foreach (var cp in ExtendedDiskCheckClassPaths) DeleteKeyTree(store, @"Software\Classes\" + cp, res);
+        }
+        catch { }
+        return res;
+    }
+
+    private static string ResolveLauncherOrApp(string? launcherPath, string? appExeFallback)
+    {
+        return ResolveExistingFile(launcherPath)
+               ?? ResolveExistingFile(Path.Combine(AppContext.BaseDirectory, LauncherExeName))
+               ?? ResolveExistingFile(Path.Combine(AppContext.BaseDirectory, "tools", "DiskMasterShellHost", "bin", "Release", "net9.0-windows", LauncherExeName))
+               ?? ResolveExistingFile(Path.Combine(AppContext.BaseDirectory, "tools", "DiskMasterShellHost", "bin", "Debug", "net9.0-windows", LauncherExeName))
+               ?? appExeFallback
+               ?? "";
+    }
+
     // ══════════════════════════════════════════════════════════════════════
     //  Install
     // ══════════════════════════════════════════════════════════════════════
@@ -289,7 +485,13 @@ public sealed class ShellIntegrationService
             return result;
         }
 
-        var launcher = ResolveExistingFile(launcherPath) ?? ResolveExistingFile(Path.Combine(AppContext.BaseDirectory, LauncherExeName));
+        var appExe = ResolveExistingFile(appExePath)
+                     ?? ResolveExistingFile(Environment.ProcessPath)
+                     ?? ResolveExistingFile(Path.Combine(AppContext.BaseDirectory, AppExeName));
+
+        var launcher = ResolveExistingFile(launcherPath)
+                       ?? ResolveExistingFile(Path.Combine(AppContext.BaseDirectory, LauncherExeName))
+                       ?? (launcherPath == null ? appExe : null);
         if (launcher == null)
         {
             result.Success = false;
@@ -297,9 +499,6 @@ public sealed class ShellIntegrationService
             return result;
         }
 
-        var appExe = ResolveExistingFile(appExePath)
-                     ?? ResolveExistingFile(Environment.ProcessPath)
-                     ?? ResolveExistingFile(Path.Combine(AppContext.BaseDirectory, AppExeName));
         if (appExe == null)
         {
             result.Success = false;

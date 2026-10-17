@@ -70,25 +70,50 @@ public sealed partial class RecoveryPage : Page
     {
         try
         {
-            var folderPicker = new FolderPicker();
-            folderPicker.SuggestedStartLocation = PickerLocationId.ComputerFolder;
-            folderPicker.FileTypeFilter.Add("*");
-
-            var hwnd = WindowHelper.GetWindowHandle();
-            if (hwnd != nint.Zero) InitializeWithWindow.Initialize(folderPicker, hwnd);
-
-            var folder = await folderPicker.PickSingleFolderAsync();
-            if (folder != null)
+            var folderPath = await FilePickerHelper.PickFolderAsync();
+            if (!string.IsNullOrWhiteSpace(folderPath))
             {
-                ViewModel.DestinationPath = folder.Path;
+                ViewModel.DestinationPath = folderPath;
                 // Warn immediately (do not wait until the user presses recover).
-                var guard = new RecoveryService().CheckDestination(folder.Path, ViewModel.VisibleItems);
+                var guard = new RecoveryService().CheckDestination(folderPath, ViewModel.VisibleItems);
                 if (!guard.Ok) ViewModel.StatusMessage = guard.Message;
             }
         }
         catch (Exception ex)
         {
             ViewModel.StatusMessage = $"選擇資料夾失敗：{ex.Message}";
+        }
+    }
+
+    private async void BrowseTargetFolder_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var folderPath = await FilePickerHelper.PickFolderAsync();
+            if (!string.IsNullOrWhiteSpace(folderPath))
+            {
+                ViewModel.TargetPath = folderPath;
+            }
+        }
+        catch (Exception ex)
+        {
+            ViewModel.StatusMessage = $"選擇來源資料夾失敗：{ex.Message}";
+        }
+    }
+
+    private async void BrowseTargetImage_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var filePath = await FilePickerHelper.PickSingleFileAsync([".img", ".bin", ".raw", ".dd", ".vhd", ".vhdx", ".iso", "*"]);
+            if (!string.IsNullOrWhiteSpace(filePath))
+            {
+                ViewModel.TargetPath = filePath;
+            }
+        }
+        catch (Exception ex)
+        {
+            ViewModel.StatusMessage = $"選擇映像檔失敗：{ex.Message}";
         }
     }
 
@@ -111,6 +136,8 @@ public sealed partial class RecoveryPage : Page
             "ja-JP" => "またはパスを入力（ドライブ / フォルダー / .img イメージ）",
             _ => "或輸入路徑（磁碟機 / 資料夾 / .img 磁碟映像檔）"
         };
+        BrowseTargetFolderBtn.Content = lang switch { "zh-CN" => "📁 文件夹", "en-US" => "📁 Folder", "ja-JP" => "📁 フォルダ", _ => "📁 資料夾" };
+        BrowseTargetImageBtn.Content = lang switch { "zh-CN" => "💿 映像档", "en-US" => "💿 Image", "ja-JP" => "💿 イメージ", _ => "💿 映像檔" };
         ScanBtn.Content = lang switch { "zh-CN" => "🔍 开始扫描", "en-US" => "🔍 Scan", "ja-JP" => "🔍 スキャン", _ => "🔍 開始掃描" };
         CancelBtn.Content = lang switch { "zh-CN" => "⏹️ 取消", "en-US" => "⏹️ Cancel", "ja-JP" => "⏹️ キャンセル", _ => "⏹️ 取消" };
         RefreshVolumesBtn.Content = lang switch { "zh-CN" => "🔄 刷新磁盘区", "en-US" => "🔄 Refresh volumes", "ja-JP" => "🔄 ボリューム更新", _ => "🔄 重新整理磁碟區" };

@@ -2,10 +2,10 @@
 [CmdletBinding()]
 param(
     [string]$Architecture = "win-x64",
-    [string]$CertThumbprint = ($env:SIGNING_CERT_THUMBPRINT ?? $env:CERT_THUMBPRINT),
-    [string]$PfxPath = ($env:SIGNING_CERT_PATH ?? $env:CERT_PATH),
-    [string]$PfxPassword = ($env:SIGNING_CERT_PASSWORD ?? $env:CERT_PASSWORD ?? $env:CSC_KEY_PASSWORD),
-    [string]$PfxBase64 = ($env:SIGNING_CERT_BASE64 ?? $env:CERT_BASE64 ?? $env:CSC_LINK),
+    [string]$CertThumbprint = (@($env:SIGNING_CERT_THUMBPRINT, $env:CERT_THUMBPRINT) | Where-Object { $_ } | Select-Object -First 1),
+    [string]$PfxPath = (@($env:SIGNING_CERT_PATH, $env:CERT_PATH) | Where-Object { $_ } | Select-Object -First 1),
+    [string]$PfxPassword = (@($env:SIGNING_CERT_PASSWORD, $env:CERT_PASSWORD, $env:CSC_KEY_PASSWORD) | Where-Object { $_ } | Select-Object -First 1),
+    [string]$PfxBase64 = (@($env:SIGNING_CERT_BASE64, $env:CERT_BASE64, $env:CSC_LINK) | Where-Object { $_ } | Select-Object -First 1),
     [switch]$SkipTimestamp
 )
 

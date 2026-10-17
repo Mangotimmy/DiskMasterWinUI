@@ -213,6 +213,25 @@ public sealed partial class NetworkToolsPage : Page
         }
     }
 
+    private async void TcpLevelPreset_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.Tag is string level && !string.IsNullOrWhiteSpace(level))
+        {
+            await ViewModel.ApplyTcpAutoTuningLevelAsync(level);
+        }
+    }
+
+    public void LoadShareFolderTarget(string folderPath)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath)) return;
+        try
+        {
+            NetTabView.SelectedItem = TabNetShare;
+            ViewModel.LoadShareFolderTarget(folderPath);
+        }
+        catch { }
+    }
+
     private async void KillNetstatRow_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button btn && btn.Tag is int pid && pid > 0)

@@ -69,20 +69,10 @@ public sealed partial class NtfsPermissionsPage : Page
 
     private async void BrowseFolder_Click(object sender, RoutedEventArgs e)
     {
-        var folderPicker = new FolderPicker();
-        folderPicker.SuggestedStartLocation = PickerLocationId.ComputerFolder;
-        folderPicker.FileTypeFilter.Add("*");
-
-        var hwnd = WindowHelper.GetWindowHandle();
-        if (hwnd != nint.Zero)
+        var path = await DiskMasterWinUI.Helpers.FilePickerHelper.PickFolderAsync();
+        if (!string.IsNullOrWhiteSpace(path))
         {
-            InitializeWithWindow.Initialize(folderPicker, hwnd);
-        }
-
-        var folder = await folderPicker.PickSingleFolderAsync();
-        if (folder != null)
-        {
-            ViewModel.TargetPath = folder.Path;
+            ViewModel.TargetPath = path;
         }
     }
 }

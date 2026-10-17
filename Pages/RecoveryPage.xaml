@@ -49,9 +49,24 @@
                               SelectedItem="{x:Bind ViewModel.SelectedVolume, Mode=TwoWay}"
                               DisplayMemberPath="DisplayName" />
 
-                    <TextBox x:Name="TargetPathBox" Grid.Row="0" Grid.Column="1" Header="或輸入路徑（磁碟機 / 資料夾 / .img 磁碟映像檔）"
-                             Text="{x:Bind ViewModel.TargetPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                             PlaceholderText="例如 D:\ 或 D:\Photos 或 C:\dump\disk.img" />
+                    <Grid Grid.Row="0" Grid.Column="1" ColumnSpacing="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="TargetPathBox" Grid.Column="0" Header="或輸入路徑（磁碟機 / 資料夾 / .img 磁碟映像檔）"
+                                 Text="{x:Bind ViewModel.TargetPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 PlaceholderText="例如 D:\ 或 D:\Photos 或 C:\dump\disk.img" />
+                        <Button x:Name="BrowseTargetFolderBtn" Grid.Column="1" Content="📁 資料夾" VerticalAlignment="Bottom"
+                                Click="BrowseTargetFolder_Click"
+                                ToolTipService.ToolTip="瀏覽要掃描的來源資料夾"
+                                AutomationProperties.Name="瀏覽來源資料夾" />
+                        <Button x:Name="BrowseTargetImageBtn" Grid.Column="2" Content="💿 映像檔" VerticalAlignment="Bottom"
+                                Click="BrowseTargetImage_Click"
+                                ToolTipService.ToolTip="瀏覽 .img / .bin / .vhd / .vhdx / .iso 磁碟映像檔"
+                                AutomationProperties.Name="瀏覽來源磁碟映像檔" />
+                    </Grid>
 
                     <Button x:Name="ScanBtn" Grid.Row="0" Grid.Column="2" Content="🔍 開始掃描" VerticalAlignment="Bottom"
                             Style="{StaticResource AccentButtonStyle}"

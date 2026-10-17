@@ -100,35 +100,89 @@ public partial class App : Application
 
             _ = Services.JumpListService.InitializeAsync();
 
-            // Parse every launch argument. The Explorer shell verb passes:
+            // Parse every launch argument. The Explorer shell verbs pass:
             //   DiskMasterWinUI.exe --tab Recovery --recover "<path>"
+            //   DiskMasterWinUI.exe --tab NtfsPermissions --path "<path>"
+            //   DiskMasterWinUI.exe --tab NetworkTools --share "<path>"
+            //   DiskMasterWinUI.exe --tab WimDeploy --image "<path>"
+            //   DiskMasterWinUI.exe --tab DiskTools --drive "<path>"
             var cmd = Environment.GetCommandLineArgs();
             string? tabTag = null;
+            string? ntfsPath = null;
+            string? sharePath = null;
+            string? imagePath = null;
+            string? drivePath = null;
+
             for (int i = 0; i < cmd.Length; i++)
             {
                 if (cmd[i] == "--tab" && i + 1 < cmd.Length)
                 {
-                    tabTag = cmd[i + 1];
-                    i++;
+                    tabTag = cmd[++i];
                 }
                 else if (cmd[i] == "--recover" && i + 1 < cmd.Length)
                 {
-                    PendingRecoverPath = cmd[i + 1];
-                    i++;
+                    PendingRecoverPath = cmd[++i];
+                }
+                else if (cmd[i] == "--path" && i + 1 < cmd.Length)
+                {
+                    ntfsPath = cmd[++i];
+                }
+                else if (cmd[i] == "--share" && i + 1 < cmd.Length)
+                {
+                    sharePath = cmd[++i];
+                }
+                else if (cmd[i] == "--image" && i + 1 < cmd.Length)
+                {
+                    imagePath = cmd[++i];
+                }
+                else if (cmd[i] == "--drive" && i + 1 < cmd.Length)
+                {
+                    drivePath = cmd[++i];
                 }
             }
 
             if (!string.IsNullOrEmpty(PendingRecoverPath))
             {
-                // Explorer shell verb: open the Recovery tab AND hand over the clicked path.
-                // The path must win over --tab: the launcher sends "--tab Recovery --recover X",
-                // so a tab-only branch would open the tab and silently drop X.
                 var target = PendingRecoverPath;
                 PendingRecoverPath = null;
                 _window.NavigateToTag("Recovery");
                 if (_window.GetOrCreatePageForTag("Recovery") is DiskMasterWinUI.Pages.RecoveryPage recoveryPage)
                 {
                     recoveryPage.LoadTarget(target);
+                }
+            }
+            else if (!string.IsNullOrEmpty(ntfsPath))
+            {
+                _window.NavigateToTag("NtfsPermissions");
+                if (_window.GetOrCreatePageForTag("NtfsPermissions") is DiskMasterWinUI.Pages.NtfsPermissionsPage ntfsPage)
+                {
+                    ntfsPage.ViewModel.TargetPath = ntfsPath;
+                }
+            }
+            else if (!string.IsNullOrEmpty(sharePath))
+            {
+                _window.NavigateToTag("NetworkTools");
+                if (_window.GetOrCreatePageForTag("NetworkTools") is DiskMasterWinUI.Pages.NetworkToolsPage netPage)
+                {
+                    netPage.LoadShareFolderTarget(sharePath);
+                }
+            }
+            else if (!string.IsNullOrEmpty(imagePath))
+            {
+                _window.NavigateToTag("WimDeploy");
+                if (_window.GetOrCreatePageForTag("WimDeploy") is DiskMasterWinUI.Pages.WimDeployPage wimPage)
+                {
+                    wimPage.ViewModel.ImagePath = imagePath;
+                    _ = wimPage.ViewModel.LoadImageInfoCommand.ExecuteAsync(null);
+                }
+            }
+            else if (!string.IsNullOrEmpty(drivePath))
+            {
+                _window.NavigateToTag("DiskTools");
+                if (_window.GetOrCreatePageForTag("DiskTools") is DiskMasterWinUI.Pages.DiskToolsPage diskPage)
+                {
+                    diskPage.ViewModel.ChkdskDrive = drivePath;
+                    diskPage.ViewModel.OptimizeDriveLetter = drivePath;
                 }
             }
             else if (!string.IsNullOrEmpty(tabTag))

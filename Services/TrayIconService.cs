@@ -232,16 +232,26 @@ public class TrayIconService : IDisposable
 
         try
         {
-            AppendMenu(hMenu, MF_STRING, (UIntPtr)101, "🟢 開啟 DiskMaster Pro");
+            AppendMenu(hMenu, MF_STRING, (UIntPtr)101, "🟢 開啟 DiskMaster Pro 主視窗");
             AppendMenu(hMenu, MF_SEPARATOR, UIntPtr.Zero, string.Empty);
             AppendMenu(hMenu, MF_STRING, (UIntPtr)102, "🚀 簡易體檢模式 (Easy Mode)");
+            AppendMenu(hMenu, MF_STRING, (UIntPtr)111, "🛟 檔案救援 (File Recovery)");
+            AppendMenu(hMenu, MF_STRING, (UIntPtr)112, "💿 系統映像部署 (WIM / VHD)");
+            AppendMenu(hMenu, MF_STRING, (UIntPtr)113, "🔧 開機引導管理 (Boot Manager)");
+            AppendMenu(hMenu, MF_STRING, (UIntPtr)105, "💾 磁碟工具與環境變數 (Disk & Env)");
+            AppendMenu(hMenu, MF_STRING, (UIntPtr)114, "🛡️ NTFS 權限與所有權 (NTFS ACL)");
+            AppendMenu(hMenu, MF_STRING, (UIntPtr)115, "📋 本機群組原則 (Group Policy)");
+            AppendMenu(hMenu, MF_STRING, (UIntPtr)116, "⚡ 系統極致加速 (System Optimizer)");
+            AppendMenu(hMenu, MF_STRING, (UIntPtr)104, "🌐 網路工具與 TCP 微調 (Network)");
             AppendMenu(hMenu, MF_STRING, (UIntPtr)103, "📊 即時效能分析 (Performance)");
-            AppendMenu(hMenu, MF_STRING, (UIntPtr)104, "🌐 網路工具與診斷 (Network)");
-            AppendMenu(hMenu, MF_STRING, (UIntPtr)105, "💾 磁碟工具與救援 (Disk Tools)");
             AppendMenu(hMenu, MF_STRING, (UIntPtr)106, "🛠️ 系統修復 DISM/SFC (Health)");
-            AppendMenu(hMenu, MF_STRING, (UIntPtr)107, "🧹 一鍵清理快取 (Clean Cache)");
+            AppendMenu(hMenu, MF_SEPARATOR, UIntPtr.Zero, string.Empty);
+            AppendMenu(hMenu, MF_STRING, (UIntPtr)107, "🧹 一鍵清理系統快取 (Clean Cache)");
+            AppendMenu(hMenu, MF_STRING, (UIntPtr)117, "🧠 一鍵釋放待機記憶體 (Trim RAM)");
+            AppendMenu(hMenu, MF_STRING, (UIntPtr)118, "🌐 一鍵刷新 DNS 快取 (Flush DNS)");
             AppendMenu(hMenu, MF_STRING, (UIntPtr)110, "🪟 切換效能懸浮窗 (FPS HUD)");
-            AppendMenu(hMenu, MF_STRING, (UIntPtr)108, "⚙️ 偏好設定 (Settings)");
+            AppendMenu(hMenu, MF_STRING, (UIntPtr)119, "🛡️ 以系統管理員身分重新啟動");
+            AppendMenu(hMenu, MF_STRING, (UIntPtr)108, "⚙️ 偏好設定與右鍵整合 (Settings)");
             AppendMenu(hMenu, MF_SEPARATOR, UIntPtr.Zero, string.Empty);
             AppendMenu(hMenu, MF_STRING, (UIntPtr)109, "❌ 結束程式 (Exit)");
 
@@ -277,11 +287,44 @@ public class TrayIconService : IDisposable
                     RestoreFromTray();
                     QuickActionRequested?.Invoke("SystemHealth");
                     break;
+                case 111:
+                    RestoreFromTray();
+                    QuickActionRequested?.Invoke("Recovery");
+                    break;
+                case 112:
+                    RestoreFromTray();
+                    QuickActionRequested?.Invoke("WimDeploy");
+                    break;
+                case 113:
+                    RestoreFromTray();
+                    QuickActionRequested?.Invoke("BootManager");
+                    break;
+                case 114:
+                    RestoreFromTray();
+                    QuickActionRequested?.Invoke("NtfsPermissions");
+                    break;
+                case 115:
+                    RestoreFromTray();
+                    QuickActionRequested?.Invoke("GroupPolicy");
+                    break;
+                case 116:
+                    RestoreFromTray();
+                    QuickActionRequested?.Invoke("SystemOptimizer");
+                    break;
                 case 107:
                     QuickActionRequested?.Invoke("CleanCache");
                     break;
+                case 117:
+                    QuickActionRequested?.Invoke("TrimMemory");
+                    break;
+                case 118:
+                    QuickActionRequested?.Invoke("FlushDns");
+                    break;
                 case 110:
                     QuickActionRequested?.Invoke("ToggleOverlay");
+                    break;
+                case 119:
+                    QuickActionRequested?.Invoke("RestartAdmin");
                     break;
                 case 108:
                     RestoreFromTray();

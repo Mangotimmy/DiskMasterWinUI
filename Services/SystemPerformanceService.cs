@@ -694,6 +694,40 @@ public partial class SystemPerformanceService
         return (code == 0, code == 0 ? "All unresponsive processes terminated." : (string.IsNullOrWhiteSpace(errStr) ? outStr : errStr));
     }
 
+    [LibraryImport("psapi.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool EmptyWorkingSet(IntPtr hProcess);
+
+    public Task<string> TrimProcessWorkingSetsAsync()
+    {
+        return Task.Run(() =>
+        {
+            int trimmed = 0;
+            try
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                foreach (var proc in Process.GetProcesses())
+                {
+                    using (proc)
+                    {
+                        try
+                        {
+                            if (proc.Id <= 4) continue;
+                            if (EmptyWorkingSet(proc.Handle))
+                            {
+                                trimmed++;
+                            }
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch { }
+            return $"已對 {trimmed} 個處理程序執行 Working Set 記憶體修剪。";
+        });
+    }
+
     // ═════════════════════════════════════════════════════════════════════
     // 4. SystemInfo Hardware Profile & Installed Hotfixes Viewer
     // ═════════════════════════════════════════════════════════════════════
