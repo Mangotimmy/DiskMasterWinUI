@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 
 namespace DiskMasterPortableLauncher;
 
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 internal static class Program
 {
     private const string TargetExeName = "DiskMasterWinUI.exe";
@@ -51,7 +52,10 @@ internal static class Program
             var launcherPath = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "DiskMaster_Portable.exe");
             StripZoneIdentifier(launcherPath);
             var launcherTicks = File.Exists(launcherPath) ? File.GetLastWriteTimeUtc(launcherPath).Ticks : 0;
-            var versionTag = launcherTicks > 0 ? $"app_{launcherTicks}" : "app_latest";
+            // Elevated and non-elevated runs use separate caches so one can never hit files
+            // (or locks) created by the other, which caused "Access to the path ... is denied".
+            var elevationSuffix = IsElevated() ? "_admin" : string.Empty;
+            var versionTag = (launcherTicks > 0 ? $"app_{launcherTicks}" : "app_latest") + elevationSuffix;
 
             var versionDir = Path.Combine(baseCacheDir, versionTag);
             var targetExePath = Path.Combine(versionDir, TargetExeName);
@@ -62,63 +66,58 @@ internal static class Program
 
             if (needsExtract)
             {
-                // Locate embedded payload resource
-                var resourceName = assembly.GetManifestResourceNames()
-                    .FirstOrDefault(n => n.EndsWith("payload.zip", StringComparison.OrdinalIgnoreCase));
+                // Serialize concurrent launches of the same build so they don't fight over files.
+                using var mutex = new Mutex(false, $@"Local\DiskMasterPortable_{versionTag}");
+                var locked = false;
+                try { locked = mutex.WaitOne(TimeSpan.FromSeconds(60)); }
+                catch (AbandonedMutexException) { locked = true; }
 
                 try
                 {
-                    if (string.IsNullOrEmpty(resourceName))
+                    // Another instance may have finished extracting while we waited.
+                    if (!File.Exists(targetExePath) || !File.Exists(readyMarker))
                     {
-                        var localZip = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "payload.zip");
-                        if (File.Exists(localZip))
+                        try
                         {
-                            Directory.CreateDirectory(versionDir);
-                            ZipFile.ExtractToDirectory(localZip, versionDir, overwriteFiles: true);
-                            File.WriteAllText(readyMarker, DateTime.UtcNow.ToString("o"));
+                            versionDir = ExtractPayloadStaged(assembly, versionDir);
+                            targetExePath = Path.Combine(versionDir, TargetExeName);
                         }
-                        else
+                        catch (FileNotFoundException nf) when (nf.FileName == "payload.zip")
                         {
                             ShowError("找不到內嵌或同目錄下的 payload.zip 資源檔案，無法解壓運行。");
                             return 1;
                         }
-                    }
-                    else
-                    {
-                        Directory.CreateDirectory(versionDir);
-                        using var stream = assembly.GetManifestResourceStream(resourceName);
-                        if (stream == null)
+                        catch (Exception extractEx)
                         {
-                            ShowError("無法載入內嵌資源 payload.zip。");
-                            return 1;
+                            // Fallback: If target executable already exists in this folder or baseCacheDir, try to run it
+                            if (File.Exists(targetExePath))
+                            {
+                                // A previous extraction is still usable.
+                            }
+                            else
+                            {
+                                var legacyTarget = Path.Combine(baseCacheDir, TargetExeName);
+                                if (File.Exists(legacyTarget))
+                                {
+                                    targetExePath = legacyTarget;
+                                    versionDir = baseCacheDir;
+                                }
+                                else
+                                {
+                                    ShowError($"解壓 DiskMaster 核心組件失敗:\n{extractEx.Message}");
+                                    return 1;
+                                }
+                            }
                         }
-
-                        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
-                        archive.ExtractToDirectory(versionDir, overwriteFiles: true);
-                        File.WriteAllText(readyMarker, DateTime.UtcNow.ToString("o"));
                     }
                 }
-                catch (Exception extractEx)
+                finally
                 {
-                    // Fallback: If target executable already exists in this folder or baseCacheDir, try to run it
-                    if (!File.Exists(targetExePath))
-                    {
-                        var legacyTarget = Path.Combine(baseCacheDir, TargetExeName);
-                        if (File.Exists(legacyTarget))
-                        {
-                            targetExePath = legacyTarget;
-                            versionDir = baseCacheDir;
-                        }
-                        else
-                        {
-                            ShowError($"解壓 DiskMaster 核心組件失敗:\n{extractEx.Message}");
-                            return 1;
-                        }
-                    }
+                    if (locked) { try { mutex.ReleaseMutex(); } catch { } }
                 }
 
                 // Asynchronously clean up older app_* folders that are not in use
-                TryCleanOldVersions(baseCacheDir, versionTag);
+                TryCleanOldVersions(baseCacheDir, Path.GetFileName(versionDir.TrimEnd(Path.DirectorySeparatorChar)));
             }
 
             // 2. Launch application (default asInvoker; elevate if requested)
@@ -154,6 +153,80 @@ internal static class Program
         {
             ShowError($"DiskMaster Portable 啟動異常:\n\n{ex.Message}\n\n{ex.StackTrace}");
             return -1;
+        }
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private static bool IsElevated()
+    {
+        try
+        {
+            using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+            return new System.Security.Principal.WindowsPrincipal(identity)
+                .IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Extracts the payload into a fresh unique staging folder (so no existing, possibly locked or
+    /// differently-owned file is ever overwritten), then renames it to <paramref name="versionDir"/>.
+    /// Returns the directory that actually contains the extracted app (falls back to the staging
+    /// folder if the final rename is not possible).
+    /// </summary>
+    private static string ExtractPayloadStaged(Assembly assembly, string versionDir)
+    {
+        var stagingDir = $"{versionDir}.tmp_{Guid.NewGuid():N}";
+        Directory.CreateDirectory(stagingDir);
+
+        try
+        {
+            var resourceName = assembly.GetManifestResourceNames()
+                .FirstOrDefault(n => n.EndsWith("payload.zip", StringComparison.OrdinalIgnoreCase));
+
+            if (string.IsNullOrEmpty(resourceName))
+            {
+                var localZip = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "payload.zip");
+                if (!File.Exists(localZip))
+                {
+                    throw new FileNotFoundException("payload.zip not found", "payload.zip");
+                }
+                ZipFile.ExtractToDirectory(localZip, stagingDir, overwriteFiles: true);
+            }
+            else
+            {
+                using var stream = assembly.GetManifestResourceStream(resourceName)
+                    ?? throw new InvalidOperationException("無法載入內嵌資源 payload.zip。");
+                using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+                archive.ExtractToDirectory(stagingDir, overwriteFiles: true);
+            }
+
+            File.WriteAllText(Path.Combine(stagingDir, ".extracted"), DateTime.UtcNow.ToString("o"));
+        }
+        catch
+        {
+            try { Directory.Delete(stagingDir, recursive: true); } catch { }
+            throw;
+        }
+
+        // Drop a stale/incomplete previous folder if possible, then publish the staged one.
+        if (Directory.Exists(versionDir))
+        {
+            try { Directory.Delete(versionDir, recursive: true); } catch { /* locked or not ours */ }
+        }
+
+        try
+        {
+            Directory.Move(stagingDir, versionDir);
+            return versionDir;
+        }
+        catch
+        {
+            // Could not take over versionDir; run straight from the private staging copy.
+            return stagingDir;
         }
     }
 

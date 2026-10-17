@@ -23,6 +23,9 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _shellEnableDiskCheck = true;
     [ObservableProperty] private string _shellStatusSummary = "尚未檢測右鍵選單狀態";
 
+    /// <summary>Explorer context-menu integration is only offered by the installer build.</summary>
+    public bool IsShellIntegrationAvailable => AppEnvironmentHelper.IsInstallerMode;
+
     // ── Tab Reordering & Visibility Management ──
     public ObservableCollection<TabOrderItem> TabOrderItems { get; } = new();
     [ObservableProperty] private bool _enableCustomTabReorder = true;
@@ -843,6 +846,12 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     public void RefreshShellIntegrationStatus()
     {
+        if (!IsShellIntegrationAvailable)
+        {
+            ShellStatusSummary = "免安裝便攜版不提供右鍵選單整合，請使用安裝版。";
+            return;
+        }
+
         try
         {
             ShellStatusSummary = _shellIntegration.GetStatusText();
@@ -856,6 +865,12 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     public void InstallShellIntegration()
     {
+        if (!IsShellIntegrationAvailable)
+        {
+            StatusMessage = "免安裝便攜版不提供右鍵選單整合，請使用安裝版。";
+            return;
+        }
+
         var res = _shellIntegration.InstallExtended(
             ShellAllUsersScope,
             ShellEnableRecovery,
@@ -870,6 +885,12 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     public void UninstallShellIntegration()
     {
+        if (!IsShellIntegrationAvailable)
+        {
+            StatusMessage = "免安裝便攜版不提供右鍵選單整合，請使用安裝版。";
+            return;
+        }
+
         var res = _shellIntegration.UninstallAllExtended(ShellAllUsersScope);
         StatusMessage = res.Headline;
         RefreshShellIntegrationStatus();

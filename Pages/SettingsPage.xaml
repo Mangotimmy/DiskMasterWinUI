@@ -642,6 +642,7 @@
             <!-- 5.5 Windows Explorer Right-Click Context Menu Integration -->
             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                    Visibility="{x:Bind ViewModel.IsShellIntegrationAvailable, Converter={StaticResource BoolToVisibilityConverter}}"
                     CornerRadius="8" Padding="16">
                 <StackPanel Spacing="12">
                     <StackPanel Orientation="Horizontal" Spacing="8">
