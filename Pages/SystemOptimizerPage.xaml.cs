@@ -78,6 +78,22 @@ public sealed partial class SystemOptimizerPage : Page
             _ => "固定時間配額 (Fixed Quantum) 能防止背景任務突發打斷遊戲執行緒，在 CS2、Valorant 等電競遊戲中能大幅改善準心操作一致性與 1% Low 幀率。修改後重開機生效。"
         };
 
+        // CPU Process Priority Customization Localization
+        CpuAppPriorityCardTitle.Text = lang switch { "zh-CN" => "🎯 指定应用程序 CPU 线程优先级自定义 (IFEO 常驻与即时调节)", "en-US" => "🎯 Per-Application CPU Priority Customization (IFEO & Real-Time)", "ja-JP" => "🎯 アプリケーション個別 CPU 優先度設定 (IFEO常駐 & リアルタイム)", _ => "🎯 指定應用程式 CPU 執行緒優先權自訂 (IFEO 常駐與即時調節)" };
+        CpuAppPriorityCardDesc.Text = lang switch { "zh-CN" => "为特定电竞游戏或重载应用程序自定义 CPU 调度优先级 (即时 / 高 / 高于标准 / 标准)。支持 Windows IFEO 注册表常驻，开机与每次启动自动生效，零后台常驻负担。", "en-US" => "Set custom CPU thread priorities for games and heavy apps (Realtime / High / AboveNormal / Normal). Backed by Windows IFEO registry to take effect automatically on every launch without background overhead.", "ja-JP" => "特定のゲームやアプリにCPU優先度（リアルタイム/高/通常以上/通常）を指定。Windows IFEO レジストリにより起動時に自動適用され、バックグラウンド負荷ゼロです。", _ => "為特定電競遊戲或重載應用程式自訂 CPU 排程優先權 (即時 / 高 / 高於標準 / 標準)。支援 Windows IFEO 登錄檔常駐，開機與每次啟動自動生效，零背景常駐負擔。" };
+        RefreshProcessesBtnText.Text = lang switch { "zh-CN" => "刷新进程", "en-US" => "Refresh Processes", "ja-JP" => "プロセス更新", _ => "重新整理行程" };
+        CpuAppProcessCombo.Header = lang switch { "zh-CN" => "选择运行中进程 (Process)", "en-US" => "Select Running Process", "ja-JP" => "実行中プロセスを選択", _ => "選擇執行中處理程序 (Process)" };
+        CpuAppProcessCombo.PlaceholderText = lang switch { "zh-CN" => "点击展开选择运行中的程序...", "en-US" => "Click to select a running process...", "ja-JP" => "実行中のプロセスを選択...", _ => "點擊展開選擇執行中之程式..." };
+        CpuAppProcessTextBox.Header = lang switch { "zh-CN" => "或手动输入可执行文件名", "en-US" => "Or Enter Executable Name", "ja-JP" => "または実行可能ファイル名を入力", _ => "或手動輸入可執行檔名稱" };
+        CpuAppPriorityCombo.Header = lang switch { "zh-CN" => "目标 CPU 优先级", "en-US" => "Target CPU Priority", "ja-JP" => "目標 CPU 優先度", _ => "目標 CPU 優先權" };
+        PriorityItem0.Content = lang switch { "zh-CN" => "⚡ 实时 (Realtime)", "en-US" => "⚡ Realtime", "ja-JP" => "⚡ リアルタイム (Realtime)", _ => "⚡ 即時 (Realtime)" };
+        PriorityItem1.Content = lang switch { "zh-CN" => "🚀 高 (High)", "en-US" => "🚀 High", "ja-JP" => "🚀 高 (High)", _ => "🚀 高 (High)" };
+        PriorityItem2.Content = lang switch { "zh-CN" => "⬆️ 高于标准 (AboveNormal)", "en-US" => "⬆️ Above Normal", "ja-JP" => "⬆️ 通常以上 (AboveNormal)", _ => "⬆️ 高於標準 (AboveNormal)" };
+        PriorityItem3.Content = lang switch { "zh-CN" => "🟢 标准 (Normal)", "en-US" => "🟢 Normal", "ja-JP" => "🟢 通常 (Normal)", _ => "🟢 標準 (Normal)" };
+        ApplyProcessPriorityBtnText.Text = lang switch { "zh-CN" => "即时应用", "en-US" => "Apply Now", "ja-JP" => "即時適用", _ => "即時套用" };
+        SaveProcessPriorityRuleBtnText.Text = lang switch { "zh-CN" => "保存为开机常驻规则 (IFEO)", "en-US" => "Save IFEO Persistent Rule", "ja-JP" => "IFEO 常駐ルールとして保存", _ => "儲存為開機常駐規則 (IFEO)" };
+        PersistedRulesTitle.Text = lang switch { "zh-CN" => "已建立之 CPU 优先级常驻规则清单 (IFEO Registry)", "en-US" => "Active IFEO CPU Priority Rules", "ja-JP" => "設定済み IFEO CPU 優先度ルール一覧", _ => "已建立之 CPU 優先權常駐規則清單 (IFEO Registry)" };
+
         MmcssCardTitle.Text = lang switch { "zh-CN" => "多媒体类调度器 (MMCSS) 与能耗节流", "en-US" => "Multimedia Class Scheduler (MMCSS) & Power Throttling", "ja-JP" => "マルチメディアクラススケジューラ (MMCSS) と電力スロットリング", _ => "多媒體類別排程器 (MMCSS) 與能源節流" };
         PowerThrottlingLabel.Text = lang switch { "zh-CN" => "禁用 CPU 能耗节流 (PowerThrottlingOff = 1)", "en-US" => "Disable CPU Power Throttling (PowerThrottlingOff = 1)", "ja-JP" => "CPU 電力スロットリングを無効化 (PowerThrottlingOff = 1)", _ => "停用 CPU 能源節流 (PowerThrottlingOff = 1)" };
         PowerThrottlingDesc.Text = lang switch { "zh-CN" => "防止 Windows 10/11 内核对背景线程或非活动游戏窗口强制降频节能。", "en-US" => "Prevents Windows kernel from aggressively throttling background threads or inactive game windows.", "ja-JP" => "Windows カーネルがバックグラウンドスレッドやゲームウィンドウの周波数を低下させるのを防ぎます。", _ => "防止 Windows 10/11 核心對背景執行緒或非活動遊戲視窗強制降頻節能。" };
@@ -465,6 +481,14 @@ public sealed partial class SystemOptimizerPage : Page
         }
     }
 
+    private async void DeletePriorityRuleBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is PersistedPriorityRuleItem item)
+        {
+            await ViewModel.DeleteRuleCommand.ExecuteAsync(item);
+        }
+    }
+
     private void OptimizerTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (ReferenceEquals(OptimizerTabView.SelectedItem, TabOneDrive))
@@ -475,6 +499,14 @@ public sealed partial class SystemOptimizerPage : Page
         {
             ViewModel.RefreshDriversCommand.Execute(null);
         }
+        else if (ReferenceEquals(OptimizerTabView.SelectedItem, TabCpu))
+        {
+            if (ViewModel.RunningProcesses.Count == 0 && !ViewModel.IsLoadingProcesses)
+            {
+                ViewModel.RefreshRunningProcessesCommand.Execute(null);
+                ViewModel.RefreshPersistedRulesCommand.Execute(null);
+            }
+        }
         else if (ReferenceEquals(OptimizerTabView.SelectedItem, TabExplorerShell))
         {
             ViewModel.IsExplorerCurrentlyAlive = ExplorerWatchdogService.CheckExplorerRunning();
@@ -483,4 +515,5 @@ public sealed partial class SystemOptimizerPage : Page
         }
     }
 }
+
 

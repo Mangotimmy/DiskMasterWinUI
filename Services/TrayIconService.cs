@@ -332,7 +332,7 @@ public class TrayIconService : IDisposable
                     break;
                 case 109:
                     IsExplicitExit = true;
-                    QuickActionRequested?.Invoke("Exit");
+                    PostMessage(_hwnd, WM_SAFE_EXIT, IntPtr.Zero, IntPtr.Zero);
                     break;
             }
         }
@@ -346,6 +346,7 @@ public class TrayIconService : IDisposable
     private const uint WM_SYSCOMMAND = 0x0112;
     private const int SC_CLOSE = 0xF060;
     private const int SC_MINIMIZE = 0xF020;
+    private const uint WM_SAFE_EXIT = 0x8000 + 4097;
 
     /// <summary>
     /// Set to true only when the user explicitly clicks "Exit" from the system tray menu.
@@ -355,6 +356,12 @@ public class TrayIconService : IDisposable
 
     private IntPtr WindowSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, UIntPtr dwRefData)
     {
+        if (uMsg == WM_SAFE_EXIT)
+        {
+            QuickActionRequested?.Invoke("Exit");
+            return IntPtr.Zero;
+        }
+
         if (uMsg == WM_CLOSE && SettingsService.Instance.Current.CloseToTray && !IsExplicitExit)
         {
             MinimizeToTray();
@@ -400,8 +407,29 @@ public class TrayIconService : IDisposable
             }
         }
 
+        if (App.WM_ACTIVATE_INSTANCE != 0 && uMsg == App.WM_ACTIVATE_INSTANCE)
+        {
+            RestoreFromTray();
+            ShowWindow(_hwnd, SW_RESTORE);
+            SetForegroundWindow(_hwnd);
+            RestoreRequested?.Invoke();
+            return IntPtr.Zero;
+        }
+
+        if (uMsg == WM_NCDESTROY)
+        {
+            if (_hwnd != IntPtr.Zero && _subclassDelegate != null)
+            {
+                RemoveWindowSubclass(_hwnd, _subclassDelegate, _subclassId);
+                _subclassDelegate = null;
+            }
+            return DefSubclassProc(hWnd, uMsg, wParam, lParam);
+        }
+
         return DefSubclassProc(hWnd, uMsg, wParam, lParam);
     }
+
+    private const uint WM_NCDESTROY = 0x0082;
 
     public void Dispose()
     {
@@ -432,6 +460,7 @@ public class TrayIconService : IDisposable
             try
             {
                 RemoveWindowSubclass(_hwnd, _subclassDelegate, _subclassId);
+                _subclassDelegate = null;
             }
             catch { }
         }

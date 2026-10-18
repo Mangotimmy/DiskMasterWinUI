@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using DiskMasterWinUI.Helpers;
@@ -19,20 +20,32 @@ public sealed partial class PerformanceOverlayWindow : Window
     private readonly SystemPerformanceService _perfService = new();
     private readonly DispatcherTimer _metricsTimer = new();
     private readonly Stopwatch _fpsStopwatch = new();
-    private int _frameCount = 0;
-    private bool _isCompact = false;
+    private readonly Stopwatch _frameStopwatch = new();
+    private readonly Queue<double> _recentFrameDurations = new();
+
+    private int _frameCount;
+    private int _lastFps = 60;
+    private int _lastLow1PctFps = 60;
+    private double _lastFrameMs = 16.6;
+
+    private bool _isCompact;
     private IntPtr _hwnd;
     private OverlappedPresenter? _presenter;
 
-    // Logical DIP dimensions (scaled by physical monitor DPI so high-DPI screens never clip)
+    // Logical DIP dimensions
     private const int ExpandedLogicalWidth = 360;
     private const int ExpandedLogicalHeight = 236;
     private const int CompactLogicalWidth = 420;
     private const int CompactLogicalHeight = 72;
+    private const int BarLogicalWidth = 720;
+    private const int BarLogicalHeight = 44;
+    private const int BadgeLogicalWidth = 320;
+    private const int BadgeLogicalHeight = 44;
 
     /// <summary>
     /// Computes the physical pixel client dimensions for the FPS HUD window, honoring both minimum
     /// logical DIP bounds and actual measured XAML content size scaled by the monitor's DPI factor.
+    /// Backward-compatible with Tier 1 test harness reflection call.
     /// </summary>
     public static Windows.Graphics.SizeInt32 CalculateDpiAwareHudClientSize(
         bool isCompact,
@@ -52,16 +65,6 @@ public sealed partial class PerformanceOverlayWindow : Window
         return new Windows.Graphics.SizeInt32(targetW, targetH);
     }
 
-    private const uint WM_NCLBUTTONDOWN = 0x00A1;
-    private const int HTCAPTION = 0x0002;
-
-    [LibraryImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool ReleaseCapture();
-
-    [DllImport("user32.dll", CharSet = CharSet.Auto)]
-    private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
-
     public PerformanceOverlayWindow()
     {
         InitializeComponent();
@@ -70,14 +73,18 @@ public sealed partial class PerformanceOverlayWindow : Window
         _hwnd = WindowNative.GetWindowHandle(this);
         ConfigureAlwaysOnTopWindow();
 
-        // 1. Live Render FPS Tracking
+        // 1. Live Render FPS & ms Delay Tracking
         _fpsStopwatch.Start();
+        _frameStopwatch.Start();
         CompositionTarget.Rendering += OnCompositionRendering;
 
-        // 2. Metrics Update Timer (1.2s cadence)
-        _metricsTimer.Interval = TimeSpan.FromSeconds(1.2);
+        // 2. Metrics Update Timer (1.0s cadence)
+        _metricsTimer.Interval = TimeSpan.FromSeconds(1.0);
         _metricsTimer.Tick += async (_, _) => await RefreshOverlayMetricsAsync();
         _metricsTimer.Start();
+
+        // Apply saved HUD settings
+        LoadSavedSettings();
 
         // Immediate first sample
         _ = RefreshOverlayMetricsAsync();
@@ -86,12 +93,102 @@ public sealed partial class PerformanceOverlayWindow : Window
         {
             _metricsTimer.Stop();
             _fpsStopwatch.Stop();
+            _frameStopwatch.Stop();
             CompositionTarget.Rendering -= OnCompositionRendering;
             if (ReferenceEquals(CurrentInstance, this))
             {
                 CurrentInstance = null;
             }
         };
+    }
+
+    private void LoadSavedSettings()
+    {
+        try
+        {
+            var s = SettingsService.Instance.Current;
+
+            // Opacity
+            double op = s.HudOpacity > 0 ? s.HudOpacity : 0.85;
+            ApplyOpacity(op);
+            if (HudOpacitySlider != null) HudOpacitySlider.Value = (int)Math.Round(op * 100);
+
+            // Style (Default is "Bar")
+            string style = string.IsNullOrEmpty(s.HudStyle) ? "Bar" : s.HudStyle;
+            ApplyHudStyle(style);
+            if (HudStyleCombo != null)
+            {
+                for (int i = 0; i < HudStyleCombo.Items.Count; i++)
+                {
+                    if (HudStyleCombo.Items[i] is ComboBoxItem item && (item.Tag?.ToString() == style))
+                    {
+                        HudStyleCombo.SelectedIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            // Toggles
+            if (ToggleFps != null) ToggleFps.IsOn = s.HudShowFps;
+            if (ToggleLow1Pct != null) ToggleLow1Pct.IsOn = s.HudShowLow1Percent;
+            if (ToggleMsDelay != null) ToggleMsDelay.IsOn = s.HudShowMsDelay;
+            if (ToggleCpu != null) ToggleCpu.IsOn = s.HudShowCpu;
+            if (ToggleGpu != null) ToggleGpu.IsOn = s.HudShowGpu;
+            if (ToggleRam != null) ToggleRam.IsOn = s.HudShowRam;
+            if (ToggleNet != null) ToggleNet.IsOn = s.HudShowNet;
+            if (ToggleApi != null) ToggleApi.IsOn = s.HudShowApi;
+            if (ToggleAppName != null) ToggleAppName.IsOn = s.HudShowAppName;
+
+            ApplyMetricVisibility();
+        }
+        catch { }
+    }
+
+    private void ApplyOpacity(double opacity)
+    {
+        opacity = Math.Clamp(opacity, 0.05, 1.0);
+        HudContainer.Opacity = opacity;
+        if (OpacityValueText != null)
+        {
+            OpacityValueText.Text = $"{(int)Math.Round(opacity * 100)}%";
+        }
+    }
+
+    private void ApplyHudStyle(string style)
+    {
+        BarViewPanel.Visibility = (style == "Bar") ? Visibility.Visible : Visibility.Collapsed;
+        CardViewPanel.Visibility = (style == "Card") ? Visibility.Visible : Visibility.Collapsed;
+        BadgeViewPanel.Visibility = (style == "Badge") ? Visibility.Visible : Visibility.Collapsed;
+
+        ApplyDpiAwareWindowSize(repositionTopRight: false);
+    }
+
+    private void ApplyMetricVisibility()
+    {
+        var s = SettingsService.Instance.Current;
+
+        // Bar badges
+        BarFpsBadge.Visibility = s.HudShowFps ? Visibility.Visible : Visibility.Collapsed;
+        BarLow1PctBadge.Visibility = s.HudShowLow1Percent ? Visibility.Visible : Visibility.Collapsed;
+        BarMsDelayBadge.Visibility = s.HudShowMsDelay ? Visibility.Visible : Visibility.Collapsed;
+        BarApiBadge.Visibility = s.HudShowApi ? Visibility.Visible : Visibility.Collapsed;
+        BarCpuBadge.Visibility = s.HudShowCpu ? Visibility.Visible : Visibility.Collapsed;
+        BarGpuBadge.Visibility = s.HudShowGpu ? Visibility.Visible : Visibility.Collapsed;
+        BarRamBadge.Visibility = s.HudShowRam ? Visibility.Visible : Visibility.Collapsed;
+        BarNetBadge.Visibility = s.HudShowNet ? Visibility.Visible : Visibility.Collapsed;
+        BarAppNameBadge.Visibility = s.HudShowAppName ? Visibility.Visible : Visibility.Collapsed;
+
+        // Card badges
+        CardFpsBadge.Visibility = s.HudShowFps ? Visibility.Visible : Visibility.Collapsed;
+        CardLow1PctBadge.Visibility = s.HudShowLow1Percent ? Visibility.Visible : Visibility.Collapsed;
+        CardMsDelayBadge.Visibility = s.HudShowMsDelay ? Visibility.Visible : Visibility.Collapsed;
+        GraphicsApiBadge.Visibility = s.HudShowApi ? Visibility.Visible : Visibility.Collapsed;
+        CardCpuRow.Visibility = s.HudShowCpu ? Visibility.Visible : Visibility.Collapsed;
+        CardGpuRow.Visibility = s.HudShowGpu ? Visibility.Visible : Visibility.Collapsed;
+        CardRamRow.Visibility = s.HudShowRam ? Visibility.Visible : Visibility.Collapsed;
+        CardNetRow.Visibility = s.HudShowNet ? Visibility.Visible : Visibility.Collapsed;
+
+        ApplyDpiAwareWindowSize(repositionTopRight: false);
     }
 
     private void OverlayRoot_Loaded(object sender, RoutedEventArgs e)
@@ -129,7 +226,14 @@ public sealed partial class PerformanceOverlayWindow : Window
                 presenter.IsMaximizable = false;
             }
 
-            ApplyDpiAwareWindowSize(repositionTopRight: true);
+            var s = SettingsService.Instance.Current;
+            bool hasSavedPos = s.HudCustomPositionX.HasValue && s.HudCustomPositionY.HasValue;
+            ApplyDpiAwareWindowSize(repositionTopRight: !hasSavedPos);
+
+            if (hasSavedPos)
+            {
+                appWindow.Move(new Windows.Graphics.PointInt32(s.HudCustomPositionX!.Value, s.HudCustomPositionY!.Value));
+            }
         }
         catch { }
     }
@@ -142,17 +246,37 @@ public sealed partial class PerformanceOverlayWindow : Window
             var appWindow = AppWindow.GetFromWindowId(windowId);
             double dpiScale = GetCurrentDpiScale();
 
+            var s = SettingsService.Instance.Current;
+            string style = s.HudStyle ?? "Bar";
+
+            double baseW = style switch
+            {
+                "Bar" => BarLogicalWidth,
+                "Badge" => BadgeLogicalWidth,
+                _ => _isCompact ? CompactLogicalWidth : ExpandedLogicalWidth
+            };
+            double baseH = style switch
+            {
+                "Bar" => BarLogicalHeight,
+                "Badge" => BadgeLogicalHeight,
+                _ => _isCompact ? CompactLogicalHeight : ExpandedLogicalHeight
+            };
+
             double measuredW = 0;
             double measuredH = 0;
             if (HudContainer != null && HudContainer.IsLoaded)
             {
-                double constraintW = _isCompact ? CompactLogicalWidth : ExpandedLogicalWidth;
-                HudContainer.Measure(new Windows.Foundation.Size(constraintW, double.PositiveInfinity));
+                HudContainer.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
                 measuredW = HudContainer.DesiredSize.Width;
                 measuredH = HudContainer.DesiredSize.Height;
             }
 
-            var clientSize = CalculateDpiAwareHudClientSize(_isCompact, dpiScale, measuredW, measuredH);
+            double logicalW = Math.Max(baseW, measuredW);
+            double logicalH = Math.Max(baseH, measuredH);
+
+            int targetW = (int)Math.Ceiling(logicalW * dpiScale);
+            int targetH = (int)Math.Ceiling(logicalH * dpiScale);
+            var clientSize = new Windows.Graphics.SizeInt32(targetW, targetH);
 
             try
             {
@@ -194,7 +318,6 @@ public sealed partial class PerformanceOverlayWindow : Window
         int maxX = Math.Max(workArea.X, workArea.X + workArea.Width - actualW);
         int maxY = Math.Max(workArea.Y, workArea.Y + workArea.Height - actualH);
 
-        // Snap to edges if within 20 physical pixels of monitor border
         int snapDistance = (int)Math.Round(20 * dpiScale);
         if (Math.Abs(curX - workArea.X) <= snapDistance) curX = workArea.X;
         else if (Math.Abs(curX - maxX) <= snapDistance) curX = maxX;
@@ -213,16 +336,59 @@ public sealed partial class PerformanceOverlayWindow : Window
 
     private void OnCompositionRendering(object? sender, object e)
     {
+        double elapsedMs = _frameStopwatch.Elapsed.TotalMilliseconds;
+        _frameStopwatch.Restart();
+
+        if (elapsedMs > 0.5 && elapsedMs < 1000.0)
+        {
+            _lastFrameMs = elapsedMs;
+            _recentFrameDurations.Enqueue(elapsedMs);
+            while (_recentFrameDurations.Count > 120)
+            {
+                _recentFrameDurations.Dequeue();
+            }
+        }
+
         _frameCount++;
         if (_fpsStopwatch.ElapsedMilliseconds >= 1000)
         {
             double seconds = _fpsStopwatch.ElapsedMilliseconds / 1000.0;
-            int currentFps = (int)Math.Round(_frameCount / seconds);
-            FpsCounterText.Text = $"{currentFps} FPS";
+            _lastFps = (int)Math.Round(_frameCount / seconds);
+
+            if (_recentFrameDurations.Count >= 10)
+            {
+                var sorted = _recentFrameDurations.OrderBy(t => t).ToList();
+                int idx99 = Math.Clamp((int)(sorted.Count * 0.99), 0, sorted.Count - 1);
+                double p99FrameTime = sorted[idx99];
+                _lastLow1PctFps = p99FrameTime > 0 ? (int)Math.Round(1000.0 / p99FrameTime) : _lastFps;
+            }
+            else
+            {
+                _lastLow1PctFps = _lastFps;
+            }
 
             _frameCount = 0;
             _fpsStopwatch.Restart();
+
+            UpdateFpsDisplay();
         }
+    }
+
+    private void UpdateFpsDisplay()
+    {
+        // 1. Bar Mode
+        BarFpsText.Text = $"{_lastFps} FPS";
+        BarLow1PctText.Text = $"{_lastLow1PctFps} 1%LOW";
+        BarMsDelayText.Text = $"{_lastFrameMs:F1} ms";
+
+        // 2. Card Mode
+        FpsCounterText.Text = $"{_lastFps} FPS";
+        CardLow1PctText.Text = $"{_lastLow1PctFps} 1%LOW";
+        CardMsDelayText.Text = $"{_lastFrameMs:F1} ms";
+
+        // 3. Badge Mode
+        BadgeFpsText.Text = $"{_lastFps} FPS";
+        BadgeDelayText.Text = $"{_lastFrameMs:F1}ms";
     }
 
     private async Task RefreshOverlayMetricsAsync()
@@ -239,17 +405,27 @@ public sealed partial class PerformanceOverlayWindow : Window
     {
         DispatcherQueue.TryEnqueue(() =>
         {
-            // Active Graphics API Badge (DX12 / DX11 / Vulkan / OpenGL)
             string api = string.IsNullOrWhiteSpace(snap.ActiveGraphicsApi) ? "DX12" : snap.ActiveGraphicsApi;
-            GraphicsApiText.Text = api;
-            HudSubtitleText.Text = string.IsNullOrWhiteSpace(snap.ForegroundAppName) ? "PERF HUD" : snap.ForegroundAppName.ToUpperInvariant();
+            string appName = string.IsNullOrWhiteSpace(snap.ForegroundAppName) ? "DESKTOP" : snap.ForegroundAppName.ToUpperInvariant();
 
-            // CPU
+            // ── Bar View Updates ──
+            BarApiText.Text = api;
+            BarCpuText.Text = $"CPU {snap.CpuUsagePercent:F0}%";
+            BarGpuText.Text = snap.GpuMemoryUsedMb > 0
+                ? $"GPU {snap.GpuUsagePercent:F0}% · {snap.DisplayGpuShortVram}"
+                : $"GPU {snap.GpuUsagePercent:F0}%";
+            BarRamText.Text = $"RAM {snap.RamUsagePercent:F0}%";
+            BarNetText.Text = snap.NetDownloadRateDisplay;
+            BarAppNameText.Text = appName;
+
+            // ── Card View Updates ──
+            GraphicsApiText.Text = api;
+            HudSubtitleText.Text = appName;
+
             CpuProgress.Value = snap.CpuUsagePercent;
             CpuText.Text = snap.DisplayCpuPercent;
             CompactCpuText.Text = $"{snap.CpuUsagePercent:F0}%";
 
-            // GPU (Usage % + Dedicated VRAM)
             GpuProgress.Value = snap.GpuUsagePercent;
             GpuText.Text = snap.GpuMemoryTotalMb > 0 || snap.GpuMemoryUsedMb > 0
                 ? $"{snap.GpuUsagePercent:F0}% · {snap.DisplayGpuShortVram}"
@@ -257,7 +433,6 @@ public sealed partial class PerformanceOverlayWindow : Window
             CompactGpuText.Text = $"{snap.GpuUsagePercent:F0}% ({api})";
             GpuModelFooterText.Text = $"🎮 {snap.GpuModelName}";
 
-            // RAM (Usage % + DDR4/DDR5 & MHz)
             RamProgress.Value = snap.RamUsagePercent;
             RamLabelText.Text = !string.IsNullOrWhiteSpace(snap.RamMemoryType) && !snap.RamMemoryType.Contains('/')
                 ? snap.RamMemoryType
@@ -268,46 +443,174 @@ public sealed partial class PerformanceOverlayWindow : Window
             CompactRamText.Text = $"{snap.RamUsagePercent:F0}%";
             RamSpecFooterText.Text = snap.DisplayRamTypeAndSpeed;
 
-            // LAN
             NetDownText.Text = $"⬇ {snap.NetDownloadRateDisplay}";
             NetUpText.Text = $"⬆ {snap.NetUploadRateDisplay}";
             NetTotalText.Text = snap.NetAdapterSpeedDisplay;
             CompactNetText.Text = snap.NetDownloadRateDisplay;
+
+            // ── Badge View Updates ──
+            BadgeApiText.Text = api;
+            BadgeCpuText.Text = $"⚡ {snap.CpuUsagePercent:F0}%";
+            BadgeGpuText.Text = $"🎮 {snap.GpuUsagePercent:F0}%";
         });
     }
+
+    // ═══ Smooth Mouse Drag & Edge Clamping ═══
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetCursorPos(out POINT lpPoint);
+
+    private bool _isDragging;
+    private POINT _dragStartCursor;
+    private Windows.Graphics.PointInt32 _windowStartPos;
 
     private void HudContainer_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
         if (e.OriginalSource is DependencyObject dep)
         {
             DependencyObject? curr = dep;
-            while (curr != null)
+            while (curr != null && curr != HudContainer)
             {
-                if (curr is Microsoft.UI.Xaml.Controls.Primitives.ButtonBase)
+                if (curr is Microsoft.UI.Xaml.Controls.Primitives.ButtonBase ||
+                    curr is Microsoft.UI.Xaml.Controls.Primitives.RangeBase ||
+                    curr is ToggleSwitch ||
+                    curr is ComboBox)
+                {
                     return;
+                }
                 curr = VisualTreeHelper.GetParent(curr);
             }
         }
 
-        if (e.GetCurrentPoint(null).Properties.IsLeftButtonPressed)
+        var pt = e.GetCurrentPoint(HudContainer);
+        if (pt.Properties.IsLeftButtonPressed)
         {
-            ReleaseCapture();
-            SendMessage(_hwnd, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero);
+            _isDragging = true;
+            GetCursorPos(out _dragStartCursor);
+
+            var windowId = Win32Interop.GetWindowIdFromWindow(_hwnd);
+            var appWindow = AppWindow.GetFromWindowId(windowId);
+            _windowStartPos = appWindow.Position;
+
+            HudContainer.CapturePointer(e.Pointer);
+            e.Handled = true;
+        }
+    }
+
+    private void HudContainer_PointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (_isDragging)
+        {
+            GetCursorPos(out POINT curCursor);
+            int deltaX = curCursor.X - _dragStartCursor.X;
+            int deltaY = curCursor.Y - _dragStartCursor.Y;
+
+            var windowId = Win32Interop.GetWindowIdFromWindow(_hwnd);
+            var appWindow = AppWindow.GetFromWindowId(windowId);
+
+            int targetX = _windowStartPos.X + deltaX;
+            int targetY = _windowStartPos.Y + deltaY;
+
+            var displayArea = DisplayArea.GetFromWindowId(windowId, DisplayAreaFallback.Primary);
+            var workArea = displayArea.WorkArea;
+
+            int maxX = Math.Max(workArea.X, workArea.X + workArea.Width - appWindow.Size.Width);
+            int maxY = Math.Max(workArea.Y, workArea.Y + workArea.Height - appWindow.Size.Height);
+
+            int clampedX = Math.Clamp(targetX, workArea.X, maxX);
+            int clampedY = Math.Clamp(targetY, workArea.Y, maxY);
+
+            appWindow.Move(new Windows.Graphics.PointInt32(clampedX, clampedY));
+            e.Handled = true;
+        }
+    }
+
+    private void HudContainer_PointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (_isDragging)
+        {
+            _isDragging = false;
+            HudContainer.ReleasePointerCapture(e.Pointer);
 
             try
             {
                 var windowId = Win32Interop.GetWindowIdFromWindow(_hwnd);
                 var appWindow = AppWindow.GetFromWindowId(windowId);
-                var displayArea = DisplayArea.GetFromWindowId(windowId, DisplayAreaFallback.Primary);
-                ClampWindowToMonitorWorkArea(appWindow, displayArea.WorkArea, appWindow.Size.Width, appWindow.Size.Height, GetCurrentDpiScale());
+                var s = SettingsService.Instance.Current;
+                s.HudCustomPositionX = appWindow.Position.X;
+                s.HudCustomPositionY = appWindow.Position.Y;
+                SettingsService.Instance.Save();
             }
             catch { }
+            e.Handled = true;
         }
     }
 
-    private void DragRegion_PointerPressed(object sender, PointerRoutedEventArgs e)
+    private void HudContainer_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
     {
-        HudContainer_PointerPressed(sender, e);
+        _isDragging = false;
+    }
+
+    // ═══ Style & Settings Handlers ═══
+
+    private void HudStyleCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (HudStyleCombo.SelectedItem is ComboBoxItem item && item.Tag is string style)
+        {
+            var s = SettingsService.Instance.Current;
+            s.HudStyle = style;
+            SettingsService.Instance.Save();
+            ApplyHudStyle(style);
+        }
+    }
+
+    private void HudOpacitySlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+    {
+        double val = e.NewValue / 100.0;
+        ApplyOpacity(val);
+        var s = SettingsService.Instance.Current;
+        if (Math.Abs(s.HudOpacity - val) > 0.01)
+        {
+            s.HudOpacity = val;
+            SettingsService.Instance.Save();
+        }
+    }
+
+    private void MetricToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        var s = SettingsService.Instance.Current;
+        if (ToggleFps != null) s.HudShowFps = ToggleFps.IsOn;
+        if (ToggleLow1Pct != null) s.HudShowLow1Percent = ToggleLow1Pct.IsOn;
+        if (ToggleMsDelay != null) s.HudShowMsDelay = ToggleMsDelay.IsOn;
+        if (ToggleCpu != null) s.HudShowCpu = ToggleCpu.IsOn;
+        if (ToggleGpu != null) s.HudShowGpu = ToggleGpu.IsOn;
+        if (ToggleRam != null) s.HudShowRam = ToggleRam.IsOn;
+        if (ToggleNet != null) s.HudShowNet = ToggleNet.IsOn;
+        if (ToggleApi != null) s.HudShowApi = ToggleApi.IsOn;
+        if (ToggleAppName != null) s.HudShowAppName = ToggleAppName.IsOn;
+
+        SettingsService.Instance.Save();
+        ApplyMetricVisibility();
+    }
+
+    private void OpenSettings_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement elem)
+        {
+            HudOptionsFlyout.ShowAt(elem);
+        }
+        else
+        {
+            HudOptionsFlyout.ShowAt(HudContainer);
+        }
     }
 
     private void CompactToggle_Click(object sender, RoutedEventArgs e)

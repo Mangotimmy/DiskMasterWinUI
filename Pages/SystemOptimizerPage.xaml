@@ -204,6 +204,142 @@
                                 </StackPanel>
                             </Border>
 
+                            <!-- ════ 指定應用程式 CPU 執行緒優先權自訂 (CPU Priority Program Selection & IFEO) ════ -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="14">
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon Grid.Column="0" Glyph="&#xE7EE;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                            <TextBlock x:Name="CpuAppPriorityCardTitle" Text="🎯 指定應用程式 CPU 執行緒優先權自訂 (IFEO 常駐與即時調節)" FontWeight="SemiBold" FontSize="15" />
+                                            <TextBlock x:Name="CpuAppPriorityCardDesc" Text="為特定電競遊戲或重載應用程式自訂 CPU 排程優先權 (即時 / 高 / 高於標準 / 標準)。支援 Windows IFEO 登錄檔常駐，開機與每次啟動自動生效，零背景常駐負擔。"
+                                                       Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Button x:Name="RefreshProcessesBtn" Grid.Column="2" Command="{x:Bind ViewModel.RefreshRunningProcessesCommand}"
+                                                Padding="10,6" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE72C;" FontSize="13" />
+                                                <TextBlock x:Name="RefreshProcessesBtnText" Text="重新整理行程" FontSize="12" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+
+                                    <!-- Controls Row -->
+                                    <Grid ColumnSpacing="12" RowSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="2.2*" />
+                                            <ColumnDefinition Width="1.5*" />
+                                            <ColumnDefinition Width="1.3*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Running Process Selector -->
+                                        <ComboBox x:Name="CpuAppProcessCombo" Grid.Column="0"
+                                                  Header="選擇執行中處理程序 (Process)"
+                                                  ItemsSource="{x:Bind ViewModel.RunningProcesses, Mode=OneWay}"
+                                                  SelectedItem="{x:Bind ViewModel.SelectedProcess, Mode=TwoWay}"
+                                                  DisplayMemberPath="DisplayName"
+                                                  PlaceholderText="點擊展開選擇執行中之程式..."
+                                                  HorizontalAlignment="Stretch" />
+
+                                        <!-- Or Manual Process Input -->
+                                        <TextBox x:Name="CpuAppProcessTextBox" Grid.Column="1"
+                                                 Header="或手動輸入可執行檔名稱"
+                                                 Text="{x:Bind ViewModel.CustomProcessInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 PlaceholderText="例如: cs2.exe, chrome.exe"
+                                                 HorizontalAlignment="Stretch" />
+
+                                        <!-- Priority Selection -->
+                                        <ComboBox x:Name="CpuAppPriorityCombo" Grid.Column="2"
+                                                  Header="目標 CPU 優先權"
+                                                  SelectedIndex="{x:Bind ViewModel.SelectedPriorityIndex, Mode=TwoWay}"
+                                                  HorizontalAlignment="Stretch">
+                                            <ComboBoxItem x:Name="PriorityItem0" Content="⚡ 即時 (Realtime)" />
+                                            <ComboBoxItem x:Name="PriorityItem1" Content="🚀 高 (High)" />
+                                            <ComboBoxItem x:Name="PriorityItem2" Content="⬆️ 高於標準 (AboveNormal)" />
+                                            <ComboBoxItem x:Name="PriorityItem3" Content="🟢 標準 (Normal)" />
+                                        </ComboBox>
+
+                                        <!-- Immediate Apply Button -->
+                                        <Button x:Name="ApplyProcessPriorityBtn" Grid.Column="3"
+                                                Command="{x:Bind ViewModel.ApplyProcessPriorityCommand}"
+                                                VerticalAlignment="Bottom" Padding="12,7">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE768;" FontSize="13" />
+                                                <TextBlock x:Name="ApplyProcessPriorityBtnText" Text="即時套用" FontWeight="SemiBold" />
+                                            </StackPanel>
+                                        </Button>
+
+                                        <!-- Save Persisted Rule Button -->
+                                        <Button x:Name="SaveProcessPriorityRuleBtn" Grid.Column="4"
+                                                Command="{x:Bind ViewModel.SavePersistedRuleCommand}"
+                                                Style="{StaticResource AccentButtonStyle}"
+                                                VerticalAlignment="Bottom" Padding="12,7">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE74E;" FontSize="13" />
+                                                <TextBlock x:Name="SaveProcessPriorityRuleBtnText" Text="儲存為開機常駐規則 (IFEO)" FontWeight="SemiBold" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+
+                                    <!-- Active Persisted Rules List -->
+                                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12,10">
+                                        <StackPanel Spacing="8">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                    <FontIcon Glyph="&#xE8B7;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                    <TextBlock x:Name="PersistedRulesTitle" Text="已建立之 CPU 優先權常駐規則清單 (IFEO Registry)" FontWeight="SemiBold" FontSize="13" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                    <TextBlock Text="規則數: " FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                    <TextBlock Text="{x:Bind ViewModel.PersistedPriorityRules.Count, Mode=OneWay}" FontWeight="Bold" FontSize="11" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <ListView ItemsSource="{x:Bind ViewModel.PersistedPriorityRules, Mode=OneWay}"
+                                                      SelectionMode="None" MaxHeight="200">
+                                                <ListView.ItemTemplate>
+                                                    <DataTemplate x:DataType="models:PersistedPriorityRuleItem">
+                                                        <Grid Padding="4,6" ColumnSpacing="12">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="2*" />
+                                                                <ColumnDefinition Width="1.5*" />
+                                                                <ColumnDefinition Width="2*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <FontIcon Grid.Column="0" Glyph="&#xE756;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                                            <TextBlock Grid.Column="1" Text="{x:Bind ProcessName}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                            <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="4" Padding="6,2" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                                <TextBlock Text="{x:Bind FormattedPriority}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                            </Border>
+                                                            <TextBlock Grid.Column="3" Text="{x:Bind Status}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                                            <Button Grid.Column="4" Click="DeletePriorityRuleBtn_Click" Padding="8,4" VerticalAlignment="Center">
+                                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                                    <FontIcon Glyph="&#xE74D;" FontSize="12" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                                                                    <TextBlock Text="刪除規則" FontSize="11" />
+                                                                </StackPanel>
+                                                            </Button>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ListView.ItemTemplate>
+                                            </ListView>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+
                             <!-- MMCSS & Power Throttling Card -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"

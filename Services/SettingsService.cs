@@ -87,6 +87,24 @@ public class AppSettings
     public Dictionary<string, double> LayoutSplitterSizes { get; set; } = new();
     public List<string> DiskHealthCardOrder { get; set; } = new();
 
+    // ── Performance Overlay / FPS HUD Settings ──
+    public string HudStyle { get; set; } = "Bar"; // "Bar", "Card", "Badge"
+    public double HudOpacity { get; set; } = 0.85; // 0.0 - 1.0 (MSI Afterburner style)
+    public bool HudShowFps { get; set; } = true;
+    public bool HudShowLow1Percent { get; set; } = true;
+    public bool HudShowMsDelay { get; set; } = true;
+    public bool HudShowCpu { get; set; } = true;
+    public bool HudShowGpu { get; set; } = true;
+    public bool HudShowRam { get; set; } = true;
+    public bool HudShowNet { get; set; } = true;
+    public bool HudShowApi { get; set; } = true;
+    public bool HudShowAppName { get; set; } = true;
+    public int? HudCustomPositionX { get; set; } = null;
+    public int? HudCustomPositionY { get; set; } = null;
+
+    // ── Process CPU Priority Rules ──
+    public Dictionary<string, string> ProcessCpuPriorities { get; set; } = new();
+
     // ── Debug & Diagnostic Logging ──
     public bool EnableDebugLogging { get; set; } = false;
 }

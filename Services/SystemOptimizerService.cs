@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using Microsoft.Win32;
 using DiskMasterWinUI.Helpers;
@@ -873,4 +874,230 @@ public class SystemOptimizerService
         catch { }
         return list;
     }
+
+    // ══════════════════════════════════════════════════════════
+    //  CPU Process Priority & IFEO Management
+    // ══════════════════════════════════════════════════════════
+
+    public List<RunningProcessPriorityItem> GetRunningProcessesWithPriority()
+    {
+        var list = new List<RunningProcessPriorityItem>();
+        try
+        {
+            var processes = Process.GetProcesses();
+            foreach (var p in processes)
+            {
+                try
+                {
+                    if (p.Id <= 4) continue;
+                    var name = p.ProcessName;
+                    if (string.IsNullOrWhiteSpace(name)) continue;
+
+                    var exeName = name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? name : name + ".exe";
+                    long memMb = 0;
+                    string prioStr = "Normal";
+                    string exePath = "";
+
+                    try { memMb = p.WorkingSet64 / (1024 * 1024); } catch { }
+                    try { prioStr = p.PriorityClass.ToString(); } catch { }
+                    try { exePath = p.MainModule?.FileName ?? ""; } catch { }
+
+                    list.Add(new RunningProcessPriorityItem
+                    {
+                        Pid = p.Id,
+                        ProcessName = exeName,
+                        DisplayName = $"{exeName} (PID: {p.Id}, {memMb} MB, 優先權: {prioStr})",
+                        PriorityClass = prioStr,
+                        MemoryMb = memMb,
+                        ExecutablePath = exePath
+                    });
+                }
+                catch { }
+                finally
+                {
+                    p.Dispose();
+                }
+            }
+        }
+        catch { }
+
+        return list.OrderBy(p => p.ProcessName).ToList();
+    }
+
+    public (bool Success, string Message, int AffectedCount) SetImmediateProcessPriority(string processName, ProcessPriorityClass priority)
+    {
+        if (string.IsNullOrWhiteSpace(processName))
+            return (false, "處理程序名稱不可為空", 0);
+
+        var cleanName = System.IO.Path.GetFileName(processName.Trim());
+        if (cleanName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            cleanName = cleanName.Substring(0, cleanName.Length - 4);
+
+        int affected = 0;
+        try
+        {
+            var procs = Process.GetProcessesByName(cleanName);
+            if (procs.Length == 0)
+            {
+                return (false, $"未找到正在執行的 {cleanName}.exe 行程", 0);
+            }
+
+            foreach (var p in procs)
+            {
+                try
+                {
+                    p.PriorityClass = priority;
+                    affected++;
+                }
+                catch { }
+                finally
+                {
+                    p.Dispose();
+                }
+            }
+
+            if (affected > 0)
+            {
+                return (true, $"已將 {cleanName}.exe (共 {affected} 個行程) 之 CPU 優先權即時設定為 {priority}", affected);
+            }
+            else
+            {
+                return (false, $"設定 {cleanName}.exe 優先權失敗 (可能權限不足)", 0);
+            }
+        }
+        catch (Exception ex)
+        {
+            return (false, $"調整處理程序優先權發生錯誤: {ex.Message}", 0);
+        }
+    }
+
+    public bool SetIfeoCpuPriority(string processName, string priority)
+    {
+        if (string.IsNullOrWhiteSpace(processName)) return false;
+
+        var cleanName = System.IO.Path.GetFileName(processName.Trim());
+        if (!cleanName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            cleanName += ".exe";
+
+        int ifeoDword = priority switch
+        {
+            "RealTime" or "Realtime" or "即時" => 4,
+            "High" or "高" => 3,
+            "AboveNormal" or "高於標準" => 6,
+            "Normal" or "標準" => 2,
+            _ => 3
+        };
+
+        try
+        {
+            using var ifeoKey = Registry.LocalMachine.CreateSubKey($@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\{cleanName}\PerfOptions", writable: true);
+            if (ifeoKey != null)
+            {
+                ifeoKey.SetValue("CpuPriorityClass", ifeoDword, RegistryValueKind.DWord);
+                return true;
+            }
+        }
+        catch { }
+
+        return false;
+    }
+
+    public bool DeleteIfeoCpuPriority(string processName)
+    {
+        if (string.IsNullOrWhiteSpace(processName)) return false;
+
+        var cleanName = System.IO.Path.GetFileName(processName.Trim());
+        if (!cleanName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            cleanName += ".exe";
+
+        try
+        {
+            using var appKey = Registry.LocalMachine.OpenSubKey($@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\{cleanName}", writable: true);
+            if (appKey != null)
+            {
+                try { appKey.DeleteSubKeyTree("PerfOptions", throwOnMissingSubKey: false); } catch { }
+                if (appKey.SubKeyCount == 0 && appKey.ValueCount == 0)
+                {
+                    using var root = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options", writable: true);
+                    root?.DeleteSubKey(cleanName, throwOnMissingSubKey: false);
+                }
+                return true;
+            }
+        }
+        catch { }
+
+        return false;
+    }
+
+    public List<PersistedPriorityRuleItem> ListPersistedIfeoRules()
+    {
+        var list = new List<PersistedPriorityRuleItem>();
+        var foundNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // 1. Read from Registry IFEO
+        try
+        {
+            using var ifeoRoot = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options");
+            if (ifeoRoot != null)
+            {
+                foreach (var subKeyName in ifeoRoot.GetSubKeyNames())
+                {
+                    try
+                    {
+                        using var perfKey = ifeoRoot.OpenSubKey($@"{subKeyName}\PerfOptions");
+                        if (perfKey != null)
+                        {
+                            var val = perfKey.GetValue("CpuPriorityClass");
+                            if (val is int intVal)
+                            {
+                                string prio = intVal switch
+                                {
+                                    4 => "RealTime",
+                                    3 => "High",
+                                    6 => "AboveNormal",
+                                    2 => "Normal",
+                                    1 => "Idle",
+                                    5 => "BelowNormal",
+                                    _ => $"Custom ({intVal})"
+                                };
+                                list.Add(new PersistedPriorityRuleItem
+                                {
+                                    ProcessName = subKeyName,
+                                    Priority = prio,
+                                    IfeoValue = intVal,
+                                    Status = "已寫入 IFEO (開機自動生效)"
+                                });
+                                foundNames.Add(subKeyName);
+                            }
+                        }
+                    }
+                    catch { }
+                }
+            }
+        }
+        catch { }
+
+        // 2. Also check SettingsService to include any configured rules that were saved
+        try
+        {
+            foreach (var kvp in SettingsService.Instance.Current.ProcessCpuPriorities)
+            {
+                var procName = kvp.Key.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? kvp.Key : kvp.Key + ".exe";
+                if (!foundNames.Contains(procName))
+                {
+                    list.Add(new PersistedPriorityRuleItem
+                    {
+                        ProcessName = procName,
+                        Priority = kvp.Value,
+                        IfeoValue = kvp.Value switch { "RealTime" => 4, "High" => 3, "AboveNormal" => 6, _ => 2 },
+                        Status = "已儲存於使用者設定"
+                    });
+                }
+            }
+        }
+        catch { }
+
+        return list.OrderBy(r => r.ProcessName).ToList();
+    }
 }
+

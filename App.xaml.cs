@@ -21,6 +21,44 @@ public partial class App : Application
 {
     private MainWindow? _window;
     private static System.Threading.Mutex? s_singleInstanceMutex;
+    public const string SingleInstanceMutexName = @"Global\DiskMasterWinUI_SingleInstanceMutex";
+    public const string ActivateInstanceMessageName = "DiskMasterWinUI_ActivateInstance_Msg";
+    public static readonly uint WM_ACTIVATE_INSTANCE = RegisterWindowMessage(ActivateInstanceMessageName);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true, CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern uint RegisterWindowMessage(string lpString);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool ChangeWindowMessageFilter(uint message, uint dwFlag);
+    private const uint MSGFLT_ADD = 1;
+
+    private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true, CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
+
+    private const int SW_RESTORE = 9;
+    private static readonly IntPtr HWND_BROADCAST = (IntPtr)0xffff;
 
     /// <summary>
     /// Path passed by the Explorer "Recover with DiskMaster" shell verb (--recover "&lt;path&gt;").
@@ -35,9 +73,74 @@ public partial class App : Application
     {
         try
         {
-            s_singleInstanceMutex = new System.Threading.Mutex(true, @"Global\DiskMasterWinUI_SingleInstanceMutex", out _);
+            if (WM_ACTIVATE_INSTANCE != 0)
+            {
+                ChangeWindowMessageFilter(WM_ACTIVATE_INSTANCE, MSGFLT_ADD);
+            }
         }
         catch { }
+
+        bool isNewInstance = true;
+        try
+        {
+            s_singleInstanceMutex = new System.Threading.Mutex(true, SingleInstanceMutexName, out isNewInstance);
+        }
+        catch (AbandonedMutexException)
+        {
+            isNewInstance = true;
+        }
+        catch
+        {
+            isNewInstance = true;
+        }
+
+        if (!isNewInstance)
+        {
+            try
+            {
+                PostMessage(HWND_BROADCAST, WM_ACTIVATE_INSTANCE, IntPtr.Zero, IntPtr.Zero);
+
+                int currentPid = Environment.ProcessId;
+                foreach (var proc in System.Diagnostics.Process.GetProcessesByName("DiskMasterWinUI"))
+                {
+                    if (proc.Id != currentPid)
+                    {
+                        if (proc.MainWindowHandle != IntPtr.Zero)
+                        {
+                            ShowWindow(proc.MainWindowHandle, SW_RESTORE);
+                            SetForegroundWindow(proc.MainWindowHandle);
+                            PostMessage(proc.MainWindowHandle, WM_ACTIVATE_INSTANCE, IntPtr.Zero, IntPtr.Zero);
+                        }
+                        else
+                        {
+                            EnumWindows((hWnd, lParam) =>
+                            {
+                                GetWindowThreadProcessId(hWnd, out uint windowPid);
+                                if (windowPid == proc.Id)
+                                {
+                                    var sb = new System.Text.StringBuilder(256);
+                                    GetWindowText(hWnd, sb, 256);
+                                    string title = sb.ToString();
+                                    if (title.Contains("DiskMaster", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        ShowWindow(hWnd, SW_RESTORE);
+                                        SetForegroundWindow(hWnd);
+                                        PostMessage(hWnd, WM_ACTIVATE_INSTANCE, IntPtr.Zero, IntPtr.Zero);
+                                        return false; // Break enumeration once primary window is found
+                                    }
+                                }
+                                return true;
+                            }, IntPtr.Zero);
+                        }
+                        break;
+                    }
+                }
+            }
+            catch { }
+
+            Environment.Exit(0);
+            return;
+        }
 
         try
         {

@@ -180,6 +180,10 @@ public sealed partial class MainWindow : Window
                 args.Handled = true;
                 TrayService.MinimizeToTray();
             }
+            else
+            {
+                TrayService.Dispose();
+            }
         };
 
         AppWindow.Changed += (sender, args) =>
@@ -407,10 +411,20 @@ public sealed partial class MainWindow : Window
                 break;
             case "Exit":
                 TrayService.IsExplicitExit = true;
-                ExplorerWatchdogService.Instance.Stop();
-                TrayService.Dispose();
-                AppWindow.Destroy();
-                Application.Current.Exit();
+                DispatcherQueue.TryEnqueue(async () =>
+                {
+                    try { DiskMasterWinUI.Controls.PerformanceOverlayWindow.CurrentInstance?.Close(); } catch { }
+                    try { ExplorerWatchdogService.Instance.Stop(); } catch { }
+                    foreach (var win in _floatingWindows.Values.ToList())
+                    {
+                        try { win.Close(); } catch { }
+                    }
+                    TrayService.Dispose();
+                    try { this.Close(); } catch { }
+                    try { Application.Current.Exit(); } catch { }
+                    await Task.Delay(300);
+                    Environment.Exit(0);
+                });
                 break;
         }
     }
@@ -814,24 +828,35 @@ public sealed partial class MainWindow : Window
         return tab?.Header?.ToString() ?? tag;
     }
 
-    public Page GetOrCreatePageForTag(string tag) => tag switch
+    public Page GetOrCreatePageForTag(string tag)
     {
-        "Starter" => _starterPage ??= new StarterPage(),
-        "EasyMode" => _easyModePage ??= new EasyModePage(),
-        "WimDeploy" => _wimDeployPage ??= new WimDeployPage(),
-        "BootManager" => _bootManagerPage ??= new BootManagerPage(),
-        "DiskTools" => _diskToolsPage ??= new DiskToolsPage(),
-        "Recovery" => _recoveryPage ??= new RecoveryPage(),
-        "SystemHealth" => _systemHealthPage ??= new SystemHealthPage(),
-        "NtfsPermissions" => _ntfsPermissionsPage ??= new NtfsPermissionsPage(),
-        "GroupPolicy" => _groupPolicyPage ??= new GroupPolicyPage(),
-        "AdvancedMode" => _advancedModePage ??= new AdvancedModePage(),
-        "SystemOptimizer" => _systemOptimizerPage ??= new SystemOptimizerPage(),
-        "NetworkTools" => _networkToolsPage ??= new NetworkToolsPage(),
-        "SystemPerformance" => _systemPerformancePage ??= new SystemPerformancePage(),
-        "Settings" => _settingsPage ??= new SettingsPage(),
-        _ => new Page()
-    };
+        try
+        {
+            return tag switch
+            {
+                "Starter" => _starterPage ??= new StarterPage(),
+                "EasyMode" => _easyModePage ??= new EasyModePage(),
+                "WimDeploy" => _wimDeployPage ??= new WimDeployPage(),
+                "BootManager" => _bootManagerPage ??= new BootManagerPage(),
+                "DiskTools" => _diskToolsPage ??= new DiskToolsPage(),
+                "Recovery" => _recoveryPage ??= new RecoveryPage(),
+                "SystemHealth" => _systemHealthPage ??= new SystemHealthPage(),
+                "NtfsPermissions" => _ntfsPermissionsPage ??= new NtfsPermissionsPage(),
+                "GroupPolicy" => _groupPolicyPage ??= new GroupPolicyPage(),
+                "AdvancedMode" => _advancedModePage ??= new AdvancedModePage(),
+                "SystemOptimizer" => _systemOptimizerPage ??= new SystemOptimizerPage(),
+                "NetworkTools" => _networkToolsPage ??= new NetworkToolsPage(),
+                "SystemPerformance" => _systemPerformancePage ??= new SystemPerformancePage(),
+                "Settings" => _settingsPage ??= new SettingsPage(),
+                _ => new Page()
+            };
+        }
+        catch (Exception ex)
+        {
+            GlobalExceptionHandler.ReportException(ex, $"GetOrCreatePageForTag({tag})");
+            return new Page();
+        }
+    }
 
     // ── Single-parent Page ownership ──
     // A Page may only ever be the child of one host: ContentFrame, RightDockFrame, BottomDockFrame or
@@ -2302,59 +2327,81 @@ public sealed partial class MainWindow : Window
     }
 
     private string? _currentNavigatedTag;
+    private bool _isNavigating;
 
     public void NavigateToTag(string? tag)
     {
         if (string.IsNullOrEmpty(tag)) return;
+        if (_isNavigating) return;
+        _isNavigating = true;
 
-        // A page that is currently docked or floating must come home before it can be shown in the
-        // central frame, otherwise it would end up with two parents.
-        if (_floatingWindows.ContainsKey(tag))
+        try
         {
-            CloseFloatingWindowFor(tag, dockBackToTabs: true);
+            // A page that is currently docked or floating must come home before it can be shown in the
+            // central frame, otherwise it would end up with two parents.
+            if (_floatingWindows.ContainsKey(tag))
+            {
+                CloseFloatingWindowFor(tag, dockBackToTabs: true);
+            }
+            if (_rightDockTag == tag)
+            {
+                CloseRightDock(reinsertToTabs: true);
+            }
+            if (_bottomDockTag == tag)
+            {
+                CloseBottomDock(reinsertToTabs: true);
+            }
+
+            var tabItem = MainTabs.TabItems.OfType<TabViewItem>().FirstOrDefault(t => t.Tag?.ToString() == tag);
+            if (tabItem != null && !ReferenceEquals(MainTabs.SelectedItem, tabItem))
+            {
+                MainTabs.SelectedItem = tabItem;
+            }
+
+            var page = GetOrCreatePageForTag(tag);
+
+            if (tag == _currentNavigatedTag && ReferenceEquals(ContentFrame.Content, page)) return;
+            _currentNavigatedTag = tag;
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            DebugLogService.Instance.Debug($"Navigating to tab '{tag}'...", "Navigation");
+
+            DetachPageFromAllHosts(page);
+            ContentFrame.Content = page;
+            UpdateViewportLayout();
+
+            sw.Stop();
+            if (sw.ElapsedMilliseconds >= 200)
+            {
+                DebugLogService.Instance.Warning($"Tab navigation to '{tag}' took {sw.ElapsedMilliseconds}ms (Potential UI hitch detected!)", "Navigation");
+            }
+            else
+            {
+                DebugLogService.Instance.Debug($"Tab navigation to '{tag}' completed in {sw.ElapsedMilliseconds}ms (Smooth)", "Navigation");
+            }
         }
-        if (_rightDockTag == tag)
+        catch (Exception ex)
         {
-            CloseRightDock(reinsertToTabs: true);
+            GlobalExceptionHandler.ReportException(ex, $"NavigateToTag({tag})");
         }
-        if (_bottomDockTag == tag)
+        finally
         {
-            CloseBottomDock(reinsertToTabs: true);
-        }
-
-        var tabItem = MainTabs.TabItems.OfType<TabViewItem>().FirstOrDefault(t => t.Tag?.ToString() == tag);
-        if (tabItem != null && !ReferenceEquals(MainTabs.SelectedItem, tabItem))
-        {
-            MainTabs.SelectedItem = tabItem;
-        }
-
-        var page = GetOrCreatePageForTag(tag);
-
-        if (tag == _currentNavigatedTag && ReferenceEquals(ContentFrame.Content, page)) return;
-        _currentNavigatedTag = tag;
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        DebugLogService.Instance.Debug($"Navigating to tab '{tag}'...", "Navigation");
-
-        DetachPageFromAllHosts(page);
-        ContentFrame.Content = page;
-        UpdateViewportLayout();
-
-        sw.Stop();
-        if (sw.ElapsedMilliseconds >= 200)
-        {
-            DebugLogService.Instance.Warning($"Tab navigation to '{tag}' took {sw.ElapsedMilliseconds}ms (Potential UI hitch detected!)", "Navigation");
-        }
-        else
-        {
-            DebugLogService.Instance.Debug($"Tab navigation to '{tag}' completed in {sw.ElapsedMilliseconds}ms (Smooth)", "Navigation");
+            _isNavigating = false;
         }
     }
 
     private void MainTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (MainTabs.SelectedItem is TabViewItem item)
+        if (_isNavigating || _isApplyingWorkspacePreset) return;
+        try
         {
-            NavigateToTag(item.Tag?.ToString());
+            if (MainTabs.SelectedItem is TabViewItem item)
+            {
+                NavigateToTag(item.Tag?.ToString());
+            }
+        }
+        catch (Exception ex)
+        {
+            GlobalExceptionHandler.ReportException(ex, "MainTabs_SelectionChanged");
         }
     }
 

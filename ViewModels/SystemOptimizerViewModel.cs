@@ -204,6 +204,32 @@ public partial class SystemOptimizerViewModel : ObservableObject
     [ObservableProperty] private int _cpuCoreParkingMinPercent = 100;
     [ObservableProperty] private int _selectedCpuBoostModeIndex = 2;
 
+    // ── CPU Priority Program Selection & IFEO Rules ──
+    public ObservableCollection<RunningProcessPriorityItem> RunningProcesses { get; } = new();
+    public ObservableCollection<PersistedPriorityRuleItem> PersistedPriorityRules { get; } = new();
+    public ObservableCollection<PersistedPriorityRuleItem> PersistedRules => PersistedPriorityRules;
+
+    [ObservableProperty] private RunningProcessPriorityItem? _selectedProcess;
+    [ObservableProperty] private string _customProcessInput = "";
+    [ObservableProperty] private int _selectedPriorityIndex = 1; // 0=RealTime, 1=High, 2=AboveNormal, 3=Normal
+    [ObservableProperty] private bool _isLoadingProcesses;
+
+    partial void OnSelectedProcessChanged(RunningProcessPriorityItem? value)
+    {
+        if (value != null && !string.IsNullOrWhiteSpace(value.ProcessName))
+        {
+            CustomProcessInput = value.ProcessName;
+            SelectedPriorityIndex = value.PriorityClass switch
+            {
+                "RealTime" => 0,
+                "High" => 1,
+                "AboveNormal" => 2,
+                "Normal" => 3,
+                _ => 1
+            };
+        }
+    }
+
     public SystemOptimizerViewModel()
     {
         AppendLog("⚡ 系統最佳化與遊戲模式引擎已啟動 (FPSHeaven & PowerPlan Suite)");
@@ -358,7 +384,17 @@ public partial class SystemOptimizerViewModel : ObservableObject
                 try { await RefreshOneDriveStatusAsync(); } catch { }
             });
 
-            await Task.WhenAll(powerTask, mmTask, wakeTask, blockersTask, restorePointsTask, oneDriveTask);
+            var procTask = Task.Run(async () =>
+            {
+                try { await RefreshRunningProcessesAsync(); } catch { }
+            });
+
+            var rulesTask = Task.Run(async () =>
+            {
+                try { await RefreshPersistedRulesAsync(); } catch { }
+            });
+
+            await Task.WhenAll(powerTask, mmTask, wakeTask, blockersTask, restorePointsTask, oneDriveTask, procTask, rulesTask);
 
             DispatcherHelper.RunOnUIThread(() =>
             {
@@ -611,6 +647,158 @@ public partial class SystemOptimizerViewModel : ObservableObject
         }
         AppendLog($"[{DateTime.Now:HH:mm:ss}] ⚡ CPU 排程量子已套用: 0x{val:X} ({val})");
         StatusMessage = $"已設定 Win32PrioritySeparation = 0x{val:X}";
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  CPU Priority Process Selection & IFEO Commands
+    // ══════════════════════════════════════════════════════════
+
+    [RelayCommand]
+    public async Task RefreshRunningProcessesAsync()
+    {
+        try
+        {
+            DispatcherHelper.RunOnUIThread(() => IsLoadingProcesses = true);
+            var list = await Task.Run(() => _optimizer.GetRunningProcessesWithPriority());
+            DispatcherHelper.RunOnUIThread(() =>
+            {
+                RunningProcesses.Clear();
+                foreach (var p in list) RunningProcesses.Add(p);
+                IsLoadingProcesses = false;
+            });
+        }
+        catch
+        {
+            DispatcherHelper.RunOnUIThread(() => IsLoadingProcesses = false);
+        }
+    }
+
+    [RelayCommand]
+    public async Task RefreshPersistedRulesAsync()
+    {
+        try
+        {
+            var rules = await Task.Run(() => _optimizer.ListPersistedIfeoRules());
+            DispatcherHelper.RunOnUIThread(() =>
+            {
+                PersistedPriorityRules.Clear();
+                foreach (var r in rules) PersistedPriorityRules.Add(r);
+            });
+        }
+        catch { }
+    }
+
+    [RelayCommand]
+    public async Task ApplyProcessPriorityAsync()
+    {
+        var targetName = !string.IsNullOrWhiteSpace(CustomProcessInput)
+            ? CustomProcessInput.Trim()
+            : SelectedProcess?.ProcessName?.Trim();
+
+        if (string.IsNullOrWhiteSpace(targetName))
+        {
+            StatusMessage = "請選擇或輸入目標處理程序名稱 (例如 cs2.exe)";
+            AudioFeedbackService.PlayError();
+            return;
+        }
+
+        var (prioClass, prioStr) = SelectedPriorityIndex switch
+        {
+            0 => (ProcessPriorityClass.RealTime, "RealTime"),
+            1 => (ProcessPriorityClass.High, "High"),
+            2 => (ProcessPriorityClass.AboveNormal, "AboveNormal"),
+            3 => (ProcessPriorityClass.Normal, "Normal"),
+            _ => (ProcessPriorityClass.High, "High")
+        };
+
+        var (success, msg, affected) = await Task.Run(() => _optimizer.SetImmediateProcessPriority(targetName, prioClass));
+        AppendLog($"[{DateTime.Now:HH:mm:ss}] 🎯 {msg}");
+        StatusMessage = msg;
+
+        if (success)
+        {
+            AudioFeedbackService.PlaySuccess();
+            await RefreshRunningProcessesAsync();
+        }
+        else
+        {
+            AudioFeedbackService.PlayError();
+        }
+    }
+
+    [RelayCommand]
+    public async Task SavePersistedRuleAsync()
+    {
+        var targetName = !string.IsNullOrWhiteSpace(CustomProcessInput)
+            ? CustomProcessInput.Trim()
+            : SelectedProcess?.ProcessName?.Trim();
+
+        if (string.IsNullOrWhiteSpace(targetName))
+        {
+            StatusMessage = "請選擇或輸入目標處理程序名稱 (例如 cs2.exe)";
+            AudioFeedbackService.PlayError();
+            return;
+        }
+
+        var cleanExeName = targetName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? targetName : targetName + ".exe";
+
+        var (prioClass, prioStr) = SelectedPriorityIndex switch
+        {
+            0 => (ProcessPriorityClass.RealTime, "RealTime"),
+            1 => (ProcessPriorityClass.High, "High"),
+            2 => (ProcessPriorityClass.AboveNormal, "AboveNormal"),
+            3 => (ProcessPriorityClass.Normal, "Normal"),
+            _ => (ProcessPriorityClass.High, "High")
+        };
+
+        await _optimizer.CreatePreTweakBackupAsync($"Before_IFEO_{Path.GetFileNameWithoutExtension(cleanExeName)}");
+
+        // 1. Write to IFEO registry
+        bool ifeoWritten = await Task.Run(() => _optimizer.SetIfeoCpuPriority(cleanExeName, prioStr));
+
+        // 2. Persist in user settings
+        SettingsService.Instance.Current.ProcessCpuPriorities[cleanExeName] = prioStr;
+        SettingsService.Instance.Save();
+
+        // 3. Apply immediately to any running instance
+        await Task.Run(() => _optimizer.SetImmediateProcessPriority(cleanExeName, prioClass));
+
+        await RefreshPersistedRulesAsync();
+        await RefreshRunningProcessesAsync();
+
+        if (ifeoWritten)
+        {
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🛡️ 已為 {cleanExeName} 建立 IFEO 常駐優先權規則 ({prioStr})");
+            StatusMessage = $"已為 {cleanExeName} 建立 IFEO 優先權 ({prioStr})，開機與每次啟動自動生效！";
+            AudioFeedbackService.PlaySuccess();
+        }
+        else
+        {
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] ⚠️ IFEO 註冊表寫入需要系統管理員權限，已先儲存於系統設定。");
+            StatusMessage = $"已先儲存 {cleanExeName} 於設定中，若要直接寫入 IFEO 建議以系統管理員權限執行。";
+            AudioFeedbackService.PlaySuccess();
+        }
+    }
+
+    [RelayCommand]
+    public async Task DeleteRuleAsync(PersistedPriorityRuleItem? rule)
+    {
+        if (rule == null || string.IsNullOrWhiteSpace(rule.ProcessName)) return;
+
+        var procName = rule.ProcessName.Trim();
+        await _optimizer.CreatePreTweakBackupAsync($"Before_Delete_IFEO_{Path.GetFileNameWithoutExtension(procName)}");
+
+        await Task.Run(() => _optimizer.DeleteIfeoCpuPriority(procName));
+
+        SettingsService.Instance.Current.ProcessCpuPriorities.Remove(procName);
+        var noExe = procName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? procName.Substring(0, procName.Length - 4) : procName;
+        SettingsService.Instance.Current.ProcessCpuPriorities.Remove(noExe);
+        SettingsService.Instance.Save();
+
+        await RefreshPersistedRulesAsync();
+        AppendLog($"[{DateTime.Now:HH:mm:ss}] 🗑️ 已刪除 {procName} 之 IFEO 優先權規則");
+        StatusMessage = $"已刪除 {procName} 之優先權規則";
+        AudioFeedbackService.PlaySuccess();
     }
 
     [RelayCommand]
