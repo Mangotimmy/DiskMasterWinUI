@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using DiskMasterWinUI.Helpers;
 
 namespace DiskMasterWinUI.Services;
@@ -139,53 +140,154 @@ public sealed class ExplorerWatchdogService
     }
 
     /// <summary>
-    /// Checks whether any explorer.exe process is currently running.
+    /// Resumes automatic recovery immediately by clearing any active suppression window.
+    /// </summary>
+    public void ResumeAutoRestart()
+    {
+        lock (_gate)
+        {
+            _suppressUntilUtc = DateTime.MinValue;
+        }
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetShellWindow();
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr FindWindow(string lpClassName, string? lpWindowName);
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr ShellExecute(IntPtr hwnd, string lpOperation, string lpFile, string? lpParameters, string? lpDirectory, int nShowCmd);
+
+    /// <summary>
+    /// Checks whether the Windows desktop shell window (Desktop or Taskbar) is actively rendered.
+    /// </summary>
+    public static bool IsDesktopShellAlive()
+    {
+        try
+        {
+            var shellHwnd = GetShellWindow();
+            if (shellHwnd != IntPtr.Zero) return true;
+
+            var trayHwnd = FindWindow("Shell_TrayWnd", null);
+            if (trayHwnd != IntPtr.Zero) return true;
+
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Checks whether Windows Explorer (explorer.exe) is currently running in the active user session.
+    /// Validates both session-specific process existence and shell window handles.
     /// </summary>
     public static bool CheckExplorerRunning()
     {
         try
         {
+            // If the shell desktop window or taskbar is alive, explorer is running.
+            if (IsDesktopShellAlive())
+            {
+                return true;
+            }
+
+            int currentSessionId;
+            try
+            {
+                currentSessionId = Process.GetCurrentProcess().SessionId;
+            }
+            catch
+            {
+                currentSessionId = -1;
+            }
+
             var procs = Process.GetProcessesByName("explorer");
-            bool running = procs.Length > 0;
+            bool running = false;
             foreach (var p in procs)
             {
-                try { p.Dispose(); } catch { }
+                try
+                {
+                    if (!p.HasExited && (currentSessionId < 0 || p.SessionId == currentSessionId))
+                    {
+                        running = true;
+                    }
+                }
+                catch { }
+                finally
+                {
+                    try { p.Dispose(); } catch { }
+                }
             }
             return running;
         }
         catch
         {
-            return true;
+            return IsDesktopShellAlive();
         }
     }
 
     /// <summary>
-    /// Performs a clean, controlled restart of explorer.exe while suppressing the watchdog.
+    /// Performs a clean, controlled restart of explorer.exe while temporarily suppressing the watchdog,
+    /// then verifies that the desktop shell successfully recovers before returning.
     /// </summary>
     public async Task<(bool Success, string Message)> RestartExplorerManuallyAsync()
     {
-        SuppressAutoRestartFor(TimeSpan.FromSeconds(8));
+        SuppressAutoRestartFor(TimeSpan.FromSeconds(10));
         return await Task.Run(async () =>
         {
             try
             {
+                DebugLogService.Instance.Info("RestartExplorerManuallyAsync invoked. Terminating explorer.exe...", "ExplorerWatchdog");
                 try
                 {
                     await ProcessHelper.RunProcessAsync("taskkill.exe", "/f /im explorer.exe");
                 }
                 catch { }
 
-                await Task.Delay(700);
+                await Task.Delay(800);
                 LaunchExplorerShell();
-                await Task.Delay(900);
 
+                // Poll for recovery up to 4 seconds
+                bool recovered = false;
+                for (int i = 0; i < 8; i++)
+                {
+                    await Task.Delay(500);
+                    if (CheckExplorerRunning())
+                    {
+                        recovered = true;
+                        break;
+                    }
+                }
+
+                // If not yet recovered, trigger secondary emergency launch
+                if (!recovered)
+                {
+                    DebugLogService.Instance.Warning("Explorer did not recover on primary pass; triggering emergency relaunch...", "ExplorerWatchdog");
+                    LaunchExplorerShell();
+                    await Task.Delay(1000);
+                    recovered = CheckExplorerRunning();
+                }
+
+                ResumeAutoRestart();
                 IsExplorerAlive = CheckExplorerRunning();
                 NotifyStatusChanged();
-                return (true, "✅ Windows 檔案總管 (explorer.exe) 已安全重新啟動！");
+
+                if (recovered || IsExplorerAlive)
+                {
+                    return (true, "✅ Windows 檔案總管 (explorer.exe) 已安全重新啟動！");
+                }
+                else
+                {
+                    return (false, "⚠️ 已發送重啟指令，但 Windows 檔案總管尚未完全就緒，請稍候或手動透過工作管理員啟動。");
+                }
             }
             catch (Exception ex)
             {
                 LaunchExplorerShell();
+                ResumeAutoRestart();
                 return (false, $"❌ 重啟檔案總管發生錯誤: {ex.Message}");
             }
         });
@@ -193,7 +295,7 @@ public sealed class ExplorerWatchdogService
 
     private async Task MonitorLoopAsync(CancellationToken token)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(2500));
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(2000));
         while (!token.IsCancellationRequested)
         {
             try
@@ -212,8 +314,8 @@ public sealed class ExplorerWatchdogService
 
                     if (DateTime.UtcNow >= suppressUntil)
                     {
-                        // Double-check after 800ms to avoid racing a normal shell restart
-                        await Task.Delay(800, token);
+                        // Double-check after 500ms to avoid racing a normal shell restart or transient glitch
+                        await Task.Delay(500, token);
                         lock (_gate) { suppressUntil = _suppressUntilUtc; }
 
                         if (DateTime.UtcNow >= suppressUntil && !CheckExplorerRunning())
@@ -222,7 +324,17 @@ public sealed class ExplorerWatchdogService
                             LaunchExplorerShell();
                             AutoRecoveryCount++;
                             LastRecoveryTimeText = $"上次自動救援: {DateTime.Now:HH:mm:ss} (累計 {AutoRecoveryCount} 次)";
-                            await Task.Delay(1200, token);
+
+                            // Poll for up to 3 seconds for recovery
+                            for (int i = 0; i < 6; i++)
+                            {
+                                await Task.Delay(500, token);
+                                if (CheckExplorerRunning())
+                                {
+                                    break;
+                                }
+                            }
+
                             IsExplorerAlive = CheckExplorerRunning();
                             NotifyStatusChanged();
                             continue;
@@ -246,32 +358,113 @@ public sealed class ExplorerWatchdogService
         }
     }
 
-    private static void LaunchExplorerShell()
+    /// <summary>
+    /// Resiliently launches Windows Explorer shell across multiple execution strategies
+    /// to bypass Administrator / High-Integrity UIPI restrictions and restore the desktop/taskbar.
+    /// </summary>
+    public static bool LaunchExplorerShell()
     {
+        var winDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        var explorerPath = Path.Combine(winDir, "explorer.exe");
+        if (!File.Exists(explorerPath))
+        {
+            explorerPath = "explorer.exe";
+        }
+
+        bool launchedAny = false;
+
+        // Strategy 1: cmd.exe /c start "" explorer.exe with UseShellExecute = true
+        // Under Windows Vista/7/8/10/11, delegating through 'start' via ShellExecute breaks out of
+        // the elevated parent token inheritance and instructs the Windows Shell/Winlogon service
+        // to spawn the interactive user desktop shell.
         try
         {
-            var winDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-            var explorerPath = Path.Combine(winDir, "explorer.exe");
-            Process.Start(new ProcessStartInfo
+            var psiCmd = new ProcessStartInfo
             {
-                FileName = File.Exists(explorerPath) ? explorerPath : "explorer.exe",
-                UseShellExecute = true
-            });
+                FileName = "cmd.exe",
+                Arguments = "/c start \"\" explorer.exe",
+                WorkingDirectory = winDir,
+                UseShellExecute = true,
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden
+            };
+            using var p = Process.Start(psiCmd);
+            launchedAny = true;
+            DebugLogService.Instance.Info("Launched explorer shell via cmd start strategy.", "ExplorerWatchdog");
         }
-        catch
+        catch (Exception ex)
         {
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "cmd.exe",
-                    Arguments = "/c start explorer.exe",
-                    CreateNoWindow = true,
-                    UseShellExecute = false
-                });
-            }
-            catch { }
+            DebugLogService.Instance.Debug($"Strategy 1 (cmd start) failed: {ex.Message}", "ExplorerWatchdog");
         }
+
+        // Brief delay to see if strategy 1 registered
+        Thread.Sleep(300);
+        if (CheckExplorerRunning())
+            return true;
+
+        // Strategy 2: Direct ShellExecute Win32 API
+        try
+        {
+            var res = ShellExecute(IntPtr.Zero, "open", explorerPath, null, winDir, 1);
+            if (res.ToInt64() > 32)
+            {
+                launchedAny = true;
+                DebugLogService.Instance.Info("Launched explorer shell via native ShellExecute.", "ExplorerWatchdog");
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogService.Instance.Debug($"Strategy 2 (ShellExecute) failed: {ex.Message}", "ExplorerWatchdog");
+        }
+
+        Thread.Sleep(300);
+        if (CheckExplorerRunning())
+            return true;
+
+        // Strategy 3: Standard Process.Start with explicit WorkingDirectory and UseShellExecute
+        try
+        {
+            var psiDirect = new ProcessStartInfo
+            {
+                FileName = explorerPath,
+                WorkingDirectory = winDir,
+                UseShellExecute = true
+            };
+            using var p = Process.Start(psiDirect);
+            launchedAny = true;
+            DebugLogService.Instance.Info("Launched explorer shell via Process.Start direct.", "ExplorerWatchdog");
+        }
+        catch (Exception ex)
+        {
+            DebugLogService.Instance.Debug($"Strategy 3 (direct Process.Start) failed: {ex.Message}", "ExplorerWatchdog");
+        }
+
+        Thread.Sleep(400);
+        if (CheckExplorerRunning())
+            return true;
+
+        // Strategy 4: PowerShell fallback (for deep UAC / sandboxed edge cases)
+        try
+        {
+            var psiPs = new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = "-NoProfile -NonInteractive -WindowStyle Hidden -Command \"Start-Process explorer.exe\"",
+                WorkingDirectory = winDir,
+                CreateNoWindow = true,
+                UseShellExecute = false
+            };
+            using var p = Process.Start(psiPs);
+            p?.WaitForExit(2000);
+            launchedAny = true;
+            DebugLogService.Instance.Info("Launched explorer shell via PowerShell fallback.", "ExplorerWatchdog");
+        }
+        catch (Exception ex)
+        {
+            DebugLogService.Instance.Debug($"Strategy 4 (PowerShell fallback) failed: {ex.Message}", "ExplorerWatchdog");
+        }
+
+        return launchedAny;
     }
 
     private void NotifyStatusChanged()

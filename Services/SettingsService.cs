@@ -89,6 +89,7 @@ public class AppSettings
 
     // ── Performance Overlay / FPS HUD Settings ──
     public string HudStyle { get; set; } = "Bar"; // "Bar", "Card", "Badge"
+    public string HudTheme { get; set; } = "Cyberpunk"; // "Cyberpunk", "Emerald", "Ocean", "Solar", "Midnight"
     public double HudOpacity { get; set; } = 0.85; // 0.0 - 1.0 (MSI Afterburner style)
     public bool HudShowFps { get; set; } = true;
     public bool HudShowLow1Percent { get; set; } = true;
@@ -101,12 +102,23 @@ public class AppSettings
     public bool HudShowAppName { get; set; } = true;
     public int? HudCustomPositionX { get; set; } = null;
     public int? HudCustomPositionY { get; set; } = null;
+    public bool HudClickThrough { get; set; } = false;
+    public bool HudRemoveBorder { get; set; } = false;
 
     // ── Process CPU Priority Rules ──
     public Dictionary<string, string> ProcessCpuPriorities { get; set; } = new();
 
     // ── Debug & Diagnostic Logging ──
     public bool EnableDebugLogging { get; set; } = false;
+
+    // ── Windows Explorer Right-Click Context Menu Integration ──
+    public bool ShellEnableRecovery { get; set; } = true;
+    public bool ShellEnableNtfs { get; set; } = true;
+    public bool ShellEnableLanShare { get; set; } = true;
+    public bool ShellEnableImageMount { get; set; } = true;
+    public bool ShellEnableDiskCheck { get; set; } = true;
+    public bool ShellEnableAddToPath { get; set; } = true;
+    public bool ShellAllUsersScope { get; set; } = false;
 }
 
 public class SettingsService
@@ -116,6 +128,9 @@ public class SettingsService
 
     private readonly string _settingsFilePath;
     private readonly object _saveLock = new();
+    private int _saveRateCount;
+    private long _saveRateWindowStart;
+    private long _lastSaveRateWarning;
     public AppSettings Current { get; private set; } = new();
 
     public event Action? SettingsChanged;
@@ -176,6 +191,21 @@ public class SettingsService
             }
 
             SettingsChanged?.Invoke();
+
+            // Diagnostic only: do not drop writes. A HUD/menu feedback loop used to call
+            // Save hundreds of times per second and starve the UI thread; this leaves a
+            // direct trace in the log when it starts happening again.
+            long now = Environment.TickCount64;
+            if (now - _saveRateWindowStart > 1000)
+            {
+                _saveRateWindowStart = now;
+                _saveRateCount = 0;
+            }
+            if (++_saveRateCount > 50 && now - _lastSaveRateWarning > 5000)
+            {
+                _lastSaveRateWarning = now;
+                DebugLogService.Instance.Warning($"SettingsService.Save rate high: {_saveRateCount} calls/sec", "Settings");
+            }
         }
         catch { }
     }

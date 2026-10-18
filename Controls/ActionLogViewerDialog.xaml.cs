@@ -15,6 +15,7 @@ namespace DiskMasterWinUI.Controls;
 
 public sealed partial class ActionLogViewerDialog : ContentDialog
 {
+    private bool _isInitialized = false;
     private readonly ObservableCollection<ActionLogItem> _displayedItems = new();
     private string _filterText = string.Empty;
     private string _categoryFilter = "ALL";
@@ -25,7 +26,14 @@ public sealed partial class ActionLogViewerDialog : ContentDialog
     public ActionLogViewerDialog()
     {
         InitializeComponent();
+        _isInitialized = true;
+
         LogListView.ItemsSource = _displayedItems;
+
+        CategoryFilterCombo.SelectionChanged += Filter_SelectionChanged;
+        LevelFilterCombo.SelectionChanged += Filter_SelectionChanged;
+        SearchBox.TextChanged += SearchBox_TextChanged;
+
         ApplyFiltersAndReload();
 
         DebugLogService.Instance.LogItemAdded += OnLogItemAdded;
@@ -45,6 +53,7 @@ public sealed partial class ActionLogViewerDialog : ContentDialog
     {
         DispatcherQueue?.TryEnqueue(() =>
         {
+            if (!_isInitialized) return;
             if (MatchesFilter(item))
             {
                 _displayedItems.Add(item);
@@ -52,7 +61,7 @@ public sealed partial class ActionLogViewerDialog : ContentDialog
                 {
                     _displayedItems.RemoveAt(0);
                 }
-                if (AutoScrollCheck.IsChecked == true)
+                if (AutoScrollCheck?.IsChecked == true && LogListView != null)
                 {
                     LogListView.ScrollIntoView(item);
                 }
@@ -63,6 +72,7 @@ public sealed partial class ActionLogViewerDialog : ContentDialog
 
     private void ApplyFiltersAndReload()
     {
+        if (!_isInitialized) return;
         var allItems = DebugLogService.Instance.GetRecentLogItems();
         _displayedItems.Clear();
         foreach (var item in allItems)
@@ -73,7 +83,7 @@ public sealed partial class ActionLogViewerDialog : ContentDialog
             }
         }
         UpdateCountStatus();
-        if (AutoScrollCheck.IsChecked == true && _displayedItems.Count > 0)
+        if (AutoScrollCheck?.IsChecked == true && _displayedItems.Count > 0 && LogListView != null)
         {
             LogListView.ScrollIntoView(_displayedItems[^1]);
         }
@@ -128,7 +138,7 @@ public sealed partial class ActionLogViewerDialog : ContentDialog
                 "ACTION" => item.Level.Equals("ACTION", StringComparison.OrdinalIgnoreCase),
                 "REQUEST" => item.Level.Equals("REQUEST", StringComparison.OrdinalIgnoreCase) || item.Category.Contains("ProcessHelper", StringComparison.OrdinalIgnoreCase),
                 "WARN_ERROR" => item.Level.Equals("WARN", StringComparison.OrdinalIgnoreCase) || item.Level.Equals("ERROR", StringComparison.OrdinalIgnoreCase),
-                "INFO" => item.Level.Equals("INFO", StringComparison.OrdinalIgnoreCase) || item.Level.Equals("DEBUG", StringComparison.OrdinalIgnoreCase),
+                "INFO" => item.Level.Equals("INFO", StringComparison.OrdinalIgnoreCase) || item.Level.Equals("DEBUG", StringComparison.OrdinalIgnoreCase) || item.Level.Equals("OUTPUT", StringComparison.OrdinalIgnoreCase),
                 _ => true
             };
             if (!lvlMatch) return false;
@@ -150,18 +160,21 @@ public sealed partial class ActionLogViewerDialog : ContentDialog
 
     private void UpdateCountStatus()
     {
+        if (CountStatusText == null) return;
         var total = DebugLogService.Instance.LogBufferCount;
         CountStatusText.Text = $"顯示 {_displayedItems.Count:N0} / 總計 {total:N0} 筆";
     }
 
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
+        if (!_isInitialized) return;
         _filterText = SearchBox.Text ?? string.Empty;
         ApplyFiltersAndReload();
     }
 
     private void Filter_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (!_isInitialized) return;
         if (CategoryFilterCombo?.SelectedItem is ComboBoxItem catItem && catItem.Tag is string catTag)
         {
             _categoryFilter = catTag;
@@ -239,6 +252,11 @@ public sealed partial class ActionLogViewerDialog : ContentDialog
             }
         }
         catch { }
+    }
+
+    private void OpenCmd_Click(object sender, RoutedEventArgs e)
+    {
+        DebugLogService.Instance.OpenLiveConsole();
     }
 
     private void OpenFolder_Click(object sender, RoutedEventArgs e)

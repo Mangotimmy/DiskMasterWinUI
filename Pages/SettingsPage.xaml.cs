@@ -262,6 +262,7 @@ public sealed partial class SettingsPage : Page
         {
             ViewModel.CustomFontScale = e.NewValue;
             UpdateFontPreview();
+            MainWindow.CurrentInstance?.ApplyCustomFont();
         }
     }
 

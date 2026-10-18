@@ -250,13 +250,13 @@ public static class DisplayHelper
             return (360.0, 0.0, 0.0, clampedScale);
         }
 
-        // Reserve 16 DIPs for the vertical scrollbar and right-edge breathing room so card borders never clip
-        const double scrollbarAndRightGutter = 16.0;
+        // Reserve 20 DIPs for the vertical scrollbar and right-edge breathing room so card borders never clip
+        const double scrollbarAndRightGutter = 20.0;
         double usableWidth = Math.Max(320.0, viewportWidth - scrollbarAndRightGutter);
         double layoutWidth = Math.Max(360.0, usableWidth / clampedScale);
 
         double visualWidth = layoutWidth * clampedScale;
-        double centerableViewportWidth = Math.Max(visualWidth, viewportWidth - 12.0);
+        double centerableViewportWidth = Math.Max(visualWidth, viewportWidth - 16.0);
         double horizontalOffset = Math.Max(0.0, Math.Round((centerableViewportWidth - visualWidth) / 2.0));
 
         double bottomMargin = clampedScale > 1.0 && contentActualHeight > 0

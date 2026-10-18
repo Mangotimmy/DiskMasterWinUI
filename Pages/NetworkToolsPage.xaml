@@ -57,7 +57,7 @@
 
                 <!-- ════ Tab 1: UPnP 自動通訊埠轉發 ════ -->
                 <TabViewItem x:Name="TabUpnp" Header="🔀 UPnP 自動通訊埠轉發" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                         <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Status & Quick Presets -->
@@ -130,10 +130,18 @@
                                     CornerRadius="8" Padding="16">
                                 <StackPanel Spacing="10">
                                     <TextBlock Text="路由器現存 UPnP 轉發清單" FontWeight="SemiBold" />
-                                    <ListView ItemsSource="{x:Bind ViewModel.PortMappings, Mode=OneWay}" SelectionMode="None" MaxHeight="300">
+                                    <ListView ItemsSource="{x:Bind ViewModel.PortMappings, Mode=OneWay}" SelectionMode="None" MaxHeight="300"
+                                              HorizontalAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                              ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="models:UpnpPortMappingItem">
-                                                <Grid Padding="4,6" ColumnSpacing="12">
+                                                <Grid HorizontalAlignment="Stretch" Padding="4,6" ColumnSpacing="12">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto" />
                                                         <ColumnDefinition Width="*" />
@@ -162,7 +170,7 @@
 
                 <!-- ════ Tab 2: 推薦 DNS 設定與快取清理 ════ -->
                 <TabViewItem x:Name="TabDns" Header="🌐 推薦 DNS 設定" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                         <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- DNS Presets Card -->
@@ -303,10 +311,18 @@
                                     </Grid>
 
                                     <!-- Pollution Test Results List -->
-                                    <ListView ItemsSource="{x:Bind ViewModel.PollutionResults, Mode=OneWay}" MaxHeight="220" SelectionMode="None">
+                                    <ListView ItemsSource="{x:Bind ViewModel.PollutionResults, Mode=OneWay}" MaxHeight="220" SelectionMode="None"
+                                              HorizontalAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                              ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="models:DnsPollutionItem">
-                                                <Grid Padding="6,8" ColumnSpacing="10" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                <Grid HorizontalAlignment="Stretch" Padding="6,8" ColumnSpacing="10" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="150" />
                                                         <ColumnDefinition Width="Auto" />
@@ -329,7 +345,7 @@
 
                 <!-- ════ Tab 3: 為什麼網路慢？智慧診斷 ════ -->
                 <TabViewItem x:Name="TabDiagnostic" Header="🩺 智慧連線卡頓診斷" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                         <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Hero Diagnostic Card -->
@@ -354,10 +370,18 @@
                             </Border>
 
                             <!-- Results List -->
-                            <ListView ItemsSource="{x:Bind ViewModel.DiagnosticResults, Mode=OneWay}" SelectionMode="None">
+                            <ListView ItemsSource="{x:Bind ViewModel.DiagnosticResults, Mode=OneWay}" SelectionMode="None"
+                                      HorizontalAlignment="Stretch"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                      ScrollViewer.HorizontalScrollMode="Disabled">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
                                 <ListView.ItemTemplate>
                                     <DataTemplate x:DataType="services:DiagnosticStepResult">
-                                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        <Border HorizontalAlignment="Stretch" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                                                 CornerRadius="8" Padding="14" Margin="0,4,0,4">
                                             <Grid ColumnSpacing="12">
@@ -494,14 +518,30 @@
                                     <!-- Issue details if any -->
                                     <StackPanel Spacing="4" Visibility="{x:Bind ViewModel.HostsAnalysis.HasIssues, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
                                         <TextBlock Text="⚠️ 檢測到的異常問題項目：" FontWeight="SemiBold" FontSize="11" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
-                                        <ListView ItemsSource="{x:Bind ViewModel.HostsAnalysis.DuplicateDomains, Mode=OneWay}" MaxHeight="80" SelectionMode="None">
+                                        <ListView ItemsSource="{x:Bind ViewModel.HostsAnalysis.DuplicateDomains, Mode=OneWay}" MaxHeight="80" SelectionMode="None"
+                                                  HorizontalAlignment="Stretch"
+                                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                  ScrollViewer.HorizontalScrollMode="Disabled">
+                                            <ListView.ItemContainerStyle>
+                                                <Style TargetType="ListViewItem">
+                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                </Style>
+                                            </ListView.ItemContainerStyle>
                                             <ListView.ItemTemplate>
                                                 <DataTemplate x:DataType="x:String">
                                                     <TextBlock Text="{x:Bind Converter={StaticResource StringFormatConverter}, ConverterParameter='• 重複網域名稱: {0}'}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontFamily="Consolas" />
                                                 </DataTemplate>
                                             </ListView.ItemTemplate>
                                         </ListView>
-                                        <ListView ItemsSource="{x:Bind ViewModel.HostsAnalysis.ConflictingEntries, Mode=OneWay}" MaxHeight="80" SelectionMode="None">
+                                        <ListView ItemsSource="{x:Bind ViewModel.HostsAnalysis.ConflictingEntries, Mode=OneWay}" MaxHeight="80" SelectionMode="None"
+                                                  HorizontalAlignment="Stretch"
+                                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                  ScrollViewer.HorizontalScrollMode="Disabled">
+                                            <ListView.ItemContainerStyle>
+                                                <Style TargetType="ListViewItem">
+                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                </Style>
+                                            </ListView.ItemContainerStyle>
                                             <ListView.ItemTemplate>
                                                 <DataTemplate x:DataType="x:String">
                                                     <TextBlock Text="{x:Bind Converter={StaticResource StringFormatConverter}, ConverterParameter='• 衝突對應: {0}'}" FontSize="11" Foreground="{ThemeResource SystemFillColorCautionBrush}" FontFamily="Consolas" />
@@ -547,10 +587,18 @@
                                     </Grid>
 
                                     <!-- Backups list -->
-                                    <ListView ItemsSource="{x:Bind ViewModel.HostsBackups, Mode=OneWay}" MaxHeight="140" SelectionMode="None">
+                                    <ListView ItemsSource="{x:Bind ViewModel.HostsBackups, Mode=OneWay}" MaxHeight="140" SelectionMode="None"
+                                              HorizontalAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                              ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="models:HostsBackupItem">
-                                                <Grid Padding="4,4" ColumnSpacing="10" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                <Grid HorizontalAlignment="Stretch" Padding="4,4" ColumnSpacing="10" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="150" />
                                                         <ColumnDefinition Width="100" />
@@ -719,8 +767,8 @@
 
                 <!-- ════ Tab 5: 網路共用精靈 (One-Click NetShare Wizard) ════ -->
                 <TabViewItem x:Name="TabNetShare" Header="🖧 網路共用精靈 (NetShare)" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                        <StackPanel Spacing="16" Margin="0,0,16,20">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
+                        <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Hero MS Account & Profile Fix Card -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -822,10 +870,18 @@
                                         <Button Grid.Column="1" Content="🔄 重新整理" Command="{x:Bind ViewModel.RefreshSharesCommand}" />
                                     </Grid>
 
-                                    <ListView ItemsSource="{x:Bind ViewModel.NetShares, Mode=OneWay}" SelectionMode="None">
+                                    <ListView ItemsSource="{x:Bind ViewModel.NetShares, Mode=OneWay}" SelectionMode="None"
+                                              HorizontalAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                              ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="models:NetShareItem">
-                                                <Grid Padding="8,8" ColumnSpacing="12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                <Grid HorizontalAlignment="Stretch" Padding="8,8" ColumnSpacing="12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="150" />
                                                         <ColumnDefinition Width="2*" />
@@ -855,8 +911,8 @@
 
                 <!-- ════ Tab 6: 遠端桌面服務 (Remote RDP Server & RDP Wrapper) ════ -->
                 <TabViewItem x:Name="TabRdp" Header="🖥️ 遠端桌面 (RDP Server)" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                        <StackPanel Spacing="16" Margin="0,0,16,20">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
+                        <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Status & Diagnostics Card -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -1161,10 +1217,18 @@
                                         <Button Grid.Column="1" Content="🔄 重新整理清單" Command="{x:Bind ViewModel.RefreshRdpStatusCommand}" Padding="8,4" FontSize="11" />
                                     </Grid>
 
-                                    <ListView ItemsSource="{x:Bind ViewModel.RdpSessions, Mode=OneWay}" MaxHeight="220" SelectionMode="None">
+                                    <ListView ItemsSource="{x:Bind ViewModel.RdpSessions, Mode=OneWay}" MaxHeight="220" SelectionMode="None"
+                                              HorizontalAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                              ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="services:RdpSessionItem">
-                                                <Grid Padding="6,6" ColumnSpacing="12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                <Grid HorizontalAlignment="Stretch" Padding="6,6" ColumnSpacing="12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="140" />
                                                         <ColumnDefinition Width="140" />
@@ -1199,8 +1263,8 @@
 
                 <!-- ════ Tab 7: CMD 網路工具箱 (Ping, Netstat, OpenFiles, Nbtstat, TCP Global AutoTuning) ════ -->
                 <TabViewItem x:Name="TabCliTools" Header="⚡ CMD 網路工具箱" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
-                        <StackPanel Spacing="16" Margin="0,0,16,20">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
+                        <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Global TCP Auto-Tuning Card (netsh int tcp set global autotuninglevel=...) -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -1390,10 +1454,18 @@
                                         </StackPanel>
                                     </Border>
 
-                                    <ListView ItemsSource="{x:Bind ViewModel.NetstatConnections, Mode=OneWay}" MaxHeight="220" SelectionMode="None">
+                                    <ListView ItemsSource="{x:Bind ViewModel.NetstatConnections, Mode=OneWay}" MaxHeight="220" SelectionMode="None"
+                                              HorizontalAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                              ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="models:NetstatConnectionItem">
-                                                <Grid Padding="4,6" ColumnSpacing="10" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                <Grid HorizontalAlignment="Stretch" Padding="4,6" ColumnSpacing="10" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="50" />
                                                         <ColumnDefinition Width="140" />
@@ -1484,10 +1556,18 @@
                                             <TextBlock Grid.Column="0" Text="📂 共享檔案遠端鎖定 (OpenFiles)" FontWeight="Bold" FontSize="13" VerticalAlignment="Center" />
                                             <Button Grid.Column="1" Content="🔄 查詢" Command="{x:Bind ViewModel.RefreshOpenFilesCommand}" Padding="8,4" FontSize="11" />
                                         </Grid>
-                                        <ListView ItemsSource="{x:Bind ViewModel.OpenFiles, Mode=OneWay}" MaxHeight="160" SelectionMode="None">
+                                        <ListView ItemsSource="{x:Bind ViewModel.OpenFiles, Mode=OneWay}" MaxHeight="160" SelectionMode="None"
+                                                  HorizontalAlignment="Stretch"
+                                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                  ScrollViewer.HorizontalScrollMode="Disabled">
+                                            <ListView.ItemContainerStyle>
+                                                <Style TargetType="ListViewItem">
+                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                </Style>
+                                            </ListView.ItemContainerStyle>
                                             <ListView.ItemTemplate>
                                                 <DataTemplate x:DataType="models:OpenSharedFileItem">
-                                                    <Grid Padding="2,4" ColumnSpacing="6">
+                                                    <Grid HorizontalAlignment="Stretch" Padding="2,4" ColumnSpacing="6">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="*" />
                                                             <ColumnDefinition Width="Auto" />

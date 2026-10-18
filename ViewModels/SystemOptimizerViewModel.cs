@@ -62,6 +62,26 @@ public partial class SystemOptimizerViewModel : ObservableObject
     [ObservableProperty] private bool _isHagsEnabled;
     [ObservableProperty] private bool _isLowInputLatencyEnabled;
 
+    // ── Khronos Vulkan Layer Diagnostics & Pure Gaming Mode ──
+    private readonly VulkanOptimizerService _vulkanService = VulkanOptimizerService.Instance;
+    public ObservableCollection<VulkanLayerItem> VulkanLayers { get; } = new();
+    [ObservableProperty] private bool _isPureVulkanMode;
+    [ObservableProperty] private int _totalVulkanLayersCount;
+    [ObservableProperty] private int _orphanedVulkanLayersCount;
+    [ObservableProperty] private bool _hasOrphanedVulkanLayers;
+    [ObservableProperty] private bool _isLoadingVulkanLayers;
+    [ObservableProperty] private string _vulkanStatusSummary = "就緒";
+
+    // ── Windows Explorer Advanced & Latency Optimization (/boost) ──
+    private readonly ExplorerAdvancedOptimizerService _explorerAdvService = ExplorerAdvancedOptimizerService.Instance;
+    [ObservableProperty] private ExplorerAdvancedState _explorerAdvState = new();
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ExplorerOptimizationScoreText))]
+    private int _explorerOptimizationScore;
+    public string ExplorerOptimizationScoreText => $"{ExplorerOptimizationScore}% 優化達成率";
+    [ObservableProperty] private string _explorerBoostStatus = "就緒";
+    [ObservableProperty] private bool _isApplyingExplorerBoost;
+
     // ── Power Plans ──
     public ObservableCollection<PowerPlanItem> PowerPlans { get; } = new();
     [ObservableProperty] private PowerPlanItem? _selectedPowerPlan;
@@ -256,23 +276,30 @@ public partial class SystemOptimizerViewModel : ObservableObject
         });
     }
 
+    [ObservableProperty]
+    private bool _isLoadingPowerPlans;
+
+    [ObservableProperty]
+    private bool _isLoadingRestorePoints;
+
     [RelayCommand]
-    public async Task RefreshAllAsync()
+    public async Task RefreshFastCoreSettingsAsync()
     {
+        await Task.CompletedTask;
         try
         {
-            IsLoading = true;
             IsUpdatingProgrammatically = true;
+            IsLoading = false;
             var lang = LocalizationService.Instance.CurrentLanguage;
             StatusMessage = lang switch
             {
-                "zh-CN" => "正在读取当前注册表与电源计划配置...",
-                "en-US" => "Reading current registry and power plan configuration...",
-                "ja-JP" => "現在のレジストリと電源プラン構成を読み込み中...",
-                _ => "正在讀取當前登錄檔與電源計畫配置..."
+                "zh-CN" => "核心配置就绪",
+                "en-US" => "Core settings ready",
+                "ja-JP" => "基本設定準備完了",
+                _ => "核心設定就緒"
             };
 
-            // 1. Fast in-memory / registry reads
+            // 1. Fast in-memory / registry reads (<5ms)
             var pSep = _optimizer.GetWin32PrioritySeparation();
             SelectedCpuPresetIndex = pSep switch
             {
@@ -315,123 +342,153 @@ public partial class SystemOptimizerViewModel : ObservableObject
             var backupList = _optimizer.ListBackups();
             foreach (var b in backupList) Backups.Add(b);
 
-            // 3. Parallel background execution for external processes
-            var powerTask = Task.Run(async () =>
-            {
-                try
-                {
-                    var plans = await _powerService.GetPowerPlansAsync();
-                    var hiberOn = _powerCfg.IsHibernationEnabled();
-                    var hiberSize = _powerCfg.GetHiberfilSizeDisplay();
-                    DispatcherHelper.RunOnUIThread(() =>
-                    {
-                        PowerPlans.Clear();
-                        foreach (var p in plans)
-                        {
-                            PowerPlans.Add(p);
-                            if (p.IsActive) SelectedPowerPlan = p;
-                        }
-                        IsHibernationEnabled = hiberOn;
-                        HiberfilSizeDisplay = hiberSize;
-                    });
-                }
-                catch { }
-            });
-
-            var mmTask = Task.Run(async () =>
-            {
-                try
-                {
-                    var mm = await _memoryManager.GetStatusAsync();
-                    DispatcherHelper.RunOnUIThread(() =>
-                    {
-                        IsMemoryCompressionEnabled = mm.MemoryCompression;
-                        IsPageCombiningEnabled = mm.PageCombining;
-                        IsAppPreLaunchEnabled = mm.ApplicationPreLaunch;
-                        IsAppLaunchProfilingEnabled = mm.ApplicationLaunchProfiling;
-                        IsOperationRecordingEnabled = mm.OperationRecording;
-                    });
-                }
-                catch { }
-            });
-
-            var wakeTask = Task.Run(async () =>
-            {
-                try { await RefreshWakeDevicesAsync(); } catch { }
-            });
-
-            var blockersTask = Task.Run(async () =>
-            {
-                try { await RefreshSleepBlockersAsync(); } catch { }
-            });
-
-            var restorePointsTask = Task.Run(async () =>
-            {
-                try
-                {
-                    var rps = await _optimizer.ListSystemRestorePointsAsync();
-                    DispatcherHelper.RunOnUIThread(() =>
-                    {
-                        RestorePoints.Clear();
-                        foreach (var r in rps) RestorePoints.Add(r);
-                    });
-                }
-                catch { }
-            });
-
-            var oneDriveTask = Task.Run(async () =>
-            {
-                try { await RefreshOneDriveStatusAsync(); } catch { }
-            });
-
-            var procTask = Task.Run(async () =>
-            {
-                try { await RefreshRunningProcessesAsync(); } catch { }
-            });
-
-            var rulesTask = Task.Run(async () =>
-            {
-                try { await RefreshPersistedRulesAsync(); } catch { }
-            });
-
-            await Task.WhenAll(powerTask, mmTask, wakeTask, blockersTask, restorePointsTask, oneDriveTask, procTask, rulesTask);
-
-            DispatcherHelper.RunOnUIThread(() =>
-            {
-                var curLang = LocalizationService.Instance.CurrentLanguage;
-                StatusMessage = curLang switch
-                {
-                    "zh-CN" => "状态刷新完成。",
-                    "en-US" => "Status refresh completed.",
-                    "ja-JP" => "ステータスの更新が完了しました。",
-                    _ => "狀態重新整理完成。"
-                };
-            });
+            // 3. Explorer Advanced & Vulkan Pure Mode (fast registry checks)
+            RefreshExplorerAdvancedState();
+            IsPureVulkanMode = _vulkanService.IsPureVulkanModeEnabled();
         }
         catch (Exception ex)
         {
-            DispatcherHelper.RunOnUIThread(() =>
-            {
-                var curLang = LocalizationService.Instance.CurrentLanguage;
-                var errPrefix = curLang switch
-                {
-                    "zh-CN" => "读取失败: ",
-                    "en-US" => "Read failed: ",
-                    "ja-JP" => "読み取り失敗: ",
-                    _ => "讀取失敗: "
-                };
-                StatusMessage = $"{errPrefix}{ex.Message}";
-            });
             AppendLog($"[ERROR] {ex.Message}");
         }
         finally
         {
+            IsUpdatingProgrammatically = false;
+        }
+
+        // Parallel background fetch for lightweight memory compression and Vulkan layers
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var mm = await _memoryManager.GetStatusAsync();
+                DispatcherHelper.RunOnUIThread(() =>
+                {
+                    IsMemoryCompressionEnabled = mm.MemoryCompression;
+                    IsPageCombiningEnabled = mm.PageCombining;
+                    IsAppPreLaunchEnabled = mm.ApplicationPreLaunch;
+                    IsAppLaunchProfilingEnabled = mm.ApplicationLaunchProfiling;
+                    IsOperationRecordingEnabled = mm.OperationRecording;
+                });
+            }
+            catch { }
+        });
+
+        _ = Task.Run(async () =>
+        {
+            try { await RefreshVulkanLayersAsync(); } catch { }
+        });
+    }
+
+    [RelayCommand]
+    public async Task RefreshPowerPlansAsync()
+    {
+        if (IsLoadingPowerPlans) return;
+        try
+        {
+            IsLoadingPowerPlans = true;
+            var plans = await _powerService.GetPowerPlansAsync();
+            var hiberOn = _powerCfg.IsHibernationEnabled();
+            var hiberSize = _powerCfg.GetHiberfilSizeDisplay();
             DispatcherHelper.RunOnUIThread(() =>
             {
-                IsUpdatingProgrammatically = false;
-                IsLoading = false;
+                PowerPlans.Clear();
+                foreach (var p in plans)
+                {
+                    PowerPlans.Add(p);
+                    if (p.IsActive) SelectedPowerPlan = p;
+                }
+                IsHibernationEnabled = hiberOn;
+                HiberfilSizeDisplay = hiberSize;
             });
         }
+        catch { }
+        finally
+        {
+            IsLoadingPowerPlans = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task RefreshRestorePointsAsync()
+    {
+        if (IsLoadingRestorePoints) return;
+        try
+        {
+            IsLoadingRestorePoints = true;
+            var rps = await _optimizer.ListSystemRestorePointsAsync();
+            DispatcherHelper.RunOnUIThread(() =>
+            {
+                RestorePoints.Clear();
+                foreach (var r in rps) RestorePoints.Add(r);
+            });
+        }
+        catch { }
+        finally
+        {
+            IsLoadingRestorePoints = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task RefreshAllAsync()
+    {
+        await RefreshFastCoreSettingsAsync();
+
+        var powerTask = Task.Run(async () =>
+        {
+            try { await RefreshPowerPlansAsync(); } catch { }
+        });
+
+        var wakeTask = Task.Run(async () =>
+        {
+            try { await RefreshWakeDevicesAsync(); } catch { }
+        });
+
+        var blockersTask = Task.Run(async () =>
+        {
+            try { await RefreshSleepBlockersAsync(); } catch { }
+        });
+
+        var restorePointsTask = Task.Run(async () =>
+        {
+            try { await RefreshRestorePointsAsync(); } catch { }
+        });
+
+        var oneDriveTask = Task.Run(async () =>
+        {
+            try { await RefreshOneDriveStatusAsync(); } catch { }
+        });
+
+        var procTask = Task.Run(async () =>
+        {
+            try { await RefreshRunningProcessesAsync(); } catch { }
+        });
+
+        var rulesTask = Task.Run(async () =>
+        {
+            try { await RefreshPersistedRulesAsync(); } catch { }
+        });
+
+        var vulkanTask = Task.Run(async () =>
+        {
+            try { await RefreshVulkanLayersAsync(); } catch { }
+        });
+
+        RefreshExplorerAdvancedState();
+
+        await Task.WhenAll(powerTask, wakeTask, blockersTask, restorePointsTask, oneDriveTask, procTask, rulesTask, vulkanTask);
+
+        DispatcherHelper.RunOnUIThread(() =>
+        {
+            var curLang = LocalizationService.Instance.CurrentLanguage;
+            StatusMessage = curLang switch
+            {
+                "zh-CN" => "状态刷新完成。",
+                "en-US" => "Status refresh completed.",
+                "ja-JP" => "ステータスの更新が完了しました。",
+                _ => "狀態重新整理完成。"
+            };
+        });
     }
 
     // ══════════════════════════════════════════════════════════
@@ -2175,25 +2232,42 @@ public partial class SystemOptimizerViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public void ToggleExplorerWatchdog()
-    {
-        bool target = !IsExplorerWatchdogEnabled;
-        ExplorerWatchdogService.Instance.IsEnabled = target;
-        if (target)
-        {
-            ExplorerWatchdogService.Instance.Start(force: true);
-        }
-        else
-        {
-            ExplorerWatchdogService.SetWatchdogGloballyDisabled(true);
-        }
+    public void ToggleExplorerWatchdog() => SetExplorerWatchdogEnabled(!IsExplorerWatchdogEnabled);
 
-        IsExplorerWatchdogEnabled = target;
-        string msg = target
-            ? "🛡️ 已啟用 Explorer.exe 背景自動守護服務 (當檔案總管崩潰或被強制關閉時將自動重啟恢復桌面)。"
-            : "⚪ 已暫停 Explorer.exe 背景自動守護服務。";
-        AppendLog($"[{DateTime.Now:HH:mm:ss}] {msg}");
-        StatusMessage = msg;
+    private bool _isApplyingWatchdogChange;
+
+    /// <summary>
+    /// Applies an explicit watchdog state. Deliberately value-driven (not a flip) and re-entrancy guarded:
+    /// setting <see cref="IsExplorerWatchdogEnabled"/> updates the bound ToggleSwitch, which raises Toggled
+    /// synchronously. A flip-style handler there recursed until a (silent, uncatchable) stack overflow.
+    /// </summary>
+    public void SetExplorerWatchdogEnabled(bool target)
+    {
+        if (_isApplyingWatchdogChange) return;
+        _isApplyingWatchdogChange = true;
+        try
+        {
+            ExplorerWatchdogService.Instance.IsEnabled = target;
+            if (target)
+            {
+                ExplorerWatchdogService.Instance.Start(force: true);
+            }
+            else
+            {
+                ExplorerWatchdogService.SetWatchdogGloballyDisabled(true);
+            }
+
+            IsExplorerWatchdogEnabled = target;
+            string msg = target
+                ? "🛡️ 已啟用 Explorer.exe 背景自動守護服務 (當檔案總管崩潰或被強制關閉時將自動重啟恢復桌面)。"
+                : "⚪ 已暫停 Explorer.exe 背景自動守護服務。";
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] {msg}");
+            StatusMessage = msg;
+        }
+        finally
+        {
+            _isApplyingWatchdogChange = false;
+        }
     }
 
     [RelayCommand]
@@ -2209,5 +2283,232 @@ public partial class SystemOptimizerViewModel : ObservableObject
             if (ok) AudioFeedbackService.PlaySuccess();
         }
         finally { IsLoading = false; }
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    //  Vulkan Layer Diagnostics & Zero-Overlay Mode (/boost)
+    // ════════════════════════════════════════════════════════════════════
+
+    [RelayCommand]
+    public async Task RefreshVulkanLayersAsync()
+    {
+        if (IsLoadingVulkanLayers) return;
+        IsLoadingVulkanLayers = true;
+        try
+        {
+            var layers = await _vulkanService.ScanAllLayersAsync();
+            var pureMode = _vulkanService.IsPureVulkanModeEnabled();
+
+            DispatcherHelper.RunOnUIThread(() =>
+            {
+                VulkanLayers.Clear();
+                int orphaned = 0;
+                foreach (var l in layers)
+                {
+                    VulkanLayers.Add(l);
+                    if (!l.ExistsOnDisk) orphaned++;
+                }
+
+                TotalVulkanLayersCount = layers.Count;
+                OrphanedVulkanLayersCount = orphaned;
+                HasOrphanedVulkanLayers = orphaned > 0;
+                IsPureVulkanMode = pureMode;
+
+                VulkanStatusSummary = orphaned > 0
+                    ? $"⚠️ 偵測到 {orphaned} 個遺失檔案的幽靈圖形層 (易導致遊戲啟動閃退 VK_ERROR_LAYER_NOT_PRESENT)！"
+                    : $"✅ 已偵測 {layers.Count} 個圖形層，所有檔案路徑正常";
+            });
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[VULKAN ERROR] {ex.Message}");
+        }
+        finally
+        {
+            IsLoadingVulkanLayers = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task PurgeOrphanedVulkanLayersAsync()
+    {
+        IsLoadingVulkanLayers = true;
+        try
+        {
+            var (purgedCount, paths) = await _vulkanService.PurgeOrphanedLayersAsync();
+            if (purgedCount > 0)
+            {
+                string msg = $"🧹 成功清除 {purgedCount} 個殘留幽靈 Vulkan 圖形層登錄項目！";
+                AppendLog($"[{DateTime.Now:HH:mm:ss}] {msg}");
+                foreach (var p in paths) AppendLog($"   - {p}");
+                StatusMessage = msg;
+                AudioFeedbackService.PlaySuccess();
+            }
+            else
+            {
+                string msg = "🛡️ 系統未發現任何殘留或損毀的 Vulkan 圖形層。";
+                AppendLog($"[{DateTime.Now:HH:mm:ss}] {msg}");
+                StatusMessage = msg;
+            }
+
+            await RefreshVulkanLayersAsync();
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[VULKAN ERROR] {ex.Message}");
+            AudioFeedbackService.PlayError();
+        }
+        finally
+        {
+            IsLoadingVulkanLayers = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task TogglePureVulkanModeAsync()
+    {
+        bool target = !IsPureVulkanMode;
+        bool ok = await _vulkanService.SetPureVulkanModeAsync(target);
+        if (ok)
+        {
+            IsPureVulkanMode = target;
+            string msg = target
+                ? "🚀 已啟用純淨 Vulkan 電競零延遲模式 (已設定 VK_LOADER_LAYERS_DISABLE = ~implicit~，已阻斷第三方覆蓋層干擾，提升 1% low FPS)！"
+                : "⚪ 已關閉純淨 Vulkan 模式 (已恢復第三方遊戲覆蓋層正常載入)。";
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] {msg}");
+            StatusMessage = msg;
+            AudioFeedbackService.PlaySuccess();
+        }
+        else
+        {
+            AudioFeedbackService.PlayError();
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    //  Explorer Advanced & Zero Delay Boost (/boost)
+    // ════════════════════════════════════════════════════════════════════
+
+    [RelayCommand]
+    public void RefreshExplorerAdvancedState()
+    {
+        try
+        {
+            var state = _explorerAdvService.GetState();
+            bool wasUpdating = IsUpdatingProgrammatically;
+            IsUpdatingProgrammatically = true;
+            try
+            {
+                ExplorerAdvState = state;
+                ExplorerOptimizationScore = state.OptimizationScorePercent;
+            }
+            finally
+            {
+                IsUpdatingProgrammatically = wasUpdating;
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[EXPLORER ADV ERROR] {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    public async Task ApplyExplorerBoostPresetAsync()
+    {
+        if (IsApplyingExplorerBoost) return;
+        IsApplyingExplorerBoost = true;
+        try
+        {
+            var (ok, msg) = await _explorerAdvService.ApplyBoostAsync(iconsOnly: false, restartExplorer: true);
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🚀 {msg}");
+            StatusMessage = msg;
+            ExplorerBoostStatus = msg;
+            RefreshExplorerAdvancedState();
+            if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+        }
+        finally
+        {
+            IsApplyingExplorerBoost = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task RestoreExplorerDefaultsAsync()
+    {
+        if (IsApplyingExplorerBoost) return;
+        IsApplyingExplorerBoost = true;
+        try
+        {
+            var (ok, msg) = await _explorerAdvService.RestoreDefaultsAsync(restartExplorer: true);
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 🛡️ {msg}");
+            StatusMessage = msg;
+            ExplorerBoostStatus = msg;
+            RefreshExplorerAdvancedState();
+            if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+        }
+        finally
+        {
+            IsApplyingExplorerBoost = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task ToggleExplorerAdvancedSettingAsync(string settingName)
+    {
+        try
+        {
+            var state = _explorerAdvService.GetState();
+            switch (settingName)
+            {
+                case "TaskbarAnimations":
+                    await _explorerAdvService.SetSettingAsync("TaskbarAnimations", state.TaskbarAnimationsDisabled ? 1 : 0);
+                    break;
+                case "DesktopLivePreview":
+                    await _explorerAdvService.SetSettingAsync("DesktopLivePreviewHoverTime", state.DesktopLivePreviewInstant ? 500 : 0);
+                    break;
+                case "DisallowShaking":
+                    await _explorerAdvService.SetSettingAsync("DisallowShaking", state.DisallowShakingEnabled ? 0 : 1);
+                    break;
+                case "SeparateProcess":
+                    await _explorerAdvService.SetSettingAsync("SeparateProcess", state.SeparateProcessEnabled ? 0 : 1);
+                    break;
+                case "nonetcrawling":
+                    await _explorerAdvService.SetSettingAsync("nonetcrawling", state.NonetCrawlingDisabled ? 0 : 1);
+                    break;
+                case "IconsOnly":
+                    await _explorerAdvService.SetSettingAsync("IconsOnly", state.IconsOnlyEnabled ? 0 : 1);
+                    break;
+                case "HideFileExt":
+                    await _explorerAdvService.SetSettingAsync("HideFileExt", state.HideFileExtDisabled ? 1 : 0);
+                    break;
+                case "TaskbarDa":
+                    await _explorerAdvService.SetSettingAsync("TaskbarDa", state.TaskbarDaDisabled ? 1 : 0);
+                    break;
+                case "ShowCopilotButton":
+                    await _explorerAdvService.SetSettingAsync("ShowCopilotButton", state.ShowCopilotButtonDisabled ? 1 : 0);
+                    break;
+                case "Start_IrisRecommendations":
+                    await _explorerAdvService.SetSettingAsync("Start_IrisRecommendations", state.StartIrisRecommendationsDisabled ? 1 : 0);
+                    break;
+                case "Start_TrackDocs":
+                    await _explorerAdvService.SetSettingAsync("Start_TrackDocs", state.StartTrackDocsDisabled ? 1 : 0);
+                    break;
+                case "ShowSecondsInSystemClock":
+                    await _explorerAdvService.SetSettingAsync("ShowSecondsInSystemClock", state.ShowSecondsInSystemClockDisabled ? 1 : 0);
+                    break;
+                case "QuickAccessRecent":
+                    int target = state.QuickAccessRecentDisabled ? 1 : 0;
+                    await _explorerAdvService.SetSettingAsync("ShowRecent", target, isExplorerRoot: true);
+                    await _explorerAdvService.SetSettingAsync("ShowFrequent", target, isExplorerRoot: true);
+                    break;
+            }
+            RefreshExplorerAdvancedState();
+            AudioFeedbackService.PlaySuccess();
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"[TOGGLE ERROR] {ex.Message}");
+        }
     }
 }

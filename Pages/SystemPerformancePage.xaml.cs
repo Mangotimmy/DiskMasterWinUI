@@ -67,10 +67,16 @@ public sealed partial class SystemPerformancePage : Page
     {
         ApplyLanguage();
         UpdateOverlayButtonState();
+        DiskMasterWinUI.Controls.PerformanceOverlayWindow.OverlayStateChanged += OnOverlayStateChanged;
         ViewModel.DiskHistoryUpdated += OnDiskHistoryUpdated;
         ViewModel.StartAutoRefresh();
         await ViewModel.InitializeAsync();
         RedrawDiskChart();
+    }
+
+    private void OnOverlayStateChanged()
+    {
+        DispatcherQueue.TryEnqueue(UpdateOverlayButtonState);
     }
 
     private void TogglePerformanceOverlay_Click(object sender, RoutedEventArgs e)
@@ -80,18 +86,65 @@ public sealed partial class SystemPerformancePage : Page
         UpdateOverlayButtonState();
     }
 
+    private void ToggleHudClickThrough_Click(object sender, RoutedEventArgs e)
+    {
+        DebugLogService.Instance.LogAction("效能監控 (Performance)", "使用者點擊切換 HUD 滑鼠穿透模式");
+        DiskMasterWinUI.Controls.PerformanceOverlayWindow.ToggleClickThroughGlobal();
+        UpdateOverlayButtonState();
+    }
+
+    private void OpenHudSettings_Click(object sender, RoutedEventArgs e)
+    {
+        DiskMasterWinUI.Controls.HudSettingsWindow.Toggle(DiskMasterWinUI.Controls.PerformanceOverlayWindow.CurrentInstance);
+    }
+
+    private void PageHudTheme_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuFlyoutItem item && item.Tag is string theme)
+        {
+            var s = SettingsService.Instance.Current;
+            s.HudTheme = theme;
+            SettingsService.Instance.Save();
+            DiskMasterWinUI.Controls.PerformanceOverlayWindow.CurrentInstance?.ApplyColorTheme(theme);
+            DebugLogService.Instance.LogAction("效能監控 (Performance)", $"從主頁面切換 HUD 主題色彩為 [{theme}]");
+        }
+    }
+
+    private void PageHudStyle_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuFlyoutItem item && item.Tag is string style)
+        {
+            var s = SettingsService.Instance.Current;
+            s.HudStyle = style;
+            SettingsService.Instance.Save();
+            DebugLogService.Instance.LogAction("效能監控 (Performance)", $"從主頁面切換 HUD 風格型態為 [{style}]");
+        }
+    }
+
     private void UpdateOverlayButtonState()
     {
+        bool isHudOpen = DiskMasterWinUI.Controls.PerformanceOverlayWindow.CurrentInstance != null;
         if (OverlayToggleBtnText != null)
         {
-            OverlayToggleBtnText.Text = DiskMasterWinUI.Controls.PerformanceOverlayWindow.CurrentInstance != null
-                ? "🪟 關閉效能懸浮窗 (HUD 開啟中)"
-                : "🪟 置頂效能懸浮窗 (FPS HUD)";
+            OverlayToggleBtnText.Text = isHudOpen
+                ? "關閉效能懸浮窗 (HUD 開啟中)"
+                : "置頂效能懸浮窗 (FPS HUD)";
+        }
+
+        if (HudClickThroughBtnText != null)
+        {
+            bool isCt = DiskMasterWinUI.Controls.PerformanceOverlayWindow.CurrentInstance?.IsClickThrough ?? SettingsService.Instance.Current.HudClickThrough;
+            HudClickThroughBtnText.Text = isCt ? "穿透中 [Ctrl+Shift+H]" : "滑鼠穿透 [Ctrl+Shift+H]";
+            if (HudClickThroughIcon != null)
+            {
+                HudClickThroughIcon.Glyph = isCt ? "\uE72E" : "\uE8C0"; // lock / transparent indicator
+            }
         }
     }
 
     private void Page_Unloaded(object sender, RoutedEventArgs e)
     {
+        DiskMasterWinUI.Controls.PerformanceOverlayWindow.OverlayStateChanged -= OnOverlayStateChanged;
         ViewModel.DiskHistoryUpdated -= OnDiskHistoryUpdated;
         ViewModel.StopAutoRefresh();
     }

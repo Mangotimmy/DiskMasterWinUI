@@ -4,62 +4,19 @@ namespace DiskMasterWinUI.Services;
 
 public class ChkdskService
 {
-    private async Task<int> RunStreamingProcessAsync(
+    private static async Task<int> RunStreamingProcessAsync(
         string fileName,
         string arguments,
         Action<string> onOutputLine,
         CancellationToken cancellationToken = default)
     {
-        var encoding = DiskMasterWinUI.Helpers.ProcessHelper.GetConsoleEncoding();
-        var psi = new ProcessStartInfo
-        {
-            FileName = fileName,
-            Arguments = arguments,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            StandardOutputEncoding = encoding,
-            StandardErrorEncoding = encoding,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        try
-        {
-            using var process = new Process { StartInfo = psi };
-
-            process.OutputDataReceived += (_, e) =>
-            {
-                if (e.Data != null) onOutputLine(e.Data);
-            };
-
-            process.ErrorDataReceived += (_, e) =>
-            {
-                if (e.Data != null) onOutputLine($"[ERROR] {e.Data}");
-            };
-
-            process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-
-            using var reg = cancellationToken.Register(() =>
-            {
-                try { process.Kill(true); } catch { }
-            });
-
-            await process.WaitForExitAsync(cancellationToken);
-            process.WaitForExit(200);
-            return process.ExitCode;
-        }
-        catch (OperationCanceledException)
-        {
-            onOutputLine("[INFO] Operation cancelled by user.");
-            return -1;
-        }
-        catch (Exception ex)
-        {
-            onOutputLine($"[EXCEPTION] Failed to execute {fileName}: {ex.Message}");
-            return -1;
-        }
+        var result = await DiskMasterWinUI.Helpers.StreamingProcessRunner.RunAsync(
+            "chkdsk",
+            fileName,
+            arguments,
+            onOutputLine,
+            cancellationToken);
+        return result.ExitCode;
     }
 
     /// <summary>Online non-destructive NTFS scan (system keeps running)</summary>

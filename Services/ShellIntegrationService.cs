@@ -306,12 +306,23 @@ public sealed class ShellIntegrationService
         @"Drive\shell\" + VerbDiskCheckKeyName
     };
 
+    public const string VerbAddToPathKeyName = "DiskMasterAddToPath";
+
+    public static readonly string[] ExtendedAddToPathClassPaths =
+    {
+        @"Directory\shell\" + VerbAddToPathKeyName,
+        @"Directory\Background\shell\" + VerbAddToPathKeyName,
+        @"Drive\shell\" + VerbAddToPathKeyName
+    };
+
     public bool IsExtendedVerbInstalled(string firstClassPath, bool allUsers = false)
     {
         try
         {
             var store = _storeFactory(allUsers);
-            var val = store.GetValue(@"Software\Classes\" + firstClassPath + @"\command", null);
+            var val = store.GetValue(@"Software\Classes\" + firstClassPath + @"\command", null)
+                   ?? store.GetValue(@"Software\Classes\" + firstClassPath + @"\shell\UserPath\command", null)
+                   ?? store.GetValue(@"Software\Classes\" + firstClassPath, "SubCommands");
             return !string.IsNullOrWhiteSpace(val);
         }
         catch { return false; }
@@ -323,7 +334,8 @@ public sealed class ShellIntegrationService
         bool enableNtfs = true,
         bool enableLanShare = true,
         bool enableImageMount = true,
-        bool enableDiskCheck = true)
+        bool enableDiskCheck = true,
+        bool enableAddToPath = true)
     {
         var result = new ShellIntegrationResult { AllUsers = allUsers };
         if (allUsers && !IsElevated())
@@ -433,6 +445,40 @@ public sealed class ShellIntegrationService
                 foreach (var cp in ExtendedDiskCheckClassPaths) DeleteKeyTree(store, @"Software\Classes\" + cp, result);
             }
 
+            // 6. Add to PATH Environment verb (Cascaded submenu: User PATH & System PATH)
+            if (enableAddToPath)
+            {
+                var args = new[] { "%1", "%V", "%V" };
+                for (int i = 0; i < ExtendedAddToPathClassPaths.Length; i++)
+                {
+                    var rel = @"Software\Classes\" + ExtendedAddToPathClassPaths[i];
+                    WriteValue(store, rel, null, "DiskMaster Add to PATH Environment", result);
+                    WriteValue(store, rel, "MUIVerb", "🌐 DiskMaster: 加至 PATH 環境變數", result);
+                    WriteValue(store, rel, "Icon", $"{appExe},0", result);
+                    WriteValue(store, rel, "Position", "Bottom", result);
+                    WriteValue(store, rel, "SubCommands", "", result);
+
+                    // Subcommand 1: User PATH
+                    var userSub = rel + @"\shell\UserPath";
+                    WriteValue(store, userSub, null, "Add to User PATH", result);
+                    WriteValue(store, userSub, "MUIVerb", "👤 加入使用者 PATH (User PATH)", result);
+                    WriteValue(store, userSub, "Icon", $"{appExe},0", result);
+                    WriteValue(store, userSub + @"\command", null, $"\"{appExe}\" --add-path-user \"{args[i]}\"", result);
+
+                    // Subcommand 2: System PATH
+                    var sysSub = rel + @"\shell\SystemPath";
+                    WriteValue(store, sysSub, null, "Add to System PATH", result);
+                    WriteValue(store, sysSub, "MUIVerb", "🛡️ 加入系統 PATH (System PATH, 需管理員)", result);
+                    WriteValue(store, sysSub, "Icon", $"{appExe},0", result);
+                    WriteValue(store, sysSub, "HasLUAShield", "", result);
+                    WriteValue(store, sysSub + @"\command", null, $"\"{appExe}\" --add-path-system \"{args[i]}\"", result);
+                }
+            }
+            else
+            {
+                foreach (var cp in ExtendedAddToPathClassPaths) DeleteKeyTree(store, @"Software\Classes\" + cp, result);
+            }
+
             result.Success = true;
             result.Message = $"已成功套用 Windows 檔案總管右鍵選單整合（{(allUsers ? "所有使用者 HKLM" : "目前使用者 HKCU")}，共寫入 {result.KeysWritten.Count} 項設定）。";
             return result;
@@ -455,6 +501,7 @@ public sealed class ShellIntegrationService
             foreach (var cp in ExtendedShareClassPaths) DeleteKeyTree(store, @"Software\Classes\" + cp, res);
             foreach (var cp in ExtendedImageClassPaths) DeleteKeyTree(store, @"Software\Classes\" + cp, res);
             foreach (var cp in ExtendedDiskCheckClassPaths) DeleteKeyTree(store, @"Software\Classes\" + cp, res);
+            foreach (var cp in ExtendedAddToPathClassPaths) DeleteKeyTree(store, @"Software\Classes\" + cp, res);
         }
         catch { }
         return res;

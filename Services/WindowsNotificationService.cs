@@ -72,7 +72,7 @@ public class WindowsNotificationService
     /// <summary>
     /// Dispatches a rich notification into the Windows Toast & Action Center list.
     /// </summary>
-    public void ShowNotification(string title, string message, string? targetTab = null)
+    public void ShowNotification(string title, string message, string? targetTab = null, bool playSound = true)
     {
         bool useCenter = SettingsService.Instance.Current.EnableWindowsNotificationCenter;
 
@@ -84,8 +84,11 @@ public class WindowsNotificationService
 
         try
         {
-            // Play custom or system audio scheme asynchronously
-            AudioFeedbackService.PlaySuccess();
+            // Completion notifications let StatusBarViewModel own the single audio cue.
+            if (playSound)
+            {
+                AudioFeedbackService.PlaySuccess();
+            }
 
             string iconXml = "";
             if (File.Exists(_iconPath))

@@ -51,48 +51,56 @@ public sealed partial class GroupPolicyPage : Page
     private void DisableAutoReboot_Toggled(object sender, RoutedEventArgs e)
     {
         if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsDisableAutoReboot) return;
         ViewModel.ToggleDisableAutoRebootCommand.Execute(null);
     }
 
     private void DisableTelemetry_Toggled(object sender, RoutedEventArgs e)
     {
         if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsDisableTelemetry) return;
         ViewModel.ToggleDisableTelemetryCommand.Execute(null);
     }
 
     private void DisableSearchBox_Toggled(object sender, RoutedEventArgs e)
     {
         if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsDisableSearchBoxSuggestions) return;
         ViewModel.ToggleDisableSearchBoxSuggestionsCommand.Execute(null);
     }
 
     private void DisableConsumerFeatures_Toggled(object sender, RoutedEventArgs e)
     {
         if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsDisableConsumerFeatures) return;
         ViewModel.ToggleDisableConsumerFeaturesCommand.Execute(null);
     }
 
     private void DisableDeliveryOptimization_Toggled(object sender, RoutedEventArgs e)
     {
         if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsDisableDeliveryOptimization) return;
         ViewModel.ToggleDisableDeliveryOptimizationCommand.Execute(null);
     }
 
     private void DisableUacSecureDesktop_Toggled(object sender, RoutedEventArgs e)
     {
         if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsDisableUacSecureDesktop) return;
         ViewModel.ToggleDisableUacSecureDesktopCommand.Execute(null);
     }
 
     private void DisableDefenderSample_Toggled(object sender, RoutedEventArgs e)
     {
         if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsDisableDefenderSampleSubmission) return;
         ViewModel.ToggleDisableDefenderSampleSubmissionCommand.Execute(null);
     }
 
     private void ForceHags_Toggled(object sender, RoutedEventArgs e)
     {
         if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsForceHags) return;
         ViewModel.ToggleForceHagsCommand.Execute(null);
     }
 }

@@ -61,7 +61,7 @@
 
         <!-- Page Content Frame -->
         <ScrollViewer x:Name="FloatingScrollViewer" Grid.Row="2"
-                      HorizontalScrollBarVisibility="Hidden"
+                      HorizontalScrollBarVisibility="Disabled"
                       HorizontalScrollMode="Disabled"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalContentAlignment="Left"

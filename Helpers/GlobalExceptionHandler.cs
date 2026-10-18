@@ -40,6 +40,39 @@ public static class GlobalExceptionHandler
         _dispatcherQueue = dispatcherQueue;
     }
 
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true, CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int MessageBoxW(IntPtr hWnd, string lpText, string lpCaption, uint uType);
+
+    private const uint MB_ICONERROR = 0x00000010;
+    private const uint MB_SYSTEMMODAL = 0x00001000;
+    private const uint MB_SETFOREGROUND = 0x00010000;
+
+    /// <summary>
+    /// Reports an unhandled or fatal exception. If terminating is true or if dispatcher queue is unavailable,
+    /// displays a native synchronous Win32 message box so the user always sees the error dialog before process exit.
+    /// </summary>
+    public static void ReportFatalException(Exception ex, string context = "嚴重例外異常 (Fatal Exception)", bool isTerminating = true)
+    {
+        ReportException(ex, context);
+
+        if (isTerminating)
+        {
+            try
+            {
+                var title = "DiskMaster Pro - 嚴重例外異常 (Fatal Error)";
+                var body = $"DiskMaster Pro 發生未攔截的嚴重錯誤，程式即將終止。\n\n" +
+                           $"【發生環節】: {context}\n" +
+                           $"【異常類型】: {ex.GetType().FullName}\n" +
+                           $"【錯誤訊息】: {ex.Message}\n\n" +
+                           $"【詳細堆疊 Trace】:\n{ex.StackTrace}\n\n" +
+                           $"此錯誤已記錄於 crash.log。";
+
+                MessageBoxW(IntPtr.Zero, body, title, MB_ICONERROR | MB_SYSTEMMODAL | MB_SETFOREGROUND);
+            }
+            catch { }
+        }
+    }
+
     /// <summary>
     /// Reports an exception gracefully without crashing the application.
     /// </summary>

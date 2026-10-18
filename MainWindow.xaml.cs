@@ -42,6 +42,15 @@ public sealed partial class MainWindow : Window
     private string _lastWorkspaceSignature = "";
     private string _pendingWorkspacePreset = "Master";
 
+    // ── Coalesced visual-settings application (background / font / zoom) ──
+    // SettingsService.Save() is called by many unrelated toggles. Re-running ApplyCustomFont()
+    // over every instantiated page for a HUD/opacity/companion change is expensive and was
+    // one of the contributors to intermittent "Not Responding" freezes.
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _visualSettingsTimer;
+    private string _lastBackgroundSignature = "";
+    private string _lastFontSignature = "";
+    private string _lastScaleSignature = "";
+
     // ── B15: capped, de-duplicated modal exception reporting ──
     private readonly HashSet<string> _reportedExceptionKeys = new();
     private readonly object _exceptionKeyLock = new();
@@ -168,6 +177,7 @@ public sealed partial class MainWindow : Window
             if (SettingsService.Instance.Current.CloseToTray && !TrayService.IsExplicitExit)
             {
                 args.Cancel = true;
+                LiveConsoleWindow.CurrentInstance?.Close();
                 TrayService.MinimizeToTray();
                 WindowsNotificationService.Instance.ShowNotification("DiskMaster Pro", LocalizationService.Instance["CloseToTrayNotice"] ?? "已縮小至系統匣後台執行", "EasyMode");
             }
@@ -178,10 +188,12 @@ public sealed partial class MainWindow : Window
             if (SettingsService.Instance.Current.CloseToTray && !TrayService.IsExplicitExit)
             {
                 args.Handled = true;
+                LiveConsoleWindow.CurrentInstance?.Close();
                 TrayService.MinimizeToTray();
             }
             else
             {
+                LiveConsoleWindow.CurrentInstance?.Close();
                 TrayService.Dispose();
             }
         };
@@ -190,6 +202,7 @@ public sealed partial class MainWindow : Window
         {
             if (args.DidPresenterChange && sender.Presenter is OverlappedPresenter op && op.State == OverlappedPresenterState.Minimized && SettingsService.Instance.Current.MinimizeToTray)
             {
+                LiveConsoleWindow.CurrentInstance?.Close();
                 TrayService.MinimizeToTray();
             }
         };
@@ -224,6 +237,12 @@ public sealed partial class MainWindow : Window
             AutoDetectZoom();
         }
 
+        // Seed the visual-setting signatures after the startup apply so the first Save()
+        // does not re-run the expensive background/font passes for the settings we just applied.
+        _lastBackgroundSignature = ComputeBackgroundSignature();
+        _lastFontSignature = ComputeFontSignature();
+        _lastScaleSignature = ComputeScaleSignature();
+
         SetupKeyboardAccelerators();
         TabReorderHelper.Attach(MainTabs, SaveCustomTabOrder);
 
@@ -231,23 +250,7 @@ public sealed partial class MainWindow : Window
         ApplyBackgroundAndCompanion();
         ExplorerWatchdogService.Instance.Start();
 
-        SettingsService.Instance.SettingsChanged += () =>
-        {
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                ApplyBackgroundAndCompanion();
-                ApplyCustomFont();
-                var savedScale = SettingsService.Instance.Current.ScalePercent;
-                if (savedScale >= 80 && savedScale <= 150 && Math.Abs(_currentZoom - (savedScale / 100.0)) > 0.01)
-                {
-                    SetZoom(savedScale / 100.0);
-                }
-                if (!_isApplyingWorkspacePreset)
-                {
-                    ScheduleWorkspaceRebuild();
-                }
-            });
-        };
+        SettingsService.Instance.SettingsChanged += OnSettingsChanged;
 
         GlobalExceptionHandler.ExceptionReported += (ex, context) =>
         {
@@ -406,6 +409,14 @@ public sealed partial class MainWindow : Window
             case "ToggleOverlay":
                 DiskMasterWinUI.Controls.PerformanceOverlayWindow.Toggle();
                 break;
+            case "ToggleClickThrough":
+                DiskMasterWinUI.Controls.PerformanceOverlayWindow.ToggleClickThroughGlobal();
+                bool isCt = DiskMasterWinUI.Controls.PerformanceOverlayWindow.CurrentInstance?.IsClickThrough == true;
+                WindowsNotificationService.Instance.ShowNotification(
+                    "DiskMaster HUD 效能監控",
+                    isCt ? "👻 已開啟滑鼠穿透模式 (滑鼠忽略 HUD，[Ctrl+Shift+H] 切換)" : "🖱️ 已停用滑鼠穿透模式 (可正常操作與拖曳 HUD)",
+                    "SystemPerformance");
+                break;
             case "RestartAdmin":
                 AdminHelper.RestartAsAdmin();
                 break;
@@ -414,6 +425,7 @@ public sealed partial class MainWindow : Window
                 DispatcherQueue.TryEnqueue(async () =>
                 {
                     try { DiskMasterWinUI.Controls.PerformanceOverlayWindow.CurrentInstance?.Close(); } catch { }
+                    try { DiskMasterWinUI.Controls.LiveConsoleWindow.CurrentInstance?.Close(); } catch { }
                     try { ExplorerWatchdogService.Instance.Stop(); } catch { }
                     foreach (var win in _floatingWindows.Values.ToList())
                     {
@@ -588,6 +600,49 @@ public sealed partial class MainWindow : Window
 
             ContentFrame.FontSize = 14.0 * scaleFactor;
             MainTabs.FontSize = 14.0 * scaleFactor;
+
+            // Apply font family and proportional font scaling across all instantiated pages
+            Page?[] allPages = [
+                _starterPage, _easyModePage, _wimDeployPage, _bootManagerPage,
+                _diskToolsPage, _recoveryPage, _systemHealthPage, _ntfsPermissionsPage,
+                _groupPolicyPage, _advancedModePage, _systemOptimizerPage,
+                _networkToolsPage, _systemPerformancePage, _settingsPage
+            ];
+
+            foreach (var page in allPages)
+            {
+                if (page != null)
+                {
+                    FontScaleHelper.ApplyFontAndScale(page, fontFamily, scaleFactor);
+                }
+            }
+
+            // Apply to frames (central, side dock, bottom dock)
+            if (ContentFrame.Content is DependencyObject currentContent)
+            {
+                FontScaleHelper.ApplyFontAndScale(currentContent, fontFamily, scaleFactor);
+            }
+            if (RightDockFrame?.Content is DependencyObject rightContent)
+            {
+                FontScaleHelper.ApplyFontAndScale(rightContent, fontFamily, scaleFactor);
+            }
+            if (BottomDockFrame?.Content is DependencyObject bottomContent)
+            {
+                FontScaleHelper.ApplyFontAndScale(bottomContent, fontFamily, scaleFactor);
+            }
+
+            // Apply to all floating windows
+            foreach (var floatWin in _floatingWindows.Values)
+            {
+                floatWin.ApplyFont();
+            }
+
+            // Update application-level theme font resource
+            try
+            {
+                Application.Current.Resources["ControlContentThemeFontSize"] = 14.0 * scaleFactor;
+            }
+            catch { }
         }
         catch { }
     }
@@ -666,6 +721,119 @@ public sealed partial class MainWindow : Window
     /// setting cannot affect the tab strip. Workspace combobox / tab-order changes still call
     /// ApplyWorkspacePreset directly, so user-visible workspace changes stay immediate.
     /// </summary>
+    private void OnSettingsChanged()
+    {
+        DispatcherQueue.TryEnqueue(ScheduleVisualSettingsApply);
+    }
+
+    private static string ComputeBackgroundSignature()
+    {
+        var s = SettingsService.Instance.Current;
+        return string.Join("|",
+            s.BackgroundImagePath ?? "",
+            s.BackgroundOpacity,
+            s.BackgroundBlur,
+            s.EnableGlassTransparency,
+            s.CardOpacity,
+            s.EnableCompanionAvatar,
+            s.CompanionAvatarType ?? "",
+            s.CompanionModelPath ?? "",
+            s.CompanionScale,
+            s.CompanionPosition ?? "",
+            s.CompanionOffsetX,
+            s.CompanionOffsetY,
+            s.CompanionShowBadge,
+            s.CompanionEnableGazeTracking,
+            s.CompanionEmotionState ?? "");
+    }
+
+    private static string ComputeFontSignature()
+    {
+        var s = SettingsService.Instance.Current;
+        return $"{s.CustomFontFamily ?? ""}|{s.CustomFontScale}";
+    }
+
+    private static string ComputeScaleSignature()
+    {
+        return SettingsService.Instance.Current.ScalePercent.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private void ScheduleVisualSettingsApply()
+    {
+        bool changed =
+            !string.Equals(ComputeBackgroundSignature(), _lastBackgroundSignature, StringComparison.Ordinal) ||
+            !string.Equals(ComputeFontSignature(), _lastFontSignature, StringComparison.Ordinal) ||
+            !string.Equals(ComputeScaleSignature(), _lastScaleSignature, StringComparison.Ordinal);
+
+        if (!_isApplyingWorkspacePreset)
+        {
+            ScheduleWorkspaceRebuild();
+        }
+
+        if (!changed) return;
+
+        if (_visualSettingsTimer == null)
+        {
+            _visualSettingsTimer = DispatcherQueue.CreateTimer();
+            _visualSettingsTimer.Interval = TimeSpan.FromMilliseconds(150);
+            _visualSettingsTimer.IsRepeating = false;
+            _visualSettingsTimer.Tick += (_, _) =>
+            {
+                _visualSettingsTimer?.Stop();
+                ApplyVisualSettings();
+            };
+        }
+
+        _visualSettingsTimer.Stop();
+        _visualSettingsTimer.Start();
+    }
+
+    private void ApplyVisualSettings()
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            var s = SettingsService.Instance.Current;
+
+            var backgroundSignature = ComputeBackgroundSignature();
+            if (!string.Equals(backgroundSignature, _lastBackgroundSignature, StringComparison.Ordinal))
+            {
+                _lastBackgroundSignature = backgroundSignature;
+                ApplyBackgroundAndCompanion();
+            }
+
+            var fontSignature = ComputeFontSignature();
+            if (!string.Equals(fontSignature, _lastFontSignature, StringComparison.Ordinal))
+            {
+                _lastFontSignature = fontSignature;
+                ApplyCustomFont();
+            }
+
+            var scaleSignature = ComputeScaleSignature();
+            if (!string.Equals(scaleSignature, _lastScaleSignature, StringComparison.Ordinal))
+            {
+                _lastScaleSignature = scaleSignature;
+                if (s.ScalePercent >= 80 && s.ScalePercent <= 150 &&
+                    Math.Abs(_currentZoom - (s.ScalePercent / 100.0)) > 0.01)
+                {
+                    SetZoom(s.ScalePercent / 100.0);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLogService.Instance.Error("套用視覺設定失敗", ex, "UI");
+        }
+        finally
+        {
+            stopwatch.Stop();
+            if (stopwatch.ElapsedMilliseconds > 500)
+            {
+                DebugLogService.Instance.Warning($"設定套用耗時 {stopwatch.ElapsedMilliseconds} ms（背景/字型/縮放）", "UI");
+            }
+        }
+    }
+
     private void ScheduleWorkspaceRebuild()
     {
         var signature = ComputeWorkspaceSignature();
@@ -833,7 +1001,7 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            return tag switch
+            Page page = tag switch
             {
                 "Starter" => _starterPage ??= new StarterPage(),
                 "EasyMode" => _easyModePage ??= new EasyModePage(),
@@ -851,6 +1019,14 @@ public sealed partial class MainWindow : Window
                 "Settings" => _settingsPage ??= new SettingsPage(),
                 _ => new Page()
             };
+
+            var fontName = SettingsService.Instance.Current.CustomFontFamily;
+            if (string.IsNullOrWhiteSpace(fontName)) fontName = "Segoe UI Variable";
+            var scalePercent = SettingsService.Instance.Current.CustomFontScale > 0 ? SettingsService.Instance.Current.CustomFontScale : 100.0;
+            double scaleFactor = scalePercent / 100.0;
+            FontScaleHelper.ApplyFontAndScale(page, new FontFamily(fontName), scaleFactor);
+
+            return page;
         }
         catch (Exception ex)
         {
@@ -1024,6 +1200,11 @@ public sealed partial class MainWindow : Window
         RightDockSplitter.Visibility = Visibility.Visible;
         RightDockColDef.Width = new GridLength(460);
 
+        var fontName = SettingsService.Instance.Current.CustomFontFamily;
+        if (string.IsNullOrWhiteSpace(fontName)) fontName = "Segoe UI Variable";
+        var scalePercent = SettingsService.Instance.Current.CustomFontScale > 0 ? SettingsService.Instance.Current.CustomFontScale : 100.0;
+        FontScaleHelper.ApplyFontAndScale(page, new FontFamily(fontName), scalePercent / 100.0);
+
         UpdateFloatingManagerUI();
         SaveCustomTabOrder();
         CompanionControl?.AutoDetectAndSnapToEdge(isRightSplitOpen: true, announce: true);
@@ -1080,6 +1261,11 @@ public sealed partial class MainWindow : Window
         BottomDockPanel.Visibility = Visibility.Visible;
         BottomDockSplitter.Visibility = Visibility.Visible;
         BottomDockRowDef.Height = new GridLength(280);
+
+        var fontName = SettingsService.Instance.Current.CustomFontFamily;
+        if (string.IsNullOrWhiteSpace(fontName)) fontName = "Segoe UI Variable";
+        var scalePercent = SettingsService.Instance.Current.CustomFontScale > 0 ? SettingsService.Instance.Current.CustomFontScale : 100.0;
+        FontScaleHelper.ApplyFontAndScale(page, new FontFamily(fontName), scalePercent / 100.0);
 
         UpdateFloatingManagerUI();
         SaveCustomTabOrder();
@@ -2245,6 +2431,16 @@ public sealed partial class MainWindow : Window
         };
         NormalView.KeyboardAccelerators.Add(actionLogViewerAccel);
 
+        // Ctrl+Shift+K for the live console mini-window
+        var liveConsoleAccel = new KeyboardAccelerator { Key = VirtualKey.K, Modifiers = VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift };
+        liveConsoleAccel.Invoked += (s, e) =>
+        {
+            DebugLogService.Instance.LogAction("快捷鍵 (Shortcut)", "使用者按下 Ctrl+Shift+K 切換即時主控台");
+            LiveConsoleWindow.Toggle();
+            e.Handled = true;
+        };
+        NormalView.KeyboardAccelerators.Add(liveConsoleAccel);
+
         // Global & per-page Ctrl+Z (Undo) and Ctrl+X (Cut) support across all 14 pages
         UndoCutManager.Attach(NormalView, () => ContentFrame.Content as Page);
 
@@ -2417,6 +2613,12 @@ public sealed partial class MainWindow : Window
 
             DetachPageFromAllHosts(page);
             ContentFrame.Content = page;
+
+            var fontName = SettingsService.Instance.Current.CustomFontFamily;
+            if (string.IsNullOrWhiteSpace(fontName)) fontName = "Segoe UI Variable";
+            var scalePercent = SettingsService.Instance.Current.CustomFontScale > 0 ? SettingsService.Instance.Current.CustomFontScale : 100.0;
+            FontScaleHelper.ApplyFontAndScale(page, new FontFamily(fontName), scalePercent / 100.0);
+
             UpdateViewportLayout();
 
             sw.Stop();
@@ -2471,41 +2673,71 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private bool _isUpdatingLayout = false;
+
     public void UpdateViewportLayout()
     {
-        if (ContentScrollViewer == null || ContentRoot == null) return;
-        var viewportW = ContentScrollViewer.ActualWidth;
-        var viewportH = ContentScrollViewer.ActualHeight;
-        if (viewportW <= 0) return;
-
-        var contentH = ContentFrame?.ActualHeight ?? ContentRoot.ActualHeight;
-        var (layoutW, offsetX, bottomMargin, factor) = DisplayHelper.CalculateScaledViewportLayout(
-            viewportW, viewportH, contentH, _currentZoom);
-
-        ContentRoot.Width = layoutW;
-        RootScaleTransform.ScaleX = factor;
-        RootScaleTransform.ScaleY = factor;
-
-        if (_currentNavigatedTag == "EasyMode" && viewportH > 0)
+        if (_isUpdatingLayout) return;
+        _isUpdatingLayout = true;
+        try
         {
-            ContentScrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
-            var layoutH = Math.Max(520, (viewportH - 4) / factor);
-            ContentRoot.Height = layoutH;
-            ContentRoot.Margin = new Thickness(offsetX, 0, 0, 0);
-        }
-        else
-        {
-            ContentScrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
-            ContentRoot.ClearValue(FrameworkElement.HeightProperty);
-            ContentRoot.Margin = new Thickness(offsetX, 0, 0, bottomMargin);
-        }
+            if (ContentScrollViewer == null || ContentRoot == null) return;
+            var viewportW = ContentScrollViewer.ActualWidth;
+            var viewportH = ContentScrollViewer.ActualHeight;
+            if (viewportW <= 0) return;
 
-        if (ContentScrollViewer.HorizontalOffset != 0)
-        {
-            ContentScrollViewer.ChangeView(0, null, null, disableAnimation: true);
-        }
+            var contentH = ContentFrame?.ActualHeight ?? ContentRoot.ActualHeight;
+            var (layoutW, offsetX, bottomMargin, factor) = DisplayHelper.CalculateScaledViewportLayout(
+                viewportW, viewportH, contentH, _currentZoom);
 
-        CompanionControl?.AutoDetectAndSnapToEdge(IsRightDockOpen, announce: false);
+            if (Math.Abs(ContentRoot.Width - layoutW) > 0.1)
+            {
+                ContentRoot.Width = layoutW;
+            }
+            ContentRoot.MaxWidth = layoutW;
+            if (ContentFrame != null)
+            {
+                ContentFrame.Width = layoutW;
+                ContentFrame.MaxWidth = layoutW;
+            }
+            if (Math.Abs(RootScaleTransform.ScaleX - factor) > 0.001)
+            {
+                RootScaleTransform.ScaleX = factor;
+                RootScaleTransform.ScaleY = factor;
+            }
+
+            if (_currentNavigatedTag == "EasyMode" && viewportH > 0)
+            {
+                if (ContentScrollViewer.VerticalScrollBarVisibility != ScrollBarVisibility.Disabled)
+                    ContentScrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
+                var layoutH = Math.Max(520, (viewportH - 4) / factor);
+                if (Math.Abs(ContentRoot.Height - layoutH) > 0.1)
+                    ContentRoot.Height = layoutH;
+                var newMargin = new Thickness(offsetX, 0, 0, 0);
+                if (ContentRoot.Margin != newMargin)
+                    ContentRoot.Margin = newMargin;
+            }
+            else
+            {
+                if (ContentScrollViewer.VerticalScrollBarVisibility != ScrollBarVisibility.Auto)
+                    ContentScrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+                ContentRoot.ClearValue(FrameworkElement.HeightProperty);
+                var newMargin = new Thickness(offsetX, 0, 0, bottomMargin);
+                if (ContentRoot.Margin != newMargin)
+                    ContentRoot.Margin = newMargin;
+            }
+
+            if (ContentScrollViewer.HorizontalOffset != 0)
+            {
+                ContentScrollViewer.ChangeView(0, null, null, disableAnimation: true);
+            }
+
+            CompanionControl?.AutoDetectAndSnapToEdge(IsRightDockOpen, announce: false);
+        }
+        finally
+        {
+            _isUpdatingLayout = false;
+        }
     }
 
     private void ContentScrollViewer_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)

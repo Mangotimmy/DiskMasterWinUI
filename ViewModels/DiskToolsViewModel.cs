@@ -85,6 +85,8 @@ public partial class DiskToolsViewModel : ObservableObject
     [ObservableProperty] private string _chkdskDrive = "C:";
     [ObservableProperty] private bool _isChkdskRunning;
     private CancellationTokenSource? _chkdskCts;
+    private int _isRefreshingAll;
+    private int _isHealthRefreshing;
 
     public ObservableCollection<DiskHealthInfo> DiskHealthItems { get; } = new();
     public ObservableCollection<DiskReliabilityInfo> ReliabilityItems { get; } = new();
@@ -177,24 +179,40 @@ public partial class DiskToolsViewModel : ObservableObject
     [RelayCommand]
     public async Task RefreshAllAsync()
     {
+        // A stuck WMI/IOCTL query used to leave the page spinning forever. A second click
+        // would start another query while the first was still blocked; ignore it.
+        if (Interlocked.CompareExchange(ref _isRefreshingAll, 1, 0) != 0) return;
+
         IsLoading = true;
         try
         {
             StatusMessage = "Refreshing license, environment, and S.M.A.R.T. health in parallel...";
+            AppendLog("[REFRESH] Starting bounded hardware refresh (20s deadline)...");
             var licenseTask = LoadLicenseInfoAsync();
             var envTask = CheckEnvironmentAsync();
             var healthTask = RefreshDiskHealthAsync();
 
-            await Task.WhenAll(licenseTask, envTask, healthTask);
-            StatusMessage = "All tool diagnostics and health metrics refreshed.";
+            try
+            {
+                await Task.WhenAll(licenseTask, envTask, healthTask).WaitAsync(TimeSpan.FromSeconds(20));
+                StatusMessage = "All tool diagnostics and health metrics refreshed.";
+            }
+            catch (TimeoutException)
+            {
+                StatusMessage = "部分硬體查詢逾時，已顯示可用資訊 (Hardware query timed out; showing available data).";
+                AppendLog("[TIMEOUT] Hardware refresh exceeded 20s; a WMI/IOCTL provider may be slow.");
+                DebugLogService.Instance.Warning("Hardware refresh exceeded 20s deadline", "DiskTools");
+            }
         }
         catch (Exception ex)
         {
             StatusMessage = $"Refresh Error: {ex.Message}";
+            AppendLog($"[ERROR] Refresh failed: {ex.Message}");
         }
         finally
         {
             IsLoading = false;
+            Interlocked.Exchange(ref _isRefreshingAll, 0);
         }
     }
 
@@ -205,7 +223,7 @@ public partial class DiskToolsViewModel : ObservableObject
         {
             IsLoading = true;
             StatusMessage = "Reading Windows license keys & BIOS hardware serials...";
-            LicenseInfo = await _keyReader.GetLicenseInfoAsync();
+            LicenseInfo = await _keyReader.GetLicenseInfoAsync().WaitAsync(TimeSpan.FromSeconds(6));
             StatusMessage = "License & Hardware information retrieved.";
         }
         catch (Exception ex)
@@ -258,7 +276,7 @@ public partial class DiskToolsViewModel : ObservableObject
         {
             IsLoading = true;
             StatusMessage = "Checking system environment, CLI tools, and PATH variables...";
-            var items = await _envService.CheckAllToolsAsync();
+            var items = await _envService.CheckAllToolsAsync().WaitAsync(TimeSpan.FromSeconds(6));
 
             ToolItems.Clear();
             foreach (var item in items) ToolItems.Add(item);
@@ -306,7 +324,7 @@ public partial class DiskToolsViewModel : ObservableObject
             var scopeCode = ParseScopeCode(EnvScopeFilter);
             var varsTask = _envService.GetEnvironmentVariablesAsync(scopeCode);
             var pathsTask = _envService.GetPathDirectoriesAsync(scopeCode == "Process" ? "All" : scopeCode);
-            await Task.WhenAll(varsTask, pathsTask);
+            await Task.WhenAll(varsTask, pathsTask).WaitAsync(TimeSpan.FromSeconds(6));
 
             AllEnvVariables.Clear();
             foreach (var v in varsTask.Result) AllEnvVariables.Add(v);
@@ -566,6 +584,32 @@ public partial class DiskToolsViewModel : ObservableObject
             });
         }
         catch { }
+    }
+
+    [RelayCommand]
+    public async Task AddToUserPathAsync(string? folderPath)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath)) return;
+        var (ok, msg) = await _envService.AddPathDirectoryAsync(folderPath, EnvironmentVariableTarget.User);
+        AppendLog($"[PATH] {msg}");
+        StatusMessage = msg;
+        if (ok)
+        {
+            await LoadEnvironmentTablesAsync();
+        }
+    }
+
+    [RelayCommand]
+    public async Task AddToSystemPathAsync(string? folderPath)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath)) return;
+        var (ok, msg) = await _envService.AddPathDirectoryAsync(folderPath, EnvironmentVariableTarget.Machine);
+        AppendLog($"[PATH] {msg}");
+        StatusMessage = msg;
+        if (ok)
+        {
+            await LoadEnvironmentTablesAsync();
+        }
     }
 
     [RelayCommand]
@@ -1073,19 +1117,46 @@ public partial class DiskToolsViewModel : ObservableObject
     [RelayCommand]
     public async Task RefreshDiskHealthAsync()
     {
+        if (Interlocked.CompareExchange(ref _isHealthRefreshing, 1, 0) != 0) return;
         try
         {
             IsHealthLoading = true;
             StatusMessage = "Querying S.M.A.R.T. disk health...";
             AppendLog("▸ Get-PhysicalDisk (S.M.A.R.T. Health Query)...");
 
-            var disks = await _healthMonitor.GetDiskHealthAsync();
-            DiskHealthItems.Clear();
-            foreach (var d in disks) DiskHealthItems.Add(d);
+            List<DiskHealthInfo>? disks = null;
+            try
+            {
+                disks = await _healthMonitor.GetDiskHealthAsync().WaitAsync(TimeSpan.FromSeconds(10));
+            }
+            catch (TimeoutException)
+            {
+                AppendLog("[TIMEOUT] Storage WMI did not return within 10s; keeping the previous disk list.");
+                DebugLogService.Instance.Warning("GetDiskHealthAsync timed out after 10s", "DiskTools");
+            }
 
-            var reliability = await _healthMonitor.GetReliabilityCountersAsync();
-            ReliabilityItems.Clear();
-            foreach (var r in reliability) ReliabilityItems.Add(r);
+            if (disks != null)
+            {
+                DiskHealthItems.Clear();
+                foreach (var d in disks) DiskHealthItems.Add(d);
+            }
+
+            List<DiskReliabilityInfo>? reliability = null;
+            try
+            {
+                reliability = await _healthMonitor.GetReliabilityCountersAsync().WaitAsync(TimeSpan.FromSeconds(8));
+            }
+            catch (TimeoutException)
+            {
+                AppendLog("[TIMEOUT] Reliability counters did not return within 8s; keeping previous counters.");
+                DebugLogService.Instance.Warning("GetReliabilityCountersAsync timed out after 8s", "DiskTools");
+            }
+
+            if (reliability != null)
+            {
+                ReliabilityItems.Clear();
+                foreach (var r in reliability) ReliabilityItems.Add(r);
+            }
 
             // Auto-select first disk if none selected
             if (DiskHealthItems.Count > 0 && SelectedDiskHealth == null)
@@ -1095,18 +1166,34 @@ public partial class DiskToolsViewModel : ObservableObject
 
             if (SelectedDiskHealth != null)
             {
-                await LoadDiskSmartDetailsAsync(SelectedDiskHealth);
+                try
+                {
+                    await LoadDiskSmartDetailsAsync(SelectedDiskHealth).WaitAsync(TimeSpan.FromSeconds(8));
+                }
+                catch (TimeoutException)
+                {
+                    IsFullSmartLoading = false;
+                    AppendLog("[TIMEOUT] S.M.A.R.T. detail query did not return within 8s.");
+                    DebugLogService.Instance.Warning("LoadDiskSmartDetailsAsync timed out after 8s", "DiskTools");
+                }
             }
 
-            AppendLog($"Found {disks.Count} disk(s), {reliability.Count} reliability counter(s).");
-            StatusMessage = $"S.M.A.R.T. health: {disks.Count} disk(s) detected.";
+            AppendLog($"Found {DiskHealthItems.Count} disk(s), {ReliabilityItems.Count} reliability counter(s).");
+            StatusMessage = disks == null
+                ? "S.M.A.R.T. 查詢逾時，已保留上次資料 (Query timed out; previous data kept)."
+                : $"S.M.A.R.T. health: {disks.Count} disk(s) detected.";
         }
         catch (Exception ex)
         {
             StatusMessage = $"SMART Error: {ex.Message}";
             AppendLog($"ERROR: {ex.Message}");
+            DebugLogService.Instance.Error("S.M.A.R.T. refresh failed", ex, "DiskTools");
         }
-        finally { IsHealthLoading = false; }
+        finally
+        {
+            IsHealthLoading = false;
+            Interlocked.Exchange(ref _isHealthRefreshing, 0);
+        }
     }
 
     [RelayCommand]
@@ -1126,7 +1213,8 @@ public partial class DiskToolsViewModel : ObservableObject
 
             if (disk.BusType.Equals("NVMe", StringComparison.OrdinalIgnoreCase) || disk.FriendlyName.Contains("NVMe", StringComparison.OrdinalIgnoreCase) || disk.MediaType == "SSD")
             {
-                var nvme = await _smartReader.GetNvmeHealthAsync(disk.DeviceId, disk.FriendlyName, disk.SizeBytes);
+                var nvme = await _smartReader.GetNvmeHealthAsync(disk.DeviceId, disk.FriendlyName, disk.SizeBytes)
+                    .WaitAsync(TimeSpan.FromSeconds(3));
                 if (nvme != null)
                 {
                     nvme.IsFahrenheit = IsFahrenheit;
@@ -1144,7 +1232,8 @@ public partial class DiskToolsViewModel : ObservableObject
             }
 
             // ATA SMART query
-            var attrs = await _smartReader.GetAtaSmartAttributesAsync(disk.DeviceId);
+            var attrs = await _smartReader.GetAtaSmartAttributesAsync(disk.DeviceId)
+                .WaitAsync(TimeSpan.FromSeconds(3));
             AtaSmartAttributes.Clear();
             foreach (var a in attrs)
             {
@@ -1162,7 +1251,7 @@ public partial class DiskToolsViewModel : ObservableObject
             else
             {
                 // Fallback: If neither NVMe log nor ATA attributes were returned, construct a friendly overview
-                var (hwTemp, warn, crit, _) = _smartReader.GetStorageTemperature(disk.DeviceId);
+                var (hwTemp, warn, crit, _) = await _smartReader.GetStorageTemperatureAsync(disk.DeviceId);
                 if (hwTemp.HasValue && hwTemp.Value > 0)
                 {
                     disk.TemperatureCelsius = hwTemp.Value;
@@ -1340,7 +1429,7 @@ public partial class DiskToolsViewModel : ObservableObject
         {
             IsHealthLoading = true;
             StatusMessage = "Querying WMI S.M.A.R.T. failure prediction...";
-            var raw = await _healthMonitor.GetSmartPredictionRawAsync();
+            var raw = await _healthMonitor.GetSmartPredictionRawAsync().WaitAsync(TimeSpan.FromSeconds(10));
             AppendLog("═══ S.M.A.R.T. Failure Prediction ═══");
             AppendLog(raw);
             StatusMessage = "S.M.A.R.T. prediction query complete.";
@@ -1355,71 +1444,96 @@ public partial class DiskToolsViewModel : ObservableObject
     // ── chkdsk ──
 
     [RelayCommand]
-    public async Task ChkdskScanAsync()
-    {
-        if (IsChkdskRunning) return;
-        try
-        {
-            IsChkdskRunning = true;
-            StatusMessage = $"chkdsk {ChkdskDrive} /scan...";
-            StatusBarViewModel.Instance.StartOperation($"chkdsk {ChkdskDrive} /scan", CancelChkdsk);
-            _chkdskCts = new CancellationTokenSource();
-            await _chkdsk.ScanAsync(ChkdskDrive, AppendLog, _chkdskCts.Token);
-            StatusMessage = "chkdsk /scan complete.";
-            StatusBarViewModel.Instance.CompleteOperation("chkdsk /scan complete.");
-        }
-        finally { IsChkdskRunning = false; }
-    }
+    public Task ChkdskScanAsync() => RunChkdskAsync(
+        $"chkdsk {ChkdskDrive} /scan",
+        "chkdsk /scan complete.",
+        ChkdskMode.Scan,
+        (onLine, ct) => _chkdsk.ScanAsync(ChkdskDrive, onLine, ct));
 
     [RelayCommand]
-    public async Task ChkdskSpotFixAsync()
-    {
-        if (IsChkdskRunning) return;
-        try
-        {
-            IsChkdskRunning = true;
-            StatusMessage = $"chkdsk {ChkdskDrive} /spotfix...";
-            StatusBarViewModel.Instance.StartOperation($"chkdsk {ChkdskDrive} /spotfix", CancelChkdsk);
-            _chkdskCts = new CancellationTokenSource();
-            await _chkdsk.SpotFixAsync(ChkdskDrive, AppendLog, _chkdskCts.Token);
-            StatusMessage = "chkdsk /spotfix complete.";
-            StatusBarViewModel.Instance.CompleteOperation("chkdsk /spotfix complete.");
-        }
-        finally { IsChkdskRunning = false; }
-    }
+    public Task ChkdskSpotFixAsync() => RunChkdskAsync(
+        $"chkdsk {ChkdskDrive} /spotfix",
+        "chkdsk /spotfix complete.",
+        ChkdskMode.SpotFix,
+        (onLine, ct) => _chkdsk.SpotFixAsync(ChkdskDrive, onLine, ct));
 
     [RelayCommand]
-    public async Task ChkdskFixAsync()
-    {
-        if (IsChkdskRunning) return;
-        try
-        {
-            IsChkdskRunning = true;
-            StatusMessage = $"chkdsk {ChkdskDrive} /f...";
-            StatusBarViewModel.Instance.StartOperation($"chkdsk {ChkdskDrive} /f", CancelChkdsk);
-            _chkdskCts = new CancellationTokenSource();
-            await _chkdsk.FixAsync(ChkdskDrive, AppendLog, _chkdskCts.Token);
-            StatusMessage = "chkdsk /f complete.";
-            StatusBarViewModel.Instance.CompleteOperation("chkdsk /f complete.");
-        }
-        finally { IsChkdskRunning = false; }
-    }
+    public Task ChkdskFixAsync() => RunChkdskAsync(
+        $"chkdsk {ChkdskDrive} /f",
+        "chkdsk /f complete.",
+        ChkdskMode.Fix,
+        (onLine, ct) => _chkdsk.FixAsync(ChkdskDrive, onLine, ct));
 
     [RelayCommand]
-    public async Task ChkdskFullRepairAsync()
+    public Task ChkdskFullRepairAsync() => RunChkdskAsync(
+        $"chkdsk {ChkdskDrive} /f /r /x",
+        "chkdsk full repair complete.",
+        ChkdskMode.FullRepair,
+        (onLine, ct) => _chkdsk.FixAndRecoverAsync(ChkdskDrive, onLine, ct));
+
+    /// <summary>
+    /// Runs a chkdsk mode with a live page log, ETA input and a completion notification.
+    /// Output reaches both the page buffer and the global tracker/live console.
+    /// </summary>
+    private async Task RunChkdskAsync(
+        string title,
+        string completeMessage,
+        ChkdskMode mode,
+        Func<Action<string>, CancellationToken, Task<int>> execute)
     {
         if (IsChkdskRunning) return;
+
         try
         {
             IsChkdskRunning = true;
-            StatusMessage = $"chkdsk {ChkdskDrive} /f /r /x (deep repair)...";
-            StatusBarViewModel.Instance.StartOperation($"chkdsk {ChkdskDrive} /f /r /x", CancelChkdsk);
+            StatusMessage = $"{title}...";
+            var estimate = ChkdskEtaEstimator.Estimate(ChkdskDrive, mode);
+            StatusBarViewModel.Instance.StartOperation(title, CancelChkdsk, estimate);
             _chkdskCts = new CancellationTokenSource();
-            await _chkdsk.FixAndRecoverAsync(ChkdskDrive, AppendLog, _chkdskCts.Token);
-            StatusMessage = "chkdsk /f /r /x complete.";
-            StatusBarViewModel.Instance.CompleteOperation("chkdsk full repair complete.");
+            var stopwatch = Stopwatch.StartNew();
+            int exitCode = await execute(AppendChkdskOutput, _chkdskCts.Token);
+            stopwatch.Stop();
+
+            bool cancelled = _chkdskCts.IsCancellationRequested;
+            if (cancelled)
+            {
+                StatusMessage = $"{title} cancelled.";
+                AppendLog($"[INFO] {title} cancelled.");
+                StatusBarViewModel.Instance.CompleteOperation($"{title} cancelled.", success: false, notify: false);
+            }
+            else if (exitCode == 0)
+            {
+                ChkdskEtaEstimator.RecordActual(ChkdskDrive, mode, stopwatch.Elapsed);
+                StatusMessage = completeMessage;
+                StatusBarViewModel.Instance.CompleteOperation(completeMessage, success: true, notify: true);
+            }
+            else
+            {
+                StatusMessage = $"{title} failed (exit code {exitCode}).";
+                AppendLog($"[ERROR] {title} failed with exit code {exitCode}.");
+                StatusBarViewModel.Instance.CompleteOperation(
+                    $"{title} failed (exit code {exitCode}).", success: false, notify: true);
+            }
         }
-        finally { IsChkdskRunning = false; }
+        catch (Exception ex)
+        {
+            StatusMessage = $"{title} error: {ex.Message}";
+            AppendLog($"[ERROR] {title}: {ex.Message}");
+            DebugLogService.Instance.Error($"{title} failed", ex, "Chkdsk");
+            StatusBarViewModel.Instance.CompleteOperation($"{title} failed.", success: false, notify: true);
+        }
+        finally
+        {
+            IsChkdskRunning = false;
+            _chkdskCts?.Dispose();
+            _chkdskCts = null;
+        }
+    }
+
+    private void AppendChkdskOutput(string line)
+    {
+        AppendLog(line);
+        StatusBarViewModel.Instance.ProcessOutputLine(line);
     }
 
     [RelayCommand]

@@ -43,14 +43,15 @@
 
         <!-- Movable Sub TabView -->
         <TabView x:Name="OptimizerTabView" Grid.Row="1"
+                 TabWidthMode="SizeToContent"
                  CanReorderTabs="True" CanDragTabs="True"
                  IsAddTabButtonVisible="False"
                  SelectionChanged="OptimizerTabView_SelectionChanged">
             <TabView.TabItems>
 
                 <!-- ════ Tab 1: 電競遊戲模式 (Gaming Mode) ════ -->
-                <TabViewItem x:Name="TabGaming" Header="🎮 電競遊戲模式 (Gaming Mode)" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                <TabViewItem x:Name="TabGaming" Header="🎮 電競遊戲 (Gaming Mode)" IsClosable="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                         <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Hero Master Card -->
@@ -67,8 +68,8 @@
                                               Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
                                     <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
                                         <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <TextBlock x:Name="HeroTitle" Text="電競遊戲極致模式 (Ultra Gaming Mode)" FontWeight="Bold" FontSize="18" />
-                                            <Border Background="{ThemeResource AccentFillColorTertiaryBrush}" CornerRadius="4" Padding="6,2">
+                                            <TextBlock x:Name="HeroTitle" Text="電競遊戲極致模式 (Ultra Gaming Mode)" FontWeight="Bold" FontSize="18" TextWrapping="Wrap" />
+                                            <Border Background="{ThemeResource AccentFillColorTertiaryBrush}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
                                                 <TextBlock Text="FPSHEAVEN &amp; MMCSS" FontSize="11" FontWeight="SemiBold" />
                                             </Border>
                                         </StackPanel>
@@ -160,13 +161,105 @@
                                     </StackPanel>
                                 </Border>
                             </Grid>
+
+                            <!-- Card 3: Khronos Vulkan Layer Optimizer & Pure Zero-Overlay Gaming Mode (/boost) -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon Grid.Column="0" Glyph="&#xE790;" FontSize="24" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="🎮 Khronos Vulkan 圖形層深度診斷、防閃退清理與零延遲電競模式" FontWeight="Bold" FontSize="15" />
+                                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,2">
+                                                    <TextBlock Text="{x:Bind ViewModel.VulkanStatusSummary, Mode=OneWay}" FontSize="11" FontWeight="SemiBold"
+                                                               Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock Text="深度掃描 64 位元與 32 位元 (WOW6432Node) Vulkan ExplicitLayers 與 ImplicitLayers 登錄檔。一鍵清除解除安裝後殘留的「幽靈圖形層」(修復 VK_ERROR_LAYER_NOT_PRESENT 遊戲啟動閃退)，或啟用「純淨 Vulkan 零延遲模式」阻斷所有第三方覆蓋層 (Discord/OBS/Steam/EOS/RTSS) 對畫面呈遞的攔截，確保 1% low FPS 穩定流暢。"
+                                                       Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Content="🧹 清除幽靈殘留圖形層" Command="{x:Bind ViewModel.PurgeOrphanedVulkanLayersCommand}"
+                                                Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center" />
+                                        <Button Grid.Column="3" Content="🔄 重新整理" Command="{x:Bind ViewModel.RefreshVulkanLayersCommand}" VerticalAlignment="Center" />
+                                    </Grid>
+
+                                    <!-- Pure Vulkan Zero-Overlay Mode Banner -->
+                                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12,10">
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Grid.Column="0" Glyph="&#xE7FC;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="🚀 純淨 Vulkan 電競零延遲模式 (VK_LOADER_LAYERS_DISABLE = ~implicit~)" FontWeight="SemiBold" />
+                                                <TextBlock Text="將強制 Vulkan 載入器 (vulkan-1.dll) 繞過所有第三方全域隱式覆蓋層 (Steam/Discord/OBS/RTSS)，保留硬體顯卡驅動與遊戲原廠功能，杜絕微卡頓 (Micro-stuttering) 與記憶體掛勾衝突。"
+                                                           Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <ToggleSwitch Grid.Column="2" IsOn="{x:Bind ViewModel.IsPureVulkanMode, Mode=OneWay}"
+                                                          OnContent="零延遲純淨已啟用" OffContent="第三方覆蓋層已允許"
+                                                          Toggled="PureVulkanMode_Toggled" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Registered Vulkan Layers List -->
+                                    <Expander Header="📋 檢視本機已註冊之 Vulkan 圖形層清單 (64-bit / 32-bit WOW6432Node / Explicit &amp; Implicit)"
+                                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                                        <ListView ItemsSource="{x:Bind ViewModel.VulkanLayers, Mode=OneWay}" SelectionMode="None" MaxHeight="260"
+                                                  HorizontalAlignment="Stretch"
+                                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                  ScrollViewer.HorizontalScrollMode="Disabled">
+                                            <ListView.ItemContainerStyle>
+                                                <Style TargetType="ListViewItem">
+                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                </Style>
+                                            </ListView.ItemContainerStyle>
+                                            <ListView.ItemTemplate>
+                                                <DataTemplate x:DataType="models:VulkanLayerItem">
+                                                    <Grid Padding="4,6" ColumnSpacing="12" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" HorizontalAlignment="Stretch">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                                                            <TextBlock Text="{x:Bind HiveName}" FontSize="11" FontFamily="Consolas" />
+                                                        </Border>
+                                                        <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                                                            <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" FontSize="13" />
+                                                            <TextBlock Text="{x:Bind Description}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{x:Bind ManifestPath}" FontSize="10" FontFamily="Consolas" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                        </StackPanel>
+                                                        <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                                                            <TextBlock Text="{x:Bind TypeBadge}" FontSize="11" />
+                                                        </Border>
+                                                        <Border Grid.Column="3" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="8,3" VerticalAlignment="Center">
+                                                            <TextBlock Text="{x:Bind StatusBadge}" FontSize="11" FontWeight="SemiBold" />
+                                                        </Border>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ListView.ItemTemplate>
+                                        </ListView>
+                                    </Expander>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </ScrollViewer>
                 </TabViewItem>
 
                 <!-- ════ Tab 2: CPU排程與工作優先權 (CPU & Task Priority) ════ -->
-                <TabViewItem x:Name="TabCpu" Header="⚡ CPU與排程優先權 (CPU &amp; Task)" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                <TabViewItem x:Name="TabCpu" Header="⚡ CPU與排程 (CPU &amp; Task)" IsClosable="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                         <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Win32PrioritySeparation Card -->
@@ -308,10 +401,18 @@
                                             </Grid>
 
                                             <ListView ItemsSource="{x:Bind ViewModel.PersistedPriorityRules, Mode=OneWay}"
-                                                      SelectionMode="None" MaxHeight="200">
+                                                      SelectionMode="None" MaxHeight="200"
+                                                      HorizontalAlignment="Stretch"
+                                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                      ScrollViewer.HorizontalScrollMode="Disabled">
+                                                <ListView.ItemContainerStyle>
+                                                    <Style TargetType="ListViewItem">
+                                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                    </Style>
+                                                </ListView.ItemContainerStyle>
                                                 <ListView.ItemTemplate>
                                                     <DataTemplate x:DataType="models:PersistedPriorityRuleItem">
-                                                        <Grid Padding="4,6" ColumnSpacing="12">
+                                                        <Grid Padding="4,6" ColumnSpacing="12" HorizontalAlignment="Stretch">
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="Auto" />
                                                                 <ColumnDefinition Width="2*" />
@@ -645,8 +746,8 @@
                 </TabViewItem>
 
                 <!-- ════ Tab 3: 電源計畫與核心喚醒 (Power Plans & Core Unparking) ════ -->
-                <TabViewItem x:Name="TabPower" Header="🔋 電源計畫與核心喚醒 (Power Plans)" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                <TabViewItem x:Name="TabPower" Header="🔋 電源計畫 (Power Plans)" IsClosable="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                         <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Unlock & Quick Toggles -->
@@ -711,10 +812,18 @@
                                     <TextBlock x:Name="InstalledPlansTitle" Text="現存電源計畫清單 (Installed Schemes)" FontWeight="SemiBold" />
                                     <ListView ItemsSource="{x:Bind ViewModel.PowerPlans, Mode=OneWay}"
                                               SelectedItem="{x:Bind ViewModel.SelectedPowerPlan, Mode=TwoWay}"
-                                              SelectionMode="Single" MaxHeight="220">
+                                              SelectionMode="Single" MaxHeight="220"
+                                              HorizontalAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                              ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="models:PowerPlanItem">
-                                                <Grid Padding="4,6" ColumnSpacing="12">
+                                                <Grid Padding="4,6" ColumnSpacing="12" HorizontalAlignment="Stretch">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto" />
                                                         <ColumnDefinition Width="*" />
@@ -891,10 +1000,18 @@
 
                                     <ProgressBar IsIndeterminate="True" Visibility="{x:Bind ViewModel.IsLoadingWakeDevices, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
 
-                                    <ListView ItemsSource="{x:Bind ViewModel.WakeDevices, Mode=OneWay}" SelectionMode="None" MaxHeight="240">
+                                    <ListView ItemsSource="{x:Bind ViewModel.WakeDevices, Mode=OneWay}" SelectionMode="None" MaxHeight="240"
+                                              HorizontalAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                              ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="models:PowerWakeDeviceItem">
-                                                <Grid Padding="6,6" ColumnSpacing="12">
+                                                <Grid Padding="6,6" ColumnSpacing="12" HorizontalAlignment="Stretch">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto" />
                                                         <ColumnDefinition Width="*" />
@@ -960,10 +1077,18 @@
 
                                     <!-- 3. Blockers List (When Blockers detected) -->
                                     <ListView ItemsSource="{x:Bind ViewModel.SleepBlockers, Mode=OneWay}" SelectionMode="None" MaxHeight="160"
-                                              Visibility="{x:Bind ViewModel.HasSleepBlockers, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                              Visibility="{x:Bind ViewModel.HasSleepBlockers, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                              HorizontalAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                              ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="models:SleepBlockerItem">
-                                                <Grid Padding="4,4" ColumnSpacing="10">
+                                                <Grid Padding="4,4" ColumnSpacing="10" HorizontalAlignment="Stretch">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto" />
                                                         <ColumnDefinition Width="*" />
@@ -984,8 +1109,8 @@
                 </TabViewItem>
 
                 <!-- ════ Tab 3.5: 檔案總管、右鍵選單與圖示自訂 (Explorer, Context Menu & Icons) ════ -->
-                <TabViewItem x:Name="TabExplorerShell" Header="🗂️ 檔案總管、右鍵與圖示 (Explorer &amp; Icons)" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                <TabViewItem x:Name="TabExplorerShell" Header="🗂️ 檔案總管與圖示 (Explorer &amp; Icons)" IsClosable="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                         <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Card 1 (Item 14 & Item 13): Explorer.exe Auto-Recovery Watchdog & Icon Cache Reset -->
@@ -1003,16 +1128,16 @@
                                         <FontIcon Grid.Column="0" Glyph="&#xEC50;" FontSize="24" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
                                         <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <TextBlock x:Name="WatchdogCardTitle" Text="🛡️ Explorer.exe 檔案總管背景自動守護與救援服務 (Auto-Recovery Watchdog)" FontWeight="Bold" FontSize="15" />
-                                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="8,2">
+                                                <TextBlock x:Name="WatchdogCardTitle" Text="🛡️ Explorer.exe 檔案總管背景自動守護與救援服務" FontWeight="Bold" FontSize="15" TextWrapping="Wrap" />
+                                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="8,2" VerticalAlignment="Center">
                                                     <TextBlock Text="{x:Bind ViewModel.ExplorerWatchdogStatusBadge, Mode=OneWay}" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
                                                 </Border>
                                             </StackPanel>
                                             <TextBlock x:Name="WatchdogCardDesc" Text="當 Windows 檔案總管 (explorer.exe) 因外掛衝突崩潰、無回應或被意外終止導致黑畫面與工作列消失時，背景守護服務將自動偵測並秒速重啟恢復桌面。"
                                                        Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                                            <TextBlock Text="{x:Bind ViewModel.ExplorerWatchdogRecoverySummary, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock Text="{x:Bind ViewModel.ExplorerWatchdogRecoverySummary, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                         </StackPanel>
-                                        <Button Grid.Column="2" Content="🔄 手動重啟檔案總管" Command="{x:Bind ViewModel.RestartExplorerManuallyCommand}" VerticalAlignment="Center" />
+                                        <Button Grid.Column="2" Content="🔄 手動重啟總管" Command="{x:Bind ViewModel.RestartExplorerManuallyCommand}" VerticalAlignment="Center" ToolTipService.ToolTip="手動重啟檔案總管 (explorer.exe)" />
                                         <ToggleSwitch Grid.Column="3" IsOn="{x:Bind ViewModel.IsExplorerWatchdogEnabled, Mode=OneWay}"
                                                       OnContent="自動救援開啟" OffContent="已暫停"
                                                       Toggled="ExplorerWatchdog_Toggled" VerticalAlignment="Center" />
@@ -1028,18 +1153,199 @@
                                             </Grid.ColumnDefinitions>
                                             <FontIcon Grid.Column="0" Glyph="&#xEB9F;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
                                             <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                                                <TextBlock Text="🖼️ 重設與重建檔案總管圖示快取 (Reset Icon &amp; Thumbnail Cache)" FontWeight="SemiBold" />
+                                                <TextBlock Text="🖼️ 重設與重建檔案總管圖示快取 (Reset Icon &amp; Thumbnail Cache)" FontWeight="SemiBold" TextWrapping="Wrap" />
                                                 <TextBlock Text="修復桌面白紙圖示、破圖或自訂圖示未更新。提供「免重啟即時刷新 (ie4uinit -show)」與「徹底清除 IconCache.db 重建」雙模式。"
                                                            Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                                 <TextBlock Text="{x:Bind ViewModel.IconCacheStatus, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                                                           Visibility="{x:Bind ViewModel.IconCacheStatus, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}" />
+                                                           Visibility="{x:Bind ViewModel.IconCacheStatus, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}" TextWrapping="Wrap" />
                                             </StackPanel>
-                                            <Button Grid.Column="2" Content="⚡ 免重啟刷新圖示" Command="{x:Bind ViewModel.QuickRefreshShellIconsCommand}" VerticalAlignment="Center" />
-                                            <Button Grid.Column="3" Content="🧹 徹底清除重建圖示快取" Command="{x:Bind ViewModel.RebuildIconCacheCommand}"
+                                            <Button Grid.Column="2" Content="⚡ 免重啟刷新" Command="{x:Bind ViewModel.QuickRefreshShellIconsCommand}" VerticalAlignment="Center" ToolTipService.ToolTip="免重啟即時刷新圖示 (ie4uinit -show)" />
+                                            <Button Grid.Column="3" Content="🧹 徹底重建快取" Command="{x:Bind ViewModel.RebuildIconCacheCommand}"
                                                     IsEnabled="{x:Bind ViewModel.IsRebuildingIconCache, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}"
-                                                    Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center" />
+                                                    Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center" ToolTipService.ToolTip="徹底清除 IconCache.db 重建" />
                                         </Grid>
                                     </Border>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Card 1.5: Explorer Advanced Zero Delay, Network Anti-Freeze & RAM Optimizer (/boost) -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource AccentFillColorDefaultBrush}" BorderThickness="1.5"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="14">
+                                    <Grid RowSpacing="10">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <!-- Top Row: Icon, Title, Score and Actions -->
+                                        <Grid Grid.Row="0" ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Grid.Column="0" Glyph="&#xE721;" FontSize="24" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                            <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock Text="🚀 檔案總管深度極速無延遲、防凍結與記憶體精簡優化" FontWeight="Bold" FontSize="15" TextWrapping="Wrap" />
+                                                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="8,2" VerticalAlignment="Center">
+                                                        <TextBlock Text="{x:Bind ViewModel.ExplorerOptimizationScoreText, Mode=OneWay}"
+                                                                   FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock Text="(Explorer\Advanced &amp; Shell Boost)" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <Button Content="⚡ 一鍵套用" Command="{x:Bind ViewModel.ApplyExplorerBoostPresetCommand}"
+                                                        Style="{StaticResource AccentButtonStyle}" ToolTipService.ToolTip="一鍵套用極致流暢設定" />
+                                                <Button Content="🛡️ 還原預設" Command="{x:Bind ViewModel.RestoreExplorerDefaultsCommand}"
+                                                        ToolTipService.ToolTip="還原官方預設值" />
+                                                <Button Content="🔄 刷新" Command="{x:Bind ViewModel.RefreshExplorerAdvancedStateCommand}" />
+                                            </StackPanel>
+                                        </Grid>
+                                        <!-- Subtitle Row -->
+                                        <TextBlock Grid.Row="1" Text="調校 HKCU\...\Explorer\Advanced 核心登錄檔。消除 200ms 動畫等待時間、徹底根治離線 NAS/網路磁碟轉圈凍結 (nonetcrawling)、隔離檔案視窗防桌面連帶崩潰 (SeparateProcess)、終止 Windows 11 Widgets (釋放 150MB~400MB RAM) 與保護 CPU 深度節能狀態。"
+                                                   Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                    </Grid>
+
+                                    <!-- 3 Column Controls Grid -->
+                                    <Grid ColumnSpacing="12" RowSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Col 1: UI Latency & Animations -->
+                                        <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="⚡ UI 動畫與視窗零延遲" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource AccentFillColorDefaultBrush}" TextWrapping="Wrap" />
+                                                <Grid Padding="0,2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="1">
+                                                        <TextBlock Text="關閉工作列最小化/還原動畫" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                        <TextBlock Text="TaskbarAnimations = 0 (省去 200ms 延遲)" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <ToggleSwitch Grid.Column="1" Tag="TaskbarAnimations" IsOn="{x:Bind ViewModel.ExplorerAdvState.TaskbarAnimationsDisabled, Mode=OneWay}"
+                                                                  Toggled="ExplorerSetting_Toggled" MinWidth="0" />
+                                                </Grid>
+                                                <Grid Padding="0,2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="1">
+                                                        <TextBlock Text="Aero Peek 桌面預覽零延遲" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                        <TextBlock Text="DesktopLivePreviewHoverTime = 0" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <ToggleSwitch Grid.Column="1" Tag="DesktopLivePreview" IsOn="{x:Bind ViewModel.ExplorerAdvState.DesktopLivePreviewInstant, Mode=OneWay}"
+                                                                  Toggled="ExplorerSetting_Toggled" MinWidth="0" />
+                                                </Grid>
+                                                <Grid Padding="0,2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="1">
+                                                        <TextBlock Text="停用 Aero 晃動最小化 (防誤觸)" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                        <TextBlock Text="DisallowShaking = 1 (防甩槍視窗全縮小)" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <ToggleSwitch Grid.Column="1" Tag="DisallowShaking" IsOn="{x:Bind ViewModel.ExplorerAdvState.DisallowShakingEnabled, Mode=OneWay}"
+                                                                  Toggled="ExplorerSetting_Toggled" MinWidth="0" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Col 2: Disk & Network Anti-Freeze -->
+                                        <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="🛡️ 磁碟與離線網路防凍結" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource AccentFillColorDefaultBrush}" TextWrapping="Wrap" />
+                                                <Grid Padding="0,2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="1">
+                                                        <TextBlock Text="停用離線網路共用背景搜尋" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                        <TextBlock Text="nonetcrawling = 1 (治癒離線 NAS 轉圈 30 秒)" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <ToggleSwitch Grid.Column="1" Tag="nonetcrawling" IsOn="{x:Bind ViewModel.ExplorerAdvState.NonetCrawlingDisabled, Mode=OneWay}"
+                                                                  Toggled="ExplorerSetting_Toggled" MinWidth="0" />
+                                                </Grid>
+                                                <Grid Padding="0,2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="1">
+                                                        <TextBlock Text="資料夾視窗獨立進程 (防當機)" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                        <TextBlock Text="SeparateProcess = 1 (單一視窗當機不黑屏)" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <ToggleSwitch Grid.Column="1" Tag="SeparateProcess" IsOn="{x:Bind ViewModel.ExplorerAdvState.SeparateProcessEnabled, Mode=OneWay}"
+                                                                  Toggled="ExplorerSetting_Toggled" MinWidth="0" />
+                                                </Grid>
+                                                <Grid Padding="0,2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="1">
+                                                        <TextBlock Text="一律顯示已知副檔名 (防偽裝)" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                        <TextBlock Text="HideFileExt = 0 (預防點擊偽裝病毒檔)" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <ToggleSwitch Grid.Column="1" Tag="HideFileExt" IsOn="{x:Bind ViewModel.ExplorerAdvState.HideFileExtDisabled, Mode=OneWay}"
+                                                                  Toggled="ExplorerSetting_Toggled" MinWidth="0" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Col 3: Memory & Telemetry Reduction -->
+                                        <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="🧹 記憶體精簡與 C-State 節能" FontWeight="SemiBold" FontSize="13" Foreground="{ThemeResource AccentFillColorDefaultBrush}" TextWrapping="Wrap" />
+                                                <Grid Padding="0,2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="1">
+                                                        <TextBlock Text="停用 Win11 Widgets 小工具" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                        <TextBlock Text="TaskbarDa = 0 (終止進程釋放 150~400MB)" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <ToggleSwitch Grid.Column="1" Tag="TaskbarDa" IsOn="{x:Bind ViewModel.ExplorerAdvState.TaskbarDaDisabled, Mode=OneWay}"
+                                                                  Toggled="ExplorerSetting_Toggled" MinWidth="0" />
+                                                </Grid>
+                                                <Grid Padding="0,2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="1">
+                                                        <TextBlock Text="隱藏 Copilot 按鈕 (防預載)" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                        <TextBlock Text="ShowCopilotButton = 0 (阻斷 WebView2)" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <ToggleSwitch Grid.Column="1" Tag="ShowCopilotButton" IsOn="{x:Bind ViewModel.ExplorerAdvState.ShowCopilotButtonDisabled, Mode=OneWay}"
+                                                                  Toggled="ExplorerSetting_Toggled" MinWidth="0" />
+                                                </Grid>
+                                                <Grid Padding="0,2">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="1">
+                                                        <TextBlock Text="關閉開始廣告與最近存取記錄" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                        <TextBlock Text="Start_Iris &amp; Start_TrackDocs = 0 (防寫入損耗)" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                    <ToggleSwitch Grid.Column="1" Tag="Start_IrisRecommendations" IsOn="{x:Bind ViewModel.ExplorerAdvState.StartIrisRecommendationsDisabled, Mode=OneWay}"
+                                                                  Toggled="ExplorerSetting_Toggled" MinWidth="0" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
                                 </StackPanel>
                             </Border>
 
@@ -1072,24 +1378,24 @@
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <Button Grid.Column="0" Command="{x:Bind ViewModel.SwitchToClassicContextMenuCommand}"
-                                                Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" Padding="12,8">
+                                                Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" Padding="8,8">
                                             <StackPanel Spacing="2">
-                                                <TextBlock Text="⚡ 切換為 Windows 10 經典完整右鍵選單" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                                                <TextBlock Text="免點「顯示更多選項」，一次展開所有功能" FontSize="11" HorizontalAlignment="Center" />
+                                                <TextBlock Text="⚡ 切換為 Win10 經典完整右鍵選單" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
+                                                <TextBlock Text="免點「顯示更多選項」，一次展開所有功能" FontSize="11" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
                                             </StackPanel>
                                         </Button>
                                         <Button Grid.Column="1" Command="{x:Bind ViewModel.SwitchToModernContextMenuCommand}"
-                                                HorizontalAlignment="Stretch" Padding="12,8">
+                                                HorizontalAlignment="Stretch" Padding="8,8">
                                             <StackPanel Spacing="2">
-                                                <TextBlock Text="🪟 切換為 Windows 11 現代簡潔右鍵選單" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                                                <TextBlock Text="還原系統預設圓角摺疊式選單" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                                                <TextBlock Text="🪟 切換為 Win11 現代簡潔右鍵選單" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
+                                                <TextBlock Text="還原系統預設圓角摺疊式選單" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
                                             </StackPanel>
                                         </Button>
                                         <Button Grid.Column="2" Command="{x:Bind ViewModel.FixSlowRightClickMenuCommand}"
-                                                HorizontalAlignment="Stretch" Padding="12,8">
+                                                HorizontalAlignment="Stretch" Padding="8,8">
                                             <StackPanel Spacing="2">
-                                                <TextBlock Text="🚀 一鍵修復右鍵選單轉圈與延遲" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                                                <TextBlock Text="MenuShowDelay=0 + 清理失效右鍵擴充項" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                                                <TextBlock Text="🚀 一鍵修復右鍵選單轉圈與延遲" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
+                                                <TextBlock Text="MenuShowDelay=0 + 清理失效右鍵擴充項" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" />
                                             </StackPanel>
                                         </Button>
                                     </Grid>
@@ -1258,8 +1564,8 @@
                 </TabViewItem>
 
                 <!-- ════ Tab 4: 登錄檔備份與還原 (Backup & Restore) ════ -->
-                <TabViewItem x:Name="TabBackup" Header="💾 登錄檔備份與還原 (Backup &amp; Restore)" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                <TabViewItem x:Name="TabBackup" Header="💾 登錄檔備份 (Backup &amp; Restore)" IsClosable="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                         <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Backup Actions Bar -->
@@ -1295,10 +1601,18 @@
                                     <TextBlock x:Name="BackupsListTitle" Text="已建立的登錄檔快照與備份 (.reg)" FontWeight="SemiBold" />
                                     <ListView ItemsSource="{x:Bind ViewModel.Backups, Mode=OneWay}"
                                               SelectedItem="{x:Bind ViewModel.SelectedBackup, Mode=TwoWay}"
-                                              SelectionMode="Single" MaxHeight="220">
+                                              SelectionMode="Single" MaxHeight="220"
+                                              HorizontalAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                              ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="models:RegistryBackupItem">
-                                                <Grid Padding="4,6" ColumnSpacing="12">
+                                                <Grid Padding="4,6" ColumnSpacing="12" HorizontalAlignment="Stretch">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto" />
                                                         <ColumnDefinition Width="*" />
@@ -1327,10 +1641,18 @@
                                     CornerRadius="8" Padding="16">
                                 <StackPanel Spacing="10">
                                     <TextBlock x:Name="RestorePointsListTitle" Text="Windows 系統還原點清單 (System Restore Points)" FontWeight="SemiBold" />
-                                    <ListView ItemsSource="{x:Bind ViewModel.RestorePoints, Mode=OneWay}" SelectionMode="None" MaxHeight="180">
+                                    <ListView ItemsSource="{x:Bind ViewModel.RestorePoints, Mode=OneWay}" SelectionMode="None" MaxHeight="180"
+                                              HorizontalAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                              ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="models:SystemRestorePointItem">
-                                                <Grid Padding="4,4" ColumnSpacing="8">
+                                                <Grid Padding="4,4" ColumnSpacing="8" HorizontalAlignment="Stretch">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto" />
                                                         <ColumnDefinition Width="*" />
@@ -1349,7 +1671,7 @@
 
                 <!-- ════ Tab 5: OneDrive 深度管理、修復與徹底卸載 (OneDrive Governance) ════ -->
                 <TabViewItem x:Name="TabOneDrive" Header="☁️ OneDrive 深度治理與卸載" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                         <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Hero Status Card -->
@@ -1489,8 +1811,8 @@
                 </TabViewItem>
 
                 <!-- ════ Tab 6: OEM 驅動程式清理 (Driver Cleanup - PnPUtil) ════ -->
-                <TabViewItem x:Name="TabDrivers" Header="🏎️ OEM 驅動清理 (PnPUtil)" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                <TabViewItem x:Name="TabDrivers" Header="🏎️ 驅動清理 (PnPUtil)" IsClosable="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                         <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                             <!-- Control Bar Card -->
@@ -1534,10 +1856,18 @@
                                     <TextBlock Text="已安裝之 OEM 驅動套件清單" FontWeight="SemiBold" />
 
                                     <ListView ItemsSource="{x:Bind ViewModel.OemDrivers, Mode=OneWay}"
-                                              SelectionMode="None" MaxHeight="450">
+                                              SelectionMode="None" MaxHeight="450"
+                                              HorizontalAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                              ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="models:OemDriverItem">
-                                                <Grid Padding="6,6" ColumnSpacing="12">
+                                                <Grid Padding="6,6" ColumnSpacing="12" HorizontalAlignment="Stretch">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto" />
                                                         <ColumnDefinition Width="*" />
@@ -1592,6 +1922,7 @@
                     <Button Grid.Column="1" Content="Clear" Command="{x:Bind ViewModel.ClearLogCommand}" Padding="8,2" FontSize="11" />
                 </Grid>
                 <ScrollViewer Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                              HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled"
                               CornerRadius="6" Padding="10">
                     <TextBlock Text="{x:Bind ViewModel.ConsoleLog, Mode=OneWay}"
                                FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"

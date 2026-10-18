@@ -106,7 +106,9 @@
 
                     <!-- Output -->
                     <ScrollViewer Grid.Row="4" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                  CornerRadius="8" Padding="12">
+                                  CornerRadius="8" Padding="12"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  HorizontalScrollMode="Disabled">
                         <TextBlock Text="{x:Bind ViewModel.DiskPartOutput, Mode=OneWay}"
                                    FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"
                                    IsTextSelectionEnabled="True" />
@@ -234,7 +236,9 @@
                             <Button Content="Clear" Command="{x:Bind ViewModel.ClearBootOutputCommand}" />
                         </StackPanel>
                         <ScrollViewer Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                      CornerRadius="8" Padding="12">
+                                      CornerRadius="8" Padding="12"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      HorizontalScrollMode="Disabled">
                             <TextBlock Text="{x:Bind ViewModel.BootOutput, Mode=OneWay}"
                                        FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"
                                        IsTextSelectionEnabled="True" />
@@ -303,10 +307,18 @@
 
                     <ListView Grid.Row="1" ItemsSource="{x:Bind ViewModel.BcdEntries, Mode=OneWay}"
                               SelectedItem="{x:Bind ViewModel.SelectedBcdEntry, Mode=TwoWay}"
-                              SelectionMode="Single">
+                              SelectionMode="Single"
+                              HorizontalAlignment="Stretch"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                              ScrollViewer.HorizontalScrollMode="Disabled">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
                         <ListView.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel Spacing="2" Padding="4">
+                                <StackPanel HorizontalAlignment="Stretch" Spacing="2" Padding="4">
                                     <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
                                     <TextBlock Text="{Binding RawText}" FontFamily="Consolas" FontSize="11"
                                                TextWrapping="Wrap" MaxLines="6"
@@ -340,7 +352,9 @@
                     </Grid.RowDefinitions>
                     <Button x:Name="ClearFullLogBtn" Content="清除記錄" Command="{x:Bind ViewModel.ClearFullLogCommand}" />
                     <ScrollViewer Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                  CornerRadius="8" Padding="12">
+                                  CornerRadius="8" Padding="12"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  HorizontalScrollMode="Disabled">
                         <TextBlock Text="{x:Bind ViewModel.FullLog, Mode=OneWay}"
                                    FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"
                                    IsTextSelectionEnabled="True" />

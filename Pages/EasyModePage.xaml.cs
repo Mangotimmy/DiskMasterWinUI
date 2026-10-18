@@ -49,13 +49,29 @@ public sealed partial class EasyModePage : Page
         try
         {
             var s = SettingsService.Instance.Current;
-            if (ColDisks.ActualWidth > 0)
-                s.LayoutSplitterSizes["EasyMode_ColDisks"] = ColDisks.ActualWidth;
-            if (RowPartitionMap.ActualHeight > 0)
-                s.LayoutSplitterSizes["EasyMode_RowPartitionMap"] = RowPartitionMap.ActualHeight;
-            if (RowConsole.ActualHeight > 0)
-                s.LayoutSplitterSizes["EasyMode_RowConsole"] = RowConsole.ActualHeight;
-            SettingsService.Instance.Save();
+            s.LayoutSplitterSizes ??= new Dictionary<string, double>();
+            bool changed = false;
+
+            void SetIfChanged(string key, double actual)
+            {
+                if (actual <= 0) return;
+                if (!s.LayoutSplitterSizes.TryGetValue(key, out var stored) || Math.Abs(stored - actual) > 0.5)
+                {
+                    s.LayoutSplitterSizes[key] = actual;
+                    changed = true;
+                }
+            }
+
+            SetIfChanged("EasyMode_ColDisks", ColDisks.ActualWidth);
+            SetIfChanged("EasyMode_RowPartitionMap", RowPartitionMap.ActualHeight);
+            SetIfChanged("EasyMode_RowConsole", RowConsole.ActualHeight);
+
+            // Unloaded fires on every tab switch away. Saving the whole settings file here used to
+            // trigger the global background/font re-apply on every navigation; only persist a real change.
+            if (changed)
+            {
+                SettingsService.Instance.Save();
+            }
         }
         catch { }
     }

@@ -7,68 +7,19 @@ namespace DiskMasterWinUI.Services;
 
 public class SystemRepairService
 {
-    private async Task<int> RunStreamingProcessAsync(
+    private static async Task<int> RunStreamingProcessAsync(
         string fileName,
         string arguments,
         Action<string> onOutputLine,
         CancellationToken cancellationToken = default)
     {
-        var encoding = DiskMasterWinUI.Helpers.ProcessHelper.GetConsoleEncoding();
-        var psi = new ProcessStartInfo
-        {
-            FileName = fileName,
-            Arguments = arguments,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            StandardOutputEncoding = encoding,
-            StandardErrorEncoding = encoding,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        try
-        {
-            using var process = new Process { StartInfo = psi };
-
-            process.OutputDataReceived += (_, e) =>
-            {
-                if (e.Data != null)
-                {
-                    onOutputLine(e.Data);
-                }
-            };
-
-            process.ErrorDataReceived += (_, e) =>
-            {
-                if (e.Data != null)
-                {
-                    onOutputLine($"[ERROR] {e.Data}");
-                }
-            };
-
-            process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-
-            using var reg = cancellationToken.Register(() =>
-            {
-                try { process.Kill(true); } catch { }
-            });
-
-            await process.WaitForExitAsync(cancellationToken);
-            process.WaitForExit(200);
-            return process.ExitCode;
-        }
-        catch (OperationCanceledException)
-        {
-            onOutputLine("[INFO] Operation cancelled by user.");
-            return -1;
-        }
-        catch (Exception ex)
-        {
-            onOutputLine($"[EXCEPTION] Failed to execute {fileName}: {ex.Message}");
-            return -1;
-        }
+        var result = await DiskMasterWinUI.Helpers.StreamingProcessRunner.RunAsync(
+            "system-repair",
+            fileName,
+            arguments,
+            onOutputLine,
+            cancellationToken);
+        return result.ExitCode;
     }
 
     public async Task<int> RunSfcScanNowAsync(Action<string> onOutput, CancellationToken ct = default)

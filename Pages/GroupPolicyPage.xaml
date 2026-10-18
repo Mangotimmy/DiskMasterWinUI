@@ -9,8 +9,8 @@
     mc:Ignorable="d"
     Loaded="Page_Loaded">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="16" Margin="16,16,24,24">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch">
+        <StackPanel Spacing="16" HorizontalAlignment="Center" MaxWidth="1200" Margin="16,16,16,24">
 
             <!-- Hero Status & Home Edition Enabler Card -->
             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"

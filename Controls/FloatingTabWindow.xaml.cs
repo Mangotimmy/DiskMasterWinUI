@@ -17,6 +17,7 @@ public sealed partial class FloatingTabWindow : Window
     public event Action<FloatingTabWindow>? DockToBottomRequested;
 
     private bool _isDocking = false;
+    private string _lastAppliedFontSignature = "";
 
     /// <summary>Frame that owns the hosted page while this window is alive (diagnostics only).</summary>
     public Frame ContentFrame => FloatingContentFrame;
@@ -146,20 +147,37 @@ public sealed partial class FloatingTabWindow : Window
 
     public void ApplyFont()
     {
-        var font = SettingsService.Instance.Current.CustomFontFamily;
-        if (!string.IsNullOrWhiteSpace(font))
+        var settings = SettingsService.Instance.Current;
+        var font = settings.CustomFontFamily;
+        if (string.IsNullOrWhiteSpace(font)) font = "Segoe UI Variable";
+        var scalePercent = settings.CustomFontScale > 0 ? settings.CustomFontScale : 100.0;
+        string signature = font + "|" + scalePercent.ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
+        if (string.Equals(_lastAppliedFontSignature, signature, StringComparison.Ordinal)) return;
+        _lastAppliedFontSignature = signature;
+
+        double scaleFactor = scalePercent / 100.0;
+
+        try
         {
-            try
+            var ff = new FontFamily(font);
+            FloatingContentFrame.FontFamily = ff;
+            DockRightButton.FontFamily = ff;
+            DockBottomButton.FontFamily = ff;
+            DockBackButton.FontFamily = ff;
+            WindowNoticeText.FontFamily = ff;
+
+            FloatingContentFrame.FontSize = 14.0 * scaleFactor;
+
+            if (this.Content is DependencyObject contentDep)
             {
-                var ff = new FontFamily(font);
-                FloatingContentFrame.FontFamily = ff;
-                DockRightButton.FontFamily = ff;
-                DockBottomButton.FontFamily = ff;
-                DockBackButton.FontFamily = ff;
-                WindowNoticeText.FontFamily = ff;
+                FontScaleHelper.ApplyFontAndScale(contentDep, ff, scaleFactor);
             }
-            catch { }
+            if (HostedPage != null)
+            {
+                FontScaleHelper.ApplyFontAndScale(HostedPage, ff, scaleFactor);
+            }
         }
+        catch { }
         UpdateFloatingViewportLayout();
     }
 
@@ -177,6 +195,12 @@ public sealed partial class FloatingTabWindow : Window
             viewportW, viewportH, contentH, scaleFactor);
 
         FloatingContentRoot.Width = layoutW;
+        FloatingContentRoot.MaxWidth = layoutW;
+        if (FloatingContentFrame != null)
+        {
+            FloatingContentFrame.Width = layoutW;
+            FloatingContentFrame.MaxWidth = layoutW;
+        }
         FloatingScaleTransform.ScaleX = factor;
         FloatingScaleTransform.ScaleY = factor;
         FloatingContentRoot.Margin = new Thickness(offsetX, 0, 0, bottomMargin);

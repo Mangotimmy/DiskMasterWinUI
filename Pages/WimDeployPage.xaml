@@ -44,7 +44,7 @@
             <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                     CornerRadius="8" Padding="16">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
                     <StackPanel Spacing="12">
                         <!-- 🌐 Official Windows ISO / WIM Downloader Expander -->
                         <Expander Header="🌐 下載微軟官方 Windows 系統映像"
@@ -629,6 +629,7 @@
 
                     <!-- Terminal ScrollViewer -->
                     <ScrollViewer x:Name="DeployLogScrollViewer" Grid.Row="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                  HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled"
                                   CornerRadius="6" Padding="12">
                         <TextBlock Text="{x:Bind ViewModel.DeployLog, Mode=OneWay}"
                                    FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"

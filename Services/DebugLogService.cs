@@ -126,6 +126,29 @@ public class DebugLogService
         }
     }
 
+    /// <summary>
+    /// Records a single raw stdout/stderr line from a long-running console command.
+    /// The live console exposes this as the OUTPUT level so backend command data is visible.
+    /// </summary>
+    public void LogCommandOutput(string category, string line)
+    {
+        if (string.IsNullOrWhiteSpace(line)) return;
+
+        var item = new ActionLogItem
+        {
+            Timestamp = DateTime.Now,
+            Level = "OUTPUT",
+            Category = category,
+            Action = line
+        };
+        EnqueueMemoryLog(item);
+
+        if (IsEnabled)
+        {
+            WriteEntry("OUTPUT", category, line);
+        }
+    }
+
     public int LogBufferCount => _memoryLogQueue.Count;
 
     public IReadOnlyList<ActionLogItem> GetRecentLogItems()
@@ -316,6 +339,52 @@ public class DebugLogService
         }
         catch
         {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Opens an interactive real-time live console (PowerShell tail) monitoring the debug log file.
+    /// Runs as an independent process so closing the console does not terminate DiskMaster.
+    /// </summary>
+    public bool OpenLiveConsole()
+    {
+        try
+        {
+            if (!IsEnabled)
+            {
+                IsEnabled = true;
+                LogAction("系統 (System)", "已自動啟動除錯日誌紀錄以支援 CMD 即時串流監控視窗");
+            }
+
+            if (!File.Exists(_logFilePath))
+            {
+                lock (_lock)
+                {
+                    File.WriteAllText(_logFilePath, $"[INFO] [System] Live Log Stream started at {DateTime.Now:yyyy-MM-dd HH:mm:ss}{Environment.NewLine}", Encoding.UTF8);
+                }
+            }
+
+            var escapedPath = _logFilePath.Replace("'", "''");
+            var script = "$Host.UI.RawUI.WindowTitle = 'DiskMaster WinUI - 即時操作日誌終端監控 (Live Stream Console)'; " +
+                         "Write-Host '========================================================================' -ForegroundColor Cyan; " +
+                         "Write-Host '  ⚡ DiskMaster WinUI 即時操作與請求動態終端 (Live Action Stream)' -ForegroundColor Green; " +
+                         $"Write-Host '  📁 日誌檔案: {_logFilePath}' -ForegroundColor DarkGray; " +
+                         "Write-Host '  💡 說明: 應用程式中的所有即時動作將同步即時顯示於此 (按 Ctrl+C 可停止)' -ForegroundColor Yellow; " +
+                         "Write-Host '========================================================================' -ForegroundColor Cyan; " +
+                         $"Get-Content -Path '{escapedPath}' -Wait -Tail 50";
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "powershell.exe",
+                Arguments = $"-NoExit -ExecutionPolicy Bypass -Command \"{script}\"",
+                UseShellExecute = true
+            });
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Error("開啟 CMD 即時日誌終端失敗", ex, "LiveConsole");
             return false;
         }
     }

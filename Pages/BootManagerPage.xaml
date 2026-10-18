@@ -99,10 +99,18 @@
                             <!-- BCD Items ListView -->
                             <ListView Grid.Row="1" ItemsSource="{x:Bind ViewModel.DisplayEntries, Mode=OneWay}"
                                       SelectedItem="{x:Bind ViewModel.SelectedEntry, Mode=TwoWay}"
-                                      SelectionMode="Single">
+                                      SelectionMode="Single"
+                                      HorizontalAlignment="Stretch"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                      ScrollViewer.HorizontalScrollMode="Disabled">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
                                 <ListView.ItemTemplate>
                                     <DataTemplate x:DataType="models:BootEntryDetail">
-                                        <Grid Padding="8,6" ColumnSpacing="10">
+                                        <Grid HorizontalAlignment="Stretch" Padding="8,6" ColumnSpacing="10">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />
@@ -131,10 +139,18 @@
                             <Expander Grid.Row="2" Header="Discovered Offline Windows" IsExpanded="False"
                                       HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                                 <StackPanel Spacing="6" Padding="4">
-                                    <ListView ItemsSource="{x:Bind ViewModel.DiscoveredWindows, Mode=OneWay}" MaxHeight="120">
+                                    <ListView ItemsSource="{x:Bind ViewModel.DiscoveredWindows, Mode=OneWay}" MaxHeight="120"
+                                              HorizontalAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                              ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="x:String">
-                                                <Grid ColumnSpacing="8" Padding="2,4">
+                                                <Grid HorizontalAlignment="Stretch" ColumnSpacing="8" Padding="2,4">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*" />
                                                         <ColumnDefinition Width="Auto" />
@@ -159,7 +175,7 @@
                     <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                             CornerRadius="8" Padding="16">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
                             <StackPanel Spacing="14">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <FontIcon Glyph="&#xE70F;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
@@ -183,7 +199,9 @@
                                 <!-- Details Readout -->
                                 <TextBlock Text="Raw Entry Specification" Style="{StaticResource BodyStrongTextBlockStyle}" />
                                 <ScrollViewer MaxHeight="260" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
-                                              CornerRadius="6" Padding="12">
+                                              CornerRadius="6" Padding="12"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              HorizontalScrollMode="Disabled">
                                     <TextBlock Text="{x:Bind ViewModel.SelectedEntry.RawText, Mode=OneWay}"
                                                FontFamily="Consolas" FontSize="11" IsTextSelectionEnabled="True" />
                                 </ScrollViewer>
@@ -205,7 +223,7 @@
                     <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                             CornerRadius="8" Padding="16">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
                             <StackPanel Spacing="12">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <FontIcon Glyph="&#xEC06;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
@@ -280,7 +298,9 @@
                             </StackPanel>
 
                             <ScrollViewer Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
-                                          CornerRadius="6" Padding="12">
+                                          CornerRadius="6" Padding="12"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          HorizontalScrollMode="Disabled">
                                 <TextBlock Text="{x:Bind ViewModel.NewBootLog, Mode=OneWay}"
                                            FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"
                                            IsTextSelectionEnabled="True" />
@@ -323,7 +343,7 @@
 
             <!-- ── Tab 4: MSConfig 安全開機與旗標 (Safe Boot & Advanced Boot Flags) ── -->
             <TabViewItem x:Name="TabSafeBoot" Header="🛡️ 安全開機 (Safe Boot)" IsClosable="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                     <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
                         <!-- Hero Card -->
                         <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -419,7 +439,7 @@
 
             <!-- ── Tab 5: TPM 2.0 & Win11 Security LabConfig Bypass ── -->
             <TabViewItem x:Name="TabTpm" Header="🛡️ TPM 2.0 與系統安全" IsClosable="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                     <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
                         <!-- TPM Hardware Status Card -->
                         <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -523,7 +543,7 @@
 
             <!-- ── Tab 6: Windows 修復環境 (WinRE) ── -->
             <TabViewItem x:Name="TabWinRe" Header="🩹 Windows 修復環境 (WinRE)" IsClosable="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                     <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
                         
                         <!-- WinRE Status Card -->

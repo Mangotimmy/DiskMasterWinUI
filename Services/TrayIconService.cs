@@ -106,6 +106,18 @@ public class TrayIconService : IDisposable
     [DllImport("user32.dll")]
     private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+    private const uint MOD_CONTROL = 0x0002;
+    private const uint MOD_SHIFT = 0x0004;
+    private const uint VK_H = 0x48;
+    private const int HOTKEY_HUD_CLICKTHROUGH = 9001;
+    private const uint WM_HOTKEY = 0x0312;
+
     [DllImport("comctl32.dll", SetLastError = true)]
     private static extern bool SetWindowSubclass(IntPtr hWnd, SubclassWndProc pfnSubclass, UIntPtr uIdSubclass, UIntPtr dwRefData);
 
@@ -136,6 +148,12 @@ public class TrayIconService : IDisposable
 
         _subclassDelegate = WindowSubclassProc;
         SetWindowSubclass(_hwnd, _subclassDelegate, _subclassId, UIntPtr.Zero);
+
+        try
+        {
+            RegisterHotKey(_hwnd, HOTKEY_HUD_CLICKTHROUGH, MOD_CONTROL | MOD_SHIFT, VK_H);
+        }
+        catch { }
 
         AddOrUpdateTrayIcon(tooltip);
     }
@@ -416,6 +434,12 @@ public class TrayIconService : IDisposable
             return IntPtr.Zero;
         }
 
+        if (uMsg == WM_HOTKEY && (int)wParam == HOTKEY_HUD_CLICKTHROUGH)
+        {
+            QuickActionRequested?.Invoke("ToggleClickThrough");
+            return IntPtr.Zero;
+        }
+
         if (uMsg == WM_NCDESTROY)
         {
             if (_hwnd != IntPtr.Zero && _subclassDelegate != null)
@@ -453,6 +477,11 @@ public class TrayIconService : IDisposable
         {
             try { DestroyIcon(_hIcon); } catch { }
             _hIcon = IntPtr.Zero;
+        }
+
+        if (_hwnd != IntPtr.Zero)
+        {
+            try { UnregisterHotKey(_hwnd, HOTKEY_HUD_CLICKTHROUGH); } catch { }
         }
 
         if (_hwnd != IntPtr.Zero && _subclassDelegate != null)

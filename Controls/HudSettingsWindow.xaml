@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Window
+    x:Class="DiskMasterWinUI.Controls.HudSettingsWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="HUD 懸浮窗自訂設定"
+    mc:Ignorable="d">
+
+    <Window.SystemBackdrop>
+        <DesktopAcrylicBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="RootContainer" Background="Transparent" Loaded="RootContainer_Loaded">
+        <Border Margin="1"
+                Background="#F00B0F19"
+                BorderBrush="#8038BDF8"
+                BorderThickness="1.5"
+                CornerRadius="8"
+                Padding="16,12">
+            <Grid RowSpacing="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Header -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE713;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="HUD 懸浮窗自訂設定" FontWeight="Bold" FontSize="13" VerticalAlignment="Center" Foreground="#F8FAFC" />
+                    </StackPanel>
+
+                    <Button Grid.Column="1" Click="CloseBtn_Click" Padding="6,4" CornerRadius="4" Background="Transparent" BorderThickness="0"
+                            ToolTipService.ToolTip="關閉設定視窗">
+                        <FontIcon Glyph="&#xE711;" FontSize="11" Foreground="#EF4444" />
+                    </Button>
+                </Grid>
+
+                <!-- Content Area -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
+                    <StackPanel Spacing="12" Margin="0,0,18,0">
+
+                        <!-- Style Selection -->
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="懸浮窗型態 (Style)" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <ComboBox x:Name="HudStyleCombo" HorizontalAlignment="Stretch"
+                                      SelectionChanged="HudStyleCombo_SelectionChanged">
+                                <ComboBoxItem Content="橫向長條型 (Bar Type)" Tag="Bar" />
+                                <ComboBoxItem Content="完整卡片型 (Card Type)" Tag="Card" />
+                                <ComboBoxItem Content="極簡徽章型 (Badge Type)" Tag="Badge" />
+                            </ComboBox>
+                        </StackPanel>
+
+                        <!-- Theme Selection -->
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="色彩主題 (Theme)" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <ComboBox x:Name="HudThemeCombo" HorizontalAlignment="Stretch"
+                                      SelectionChanged="HudThemeCombo_SelectionChanged">
+                                <ComboBoxItem Content="⚡ 賽博霓虹 (Cyberpunk)" Tag="Cyberpunk" />
+                                <ComboBoxItem Content="🟢 矩陣幽綠 (Emerald)" Tag="Emerald" />
+                                <ComboBoxItem Content="🔵 冰晶蔚藍 (Ocean)" Tag="Ocean" />
+                                <ComboBoxItem Content="🟣 炫彩日冕 (Solar)" Tag="Solar" />
+                                <ComboBoxItem Content="⚫ 曜石黑魂 (Midnight)" Tag="Midnight" />
+                            </ComboBox>
+                        </StackPanel>
+
+                        <!-- Background Transparency -->
+                        <StackPanel Spacing="4">
+                            <Grid>
+                                <TextBlock Text="底板不透明度 (Background Opacity)" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock x:Name="OpacityValueText" Text="85%" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right" Foreground="#38BDF8" />
+                            </Grid>
+                            <Slider x:Name="HudOpacitySlider" Minimum="5" Maximum="100" StepFrequency="1"
+                                    ValueChanged="HudOpacitySlider_ValueChanged" />
+                            <TextBlock Text="僅調整背景底板透明度，文字與數據保持高對比清晰"
+                                       FontSize="10" Foreground="#64748B" TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <!-- Visibility Toggles -->
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="指標顯示開關" FontSize="11" FontWeight="SemiBold" Margin="0,4,0,0" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <ToggleSwitch x:Name="ToggleFps" Header="FPS 即時影格率" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
+                            <ToggleSwitch x:Name="ToggleLow1Pct" Header="1% Low 最低影格" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
+                            <ToggleSwitch x:Name="ToggleMsDelay" Header="幀延遲 (ms delay)" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
+                            <ToggleSwitch x:Name="ToggleCpu" Header="CPU 使用率" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
+                            <ToggleSwitch x:Name="ToggleGpu" Header="GPU 負載 &amp; 顯存" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
+                            <ToggleSwitch x:Name="ToggleRam" Header="RAM 記憶體" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
+                            <ToggleSwitch x:Name="ToggleNet" Header="LAN 網路速率" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
+                            <ToggleSwitch x:Name="ToggleApi" Header="圖形渲染 API 標籤" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
+                            <ToggleSwitch x:Name="ToggleAppName" Header="前景程式名稱" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
+                        </StackPanel>
+
+                        <!-- Click-Through & Border Settings -->
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="進階視窗穿透與邊框" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                            <ToggleSwitch x:Name="ToggleClickThrough" Header="🖱️ 滑鼠點擊穿透 (Click-Through)"
+                                          Toggled="ClickThrough_Toggled"
+                                          OffContent="停用 (可拖曳與操作 HUD)" OnContent="啟用 (點擊穿透至背景程式)" />
+                            <TextBlock Text="啟用後滑鼠點擊將直接穿透 HUD 操作背景應用程式。可透過全域快捷鍵 [Ctrl+Shift+H] 隨時切換。"
+                                       FontSize="10" Foreground="#64748B" TextWrapping="Wrap" />
+
+                            <ToggleSwitch x:Name="ToggleRemoveBorder" AutomationProperties.AutomationId="HudRemoveBorderToggle" Header="🔲 移除 HUD 外邊框 (Remove Border)"
+                                          Toggled="RemoveBorder_Toggled"
+                                          OffContent="保留外邊框 (預設發光邊框)" OnContent="移除外邊框 (完全無邊框極簡)" />
+                        </StackPanel>
+
+                        <!-- Presets -->
+                        <StackPanel Spacing="6" Margin="0,4,0,0">
+                            <TextBlock Text="快速預設方案" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <Grid ColumnSpacing="6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" Content="極簡 FPS" HorizontalAlignment="Stretch" Padding="4,6" FontSize="11" Click="PresetMinimal_Click" />
+                                <Button Grid.Column="1" Content="常用監控" HorizontalAlignment="Stretch" Padding="4,6" FontSize="11" Click="PresetStandard_Click" />
+                            </Grid>
+                            <Grid ColumnSpacing="6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" Content="完整全開" HorizontalAlignment="Stretch" Padding="4,6" FontSize="11" Click="PresetFull_Click" />
+                                <Button Grid.Column="1" Content="重設預設值" HorizontalAlignment="Stretch" Padding="4,6" FontSize="11" Click="PresetReset_Click" />
+                            </Grid>
+                        </StackPanel>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

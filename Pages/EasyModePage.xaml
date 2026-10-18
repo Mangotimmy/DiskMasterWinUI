@@ -124,10 +124,18 @@
 
                     <ListView Grid.Row="1" ItemsSource="{x:Bind ViewModel.Disks, Mode=OneWay}"
                               SelectedItem="{x:Bind ViewModel.SelectedDisk, Mode=TwoWay}"
-                              SelectionMode="Single">
+                              SelectionMode="Single"
+                              HorizontalAlignment="Stretch"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                              ScrollViewer.HorizontalScrollMode="Disabled">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="models:DiskInfo">
-                                <Grid Padding="6,8" ColumnSpacing="10">
+                                <Grid HorizontalAlignment="Stretch" Padding="6,8" ColumnSpacing="10">
                                     <Grid.ContextFlyout>
                                         <MenuFlyout>
                                             <MenuFlyoutItem Text="🔍 深入檢視磁碟詳細規格" Click="DiskContext_Detail_Click" />
@@ -188,7 +196,7 @@
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                         CornerRadius="8" Padding="14">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
                         <StackPanel Spacing="10">
                             <!-- Header with Legend -->
                             <Grid>
@@ -230,6 +238,7 @@
                             <ListView ItemsSource="{x:Bind ViewModel.SelectedDisk.VisualBlocks, Mode=OneWay}"
                                       SelectedItem="{x:Bind ViewModel.SelectedBlock, Mode=TwoWay}"
                                       SelectionMode="Single"
+                                      HorizontalAlignment="Stretch"
                                       Height="106"
                                       Padding="0,4,0,18"
                                       ScrollViewer.HorizontalScrollBarVisibility="Auto"
@@ -337,7 +346,7 @@
                                         Margin="0,4" />
 
                 <!-- 2. Middle: Suggested Command Preview + Management Tools -->
-                <ScrollViewer Grid.Row="2">
+                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
                     <StackPanel Spacing="12">
                         <!-- Suggested DiskPart Command -->
                         <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -543,7 +552,9 @@
 
                         <!-- Terminal Text Output -->
                         <ScrollViewer Grid.Row="1" Background="{ThemeResource LayerFillColorDefaultBrush}"
-                                      CornerRadius="4" Padding="8">
+                                      CornerRadius="4" Padding="8"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      HorizontalScrollMode="Disabled">
                             <ScrollViewer.ContextFlyout>
                                 <MenuFlyout>
                                     <MenuFlyoutItem Text="📋 複製全部終端記錄" Click="LogContext_CopyAll_Click" />

@@ -13,6 +13,34 @@
     </Window.SystemBackdrop>
 
     <Grid x:Name="OverlayRoot" Background="Transparent" Loaded="OverlayRoot_Loaded">
+        <Grid.Resources>
+            <MenuFlyout x:Key="HudStyleThemeMenu">
+                <MenuFlyoutSubItem Text="🎨 HUD 主題色彩 (Theme)">
+                    <ToggleMenuFlyoutItem x:Name="ThemeCyberpunkItem" Text="⚡ 賽博霓虹 (Cyberpunk)" Tag="Cyberpunk" Click="HudThemeMenu_Click" />
+                    <ToggleMenuFlyoutItem x:Name="ThemeEmeraldItem" Text="🟢 矩陣幽綠 (Emerald)" Tag="Emerald" Click="HudThemeMenu_Click" />
+                    <ToggleMenuFlyoutItem x:Name="ThemeOceanItem" Text="🔵 冰晶蔚藍 (Ocean)" Tag="Ocean" Click="HudThemeMenu_Click" />
+                    <ToggleMenuFlyoutItem x:Name="ThemeSolarItem" Text="🟣 炫彩日冕 (Solar)" Tag="Solar" Click="HudThemeMenu_Click" />
+                    <ToggleMenuFlyoutItem x:Name="ThemeMidnightItem" Text="⚫ 曜石黑魂 (Midnight)" Tag="Midnight" Click="HudThemeMenu_Click" />
+                </MenuFlyoutSubItem>
+                <MenuFlyoutSubItem Text="🎛️ 懸浮型態 (Style)">
+                    <ToggleMenuFlyoutItem x:Name="StyleBarItem" Text="橫向長條型 (Bar)" Tag="Bar" Click="HudStyleMenu_Click" />
+                    <ToggleMenuFlyoutItem x:Name="StyleCardItem" Text="完整卡片型 (Card)" Tag="Card" Click="HudStyleMenu_Click" />
+                    <ToggleMenuFlyoutItem x:Name="StyleBadgeItem" Text="極簡徽章型 (Badge)" Tag="Badge" Click="HudStyleMenu_Click" />
+                </MenuFlyoutSubItem>
+                <MenuFlyoutSubItem Text="👁️ 背景透明度 (Opacity)">
+                    <ToggleMenuFlyoutItem x:Name="Opacity100Item" Text="100% (不透明)" Tag="1.0" Click="HudOpacityMenu_Click" />
+                    <ToggleMenuFlyoutItem x:Name="Opacity85Item" Text="85% (預設微透)" Tag="0.85" Click="HudOpacityMenu_Click" />
+                    <ToggleMenuFlyoutItem x:Name="Opacity70Item" Text="70% (半透明)" Tag="0.70" Click="HudOpacityMenu_Click" />
+                    <ToggleMenuFlyoutItem x:Name="Opacity50Item" Text="50% (低調通透)" Tag="0.50" Click="HudOpacityMenu_Click" />
+                </MenuFlyoutSubItem>
+                <MenuFlyoutSeparator />
+                <ToggleMenuFlyoutItem x:Name="ClickThroughMenuItem" Text="🖱️ 滑鼠穿透模式 (Click-Through) [Ctrl+Shift+H]" Click="ClickThroughMenuItem_Click" />
+                <ToggleMenuFlyoutItem x:Name="RemoveBorderMenuItem" Text="🔲 移除外邊框 (Remove Border)" Click="RemoveBorderMenuItem_Click" />
+                <MenuFlyoutItem Text="⚙️ 開啟進階設定面板" Click="OpenSettings_Click" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="❌ 關閉懸浮窗" Click="CloseBtn_Click" />
+            </MenuFlyout>
+        </Grid.Resources>
         <!-- Outer Glowing HUD Container with Mouse Drag & Edge Clamping -->
         <Border x:Name="HudContainer" Margin="0"
                 Background="#200B0F19"
@@ -22,6 +50,7 @@
                 Padding="10,6"
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"
+                ContextFlyout="{StaticResource HudStyleThemeMenu}"
                 PointerPressed="HudContainer_PointerPressed"
                 PointerMoved="HudContainer_PointerMoved"
                 PointerReleased="HudContainer_PointerReleased"
@@ -40,28 +69,19 @@
                     <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                         <!-- FPS Badge -->
                         <Border x:Name="BarFpsBadge" Background="#2810B981" BorderBrush="#9910B981" BorderThickness="1" CornerRadius="6" Padding="6,2">
-                            <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-                                <TextBlock Text="🎮" FontSize="11" VerticalAlignment="Center" />
-                                <TextBlock x:Name="BarFpsText" Text="60 FPS" FontWeight="Bold" FontSize="11" Foreground="#34D399" VerticalAlignment="Center" />
-                            </StackPanel>
+                            <TextBlock x:Name="BarFpsText" Text="60 FPS" FontWeight="Bold" FontSize="11" Foreground="#34D399" VerticalAlignment="Center" />
                         </Border>
 
                         <!-- 1% Low FPS Badge -->
                         <Border x:Name="BarLow1PctBadge" Background="#28F59E0B" BorderBrush="#99F59E0B" BorderThickness="1" CornerRadius="6" Padding="6,2"
                                 ToolTipService.ToolTip="1% Low 最低影格率 (抗掉幀流暢度指標)">
-                            <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-                                <TextBlock Text="📉" FontSize="10" VerticalAlignment="Center" />
-                                <TextBlock x:Name="BarLow1PctText" Text="58 1%LOW" FontWeight="Bold" FontSize="11" Foreground="#FBBF24" VerticalAlignment="Center" />
-                            </StackPanel>
+                            <TextBlock x:Name="BarLow1PctText" Text="58 1%LOW" FontWeight="Bold" FontSize="11" Foreground="#FBBF24" VerticalAlignment="Center" />
                         </Border>
 
                         <!-- ms Delay Badge -->
                         <Border x:Name="BarMsDelayBadge" Background="#2806B6D4" BorderBrush="#9906B6D4" BorderThickness="1" CornerRadius="6" Padding="6,2"
                                 ToolTipService.ToolTip="即時渲染幀生成延遲 (Frame Time Latency)">
-                            <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-                                <TextBlock Text="⏱️" FontSize="10" VerticalAlignment="Center" />
-                                <TextBlock x:Name="BarMsDelayText" Text="16.6 ms" FontWeight="Bold" FontSize="11" Foreground="#22D3EE" VerticalAlignment="Center" />
-                            </StackPanel>
+                            <TextBlock x:Name="BarMsDelayText" Text="16.6 ms" FontWeight="Bold" FontSize="11" Foreground="#22D3EE" VerticalAlignment="Center" />
                         </Border>
 
                         <!-- Graphics API Badge -->
@@ -72,88 +92,45 @@
 
                         <!-- CPU Badge -->
                         <Border x:Name="BarCpuBadge" Background="#2038BDF8" BorderBrush="#6038BDF8" BorderThickness="1" CornerRadius="6" Padding="6,2">
-                            <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-                                <TextBlock Text="⚡" FontSize="10" VerticalAlignment="Center" />
-                                <TextBlock x:Name="BarCpuText" Text="CPU 0%" FontWeight="Bold" FontSize="11" Foreground="#38BDF8" VerticalAlignment="Center" />
-                            </StackPanel>
+                            <TextBlock x:Name="BarCpuText" Text="CPU 0%" FontWeight="Bold" FontSize="11" Foreground="#38BDF8" VerticalAlignment="Center" />
                         </Border>
 
                         <!-- GPU Badge -->
                         <Border x:Name="BarGpuBadge" Background="#20C084FC" BorderBrush="#60C084FC" BorderThickness="1" CornerRadius="6" Padding="6,2">
-                            <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-                                <TextBlock Text="🎮" FontSize="10" VerticalAlignment="Center" />
-                                <TextBlock x:Name="BarGpuText" Text="GPU 0%" FontWeight="Bold" FontSize="11" Foreground="#C084FC" VerticalAlignment="Center" />
-                            </StackPanel>
+                            <TextBlock x:Name="BarGpuText" Text="GPU 0%" FontWeight="Bold" FontSize="11" Foreground="#C084FC" VerticalAlignment="Center" />
                         </Border>
 
                         <!-- RAM Badge -->
                         <Border x:Name="BarRamBadge" Background="#20FBBF24" BorderBrush="#60FBBF24" BorderThickness="1" CornerRadius="6" Padding="6,2">
-                            <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-                                <TextBlock Text="💾" FontSize="10" VerticalAlignment="Center" />
-                                <TextBlock x:Name="BarRamText" Text="RAM 0%" FontWeight="Bold" FontSize="11" Foreground="#FBBF24" VerticalAlignment="Center" />
-                            </StackPanel>
+                            <TextBlock x:Name="BarRamText" Text="RAM 0%" FontWeight="Bold" FontSize="11" Foreground="#FBBF24" VerticalAlignment="Center" />
                         </Border>
 
                         <!-- LAN Badge -->
                         <Border x:Name="BarNetBadge" Background="#2034D399" BorderBrush="#6034D399" BorderThickness="1" CornerRadius="6" Padding="6,2">
-                            <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-                                <TextBlock Text="⬇" FontSize="10" Foreground="#34D399" VerticalAlignment="Center" />
-                                <TextBlock x:Name="BarNetText" Text="0 KB/s" FontWeight="SemiBold" FontSize="11" Foreground="#34D399" VerticalAlignment="Center" />
-                            </StackPanel>
+                            <TextBlock x:Name="BarNetText" Text="0 KB/s" FontWeight="SemiBold" FontSize="11" Foreground="#34D399" VerticalAlignment="Center" />
                         </Border>
 
                         <!-- Foreground App Name Badge -->
                         <Border x:Name="BarAppNameBadge" Background="#14FFFFFF" CornerRadius="6" Padding="6,2">
                             <TextBlock x:Name="BarAppNameText" Text="APP" FontWeight="SemiBold" FontSize="10" Foreground="#94A3B8" VerticalAlignment="Center" MaxWidth="120" TextTrimming="CharacterEllipsis" />
                         </Border>
+
+                        <!-- Click-Through Indicator Badge -->
+                        <Border x:Name="BarClickThroughBadge" Background="#30A855F7" BorderBrush="#80A855F7" BorderThickness="1" CornerRadius="6" Padding="6,2" Visibility="Collapsed"
+                                ToolTipService.ToolTip="滑鼠穿透中：點擊將穿透至背景程式 [按 Ctrl+Shift+H 關閉]">
+                            <TextBlock Text="👻 穿透 [Ctrl+Shift+H]" FontWeight="Bold" FontSize="10" Foreground="#C084FC" VerticalAlignment="Center" />
+                        </Border>
                     </StackPanel>
 
                     <!-- Control Buttons -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" Margin="6,0,0,0">
-                        <Button x:Name="SettingsBtnBar" Padding="5,2" CornerRadius="4" Background="Transparent" BorderThickness="0"
-                                ToolTipService.ToolTip="HUD 外觀樣式、透明度與顯示項目設定">
-                            <TextBlock Text="⚙️" FontSize="11" Foreground="#94A3B8" />
-                            <Button.Flyout>
-                                <Flyout x:Name="HudOptionsFlyout">
-                                    <StackPanel Spacing="10" Width="240" Padding="4">
-                                        <TextBlock Text="🎛️ HUD 懸浮窗自訂選項" FontWeight="Bold" FontSize="13" />
-
-                                        <!-- Style Selection -->
-                                        <ComboBox x:Name="HudStyleCombo" Header="懸浮窗型態 (Style)" HorizontalAlignment="Stretch"
-                                                  SelectionChanged="HudStyleCombo_SelectionChanged">
-                                            <ComboBoxItem Content="橫向長條型 (Bar Type)" Tag="Bar" />
-                                            <ComboBoxItem Content="完整卡片型 (Card Type)" Tag="Card" />
-                                            <ComboBoxItem Content="極簡徽章型 (Badge Type)" Tag="Badge" />
-                                        </ComboBox>
-
-                                        <!-- Transparency Slider -->
-                                        <StackPanel Spacing="4">
-                                            <Grid>
-                                                <TextBlock Text="不透明度 (Opacity)" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                                <TextBlock x:Name="OpacityValueText" Text="85%" FontSize="11" FontWeight="Bold" HorizontalAlignment="Right" />
-                                            </Grid>
-                                            <Slider x:Name="HudOpacitySlider" Minimum="5" Maximum="100" StepFrequency="1" Value="85"
-                                                    ValueChanged="HudOpacitySlider_ValueChanged" />
-                                        </StackPanel>
-
-                                        <!-- Visibility Toggles -->
-                                        <TextBlock Text="指標顯示開關" FontSize="11" FontWeight="SemiBold" Margin="0,4,0,0" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                        <ToggleSwitch x:Name="ToggleFps" Header="FPS 即時影格率" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
-                                        <ToggleSwitch x:Name="ToggleLow1Pct" Header="1% Low 最低影格" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
-                                        <ToggleSwitch x:Name="ToggleMsDelay" Header="幀延遲 (ms delay)" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
-                                        <ToggleSwitch x:Name="ToggleCpu" Header="CPU 使用率" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
-                                        <ToggleSwitch x:Name="ToggleGpu" Header="GPU 負載 &amp; 顯存" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
-                                        <ToggleSwitch x:Name="ToggleRam" Header="RAM 記憶體" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
-                                        <ToggleSwitch x:Name="ToggleNet" Header="LAN 網路速率" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
-                                        <ToggleSwitch x:Name="ToggleApi" Header="圖形渲染 API 標籤" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
-                                        <ToggleSwitch x:Name="ToggleAppName" Header="前景程式名稱" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
-                                    </StackPanel>
-                                </Flyout>
-                            </Button.Flyout>
+                        <Button x:Name="ThemeBtnBar" Flyout="{StaticResource HudStyleThemeMenu}" Padding="5,2" CornerRadius="4" Background="Transparent" BorderThickness="0"
+                                ToolTipService.ToolTip="HUD 主題色彩與外觀型態 (右鍵全區亦可開啟)">
+                            <FontIcon Glyph="&#xE790;" FontSize="11" Foreground="#94A3B8" />
                         </Button>
                         <Button Click="CloseBtn_Click" Padding="5,2" CornerRadius="4" Background="Transparent" BorderThickness="0"
                                 ToolTipService.ToolTip="關閉置頂懸浮窗">
-                            <TextBlock Text="✕" FontSize="11" FontWeight="Bold" Foreground="#EF4444" />
+                            <FontIcon Glyph="&#xE711;" FontSize="10" Foreground="#EF4444" />
                         </Button>
                     </StackPanel>
                 </Grid>
@@ -172,10 +149,7 @@
                         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                             <!-- FPS Badge -->
                             <Border x:Name="CardFpsBadge" Background="#2810B981" BorderBrush="#9910B981" BorderThickness="1" CornerRadius="6" Padding="6,2">
-                                <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
-                                    <TextBlock Text="🎮" FontSize="11" VerticalAlignment="Center" />
-                                    <TextBlock x:Name="FpsCounterText" Text="60 FPS" FontWeight="Bold" FontSize="12" Foreground="#34D399" VerticalAlignment="Center" />
-                                </StackPanel>
+                                <TextBlock x:Name="FpsCounterText" Text="60 FPS" FontWeight="Bold" FontSize="12" Foreground="#34D399" VerticalAlignment="Center" />
                             </Border>
 
                             <!-- 1% Low Badge -->
@@ -196,6 +170,12 @@
                             <TextBlock x:Name="HudSubtitleText" Text="PERF HUD" FontWeight="Black" FontSize="10"
                                        Foreground="#94A3B8" VerticalAlignment="Center" CharacterSpacing="30"
                                        TextTrimming="CharacterEllipsis" MaxWidth="90" />
+
+                            <!-- Click-Through Indicator Badge -->
+                            <Border x:Name="CardClickThroughBadge" Background="#30A855F7" BorderBrush="#80A855F7" BorderThickness="1" CornerRadius="6" Padding="5,2" Visibility="Collapsed"
+                                    ToolTipService.ToolTip="滑鼠穿透中 [按 Ctrl+Shift+H 關閉]">
+                                <TextBlock Text="👻 穿透中" FontWeight="Bold" FontSize="10" Foreground="#C084FC" VerticalAlignment="Center" />
+                            </Border>
                         </StackPanel>
 
                         <!-- Action Buttons -->
@@ -204,13 +184,13 @@
                                     ToolTipService.ToolTip="切換長條 / 卡片模式">
                                 <TextBlock x:Name="CompactToggleIcon" Text="⊟" FontSize="11" Foreground="#94A3B8" />
                             </Button>
-                            <Button Click="OpenSettings_Click" Padding="5,2" CornerRadius="4" Background="Transparent" BorderThickness="0"
-                                    ToolTipService.ToolTip="設定">
-                                <TextBlock Text="⚙️" FontSize="11" Foreground="#94A3B8" />
+                            <Button Flyout="{StaticResource HudStyleThemeMenu}" Padding="5,2" CornerRadius="4" Background="Transparent" BorderThickness="0"
+                                    ToolTipService.ToolTip="HUD 主題色彩與外觀型態">
+                                <FontIcon Glyph="&#xE790;" FontSize="11" Foreground="#94A3B8" />
                             </Button>
                             <Button Click="CloseBtn_Click" Padding="5,2" CornerRadius="4" Background="Transparent" BorderThickness="0"
                                     ToolTipService.ToolTip="關閉">
-                                <TextBlock Text="✕" FontSize="11" FontWeight="Bold" Foreground="#EF4444" />
+                                <FontIcon Glyph="&#xE711;" FontSize="10" Foreground="#EF4444" />
                             </Button>
                         </StackPanel>
                     </Grid>
@@ -220,14 +200,11 @@
                         <!-- CPU Metric Row -->
                         <Grid x:Name="CardCpuRow" ColumnSpacing="6">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="58" />
+                                <ColumnDefinition Width="54" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="96" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                <TextBlock Text="⚡" FontSize="11" />
-                                <TextBlock Text="CPU" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" />
-                            </StackPanel>
+                            <TextBlock Grid.Column="0" Text="CPU" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" VerticalAlignment="Center" />
                             <ProgressBar Grid.Column="1" x:Name="CpuProgress" Maximum="100" Value="0" Height="6"
                                          Foreground="#38BDF8" Background="#2638BDF8" CornerRadius="3" VerticalAlignment="Center" />
                             <TextBlock Grid.Column="2" x:Name="CpuText" Text="0.0%" FontSize="11" FontWeight="Bold" Foreground="#F8FAFC" TextAlignment="Right" VerticalAlignment="Center" />
@@ -236,14 +213,11 @@
                         <!-- GPU Metric Row -->
                         <Grid x:Name="CardGpuRow" ColumnSpacing="6">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="58" />
+                                <ColumnDefinition Width="54" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="96" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                <TextBlock Text="🎮" FontSize="11" />
-                                <TextBlock Text="GPU" FontSize="11" FontWeight="Bold" Foreground="#C084FC" />
-                            </StackPanel>
+                            <TextBlock Grid.Column="0" Text="GPU" FontSize="11" FontWeight="Bold" Foreground="#C084FC" VerticalAlignment="Center" />
                             <ProgressBar Grid.Column="1" x:Name="GpuProgress" Maximum="100" Value="0" Height="6"
                                          Foreground="#C084FC" Background="#26C084FC" CornerRadius="3" VerticalAlignment="Center" />
                             <TextBlock Grid.Column="2" x:Name="GpuText" Text="0.0% · 0.0G" FontSize="11" FontWeight="Bold" Foreground="#F8FAFC" TextAlignment="Right" VerticalAlignment="Center" />
@@ -252,14 +226,11 @@
                         <!-- RAM Metric Row -->
                         <Grid x:Name="CardRamRow" ColumnSpacing="6">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="58" />
+                                <ColumnDefinition Width="54" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="96" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                <TextBlock Text="💾" FontSize="11" />
-                                <TextBlock x:Name="RamLabelText" Text="RAM" FontSize="11" FontWeight="Bold" Foreground="#FBBF24" />
-                            </StackPanel>
+                            <TextBlock Grid.Column="0" x:Name="RamLabelText" Text="RAM" FontSize="11" FontWeight="Bold" Foreground="#FBBF24" VerticalAlignment="Center" />
                             <ProgressBar Grid.Column="1" x:Name="RamProgress" Maximum="100" Value="0" Height="6"
                                          Foreground="#FBBF24" Background="#26FBBF24" CornerRadius="3" VerticalAlignment="Center" />
                             <TextBlock Grid.Column="2" x:Name="RamText" Text="0.0%" FontSize="11" FontWeight="Bold" Foreground="#F8FAFC" TextAlignment="Right" VerticalAlignment="Center" />
@@ -268,17 +239,14 @@
                         <!-- NET Metric Row -->
                         <Grid x:Name="CardNetRow" ColumnSpacing="6">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="58" />
+                                <ColumnDefinition Width="54" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                <TextBlock Text="🌐" FontSize="11" />
-                                <TextBlock Text="LAN" FontSize="11" FontWeight="Bold" Foreground="#34D399" />
-                            </StackPanel>
+                            <TextBlock Grid.Column="0" Text="LAN" FontSize="11" FontWeight="Bold" Foreground="#34D399" VerticalAlignment="Center" />
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                <TextBlock x:Name="NetDownText" Text="⬇ 0 KB/s" FontSize="10" Foreground="#34D399" FontWeight="SemiBold" />
-                                <TextBlock x:Name="NetUpText" Text="⬆ 0 KB/s" FontSize="10" Foreground="#94A3B8" />
+                                <TextBlock x:Name="NetDownText" Text="0 KB/s" FontSize="10" Foreground="#34D399" FontWeight="SemiBold" />
+                                <TextBlock x:Name="NetUpText" Text="0 KB/s" FontSize="10" Foreground="#94A3B8" />
                             </StackPanel>
                             <TextBlock Grid.Column="2" x:Name="NetTotalText" Text="連線中" FontSize="10" Foreground="#64748B" TextAlignment="Right" VerticalAlignment="Center" />
                         </Grid>
@@ -298,25 +266,13 @@
 
                     <!-- Compact mode row -->
                     <StackPanel x:Name="CompactViewPanel" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
-                        <StackPanel Orientation="Horizontal" Spacing="3">
-                            <TextBlock Text="⚡" FontSize="10" />
-                            <TextBlock x:Name="CompactCpuText" Text="0%" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" />
-                        </StackPanel>
+                        <TextBlock x:Name="CompactCpuText" Text="CPU 0%" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" />
                         <TextBlock Text="|" Foreground="#334155" FontSize="10" />
-                        <StackPanel Orientation="Horizontal" Spacing="3">
-                            <TextBlock Text="🎮" FontSize="10" />
-                            <TextBlock x:Name="CompactGpuText" Text="0%" FontSize="11" FontWeight="Bold" Foreground="#C084FC" />
-                        </StackPanel>
+                        <TextBlock x:Name="CompactGpuText" Text="GPU 0%" FontSize="11" FontWeight="Bold" Foreground="#C084FC" />
                         <TextBlock Text="|" Foreground="#334155" FontSize="10" />
-                        <StackPanel Orientation="Horizontal" Spacing="3">
-                            <TextBlock Text="💾" FontSize="10" />
-                            <TextBlock x:Name="CompactRamText" Text="0%" FontSize="11" FontWeight="Bold" Foreground="#FBBF24" />
-                        </StackPanel>
+                        <TextBlock x:Name="CompactRamText" Text="RAM 0%" FontSize="11" FontWeight="Bold" Foreground="#FBBF24" />
                         <TextBlock Text="|" Foreground="#334155" FontSize="10" />
-                        <StackPanel Orientation="Horizontal" Spacing="3">
-                            <TextBlock Text="⬇" FontSize="10" Foreground="#34D399" />
-                            <TextBlock x:Name="CompactNetText" Text="0 KB/s" FontSize="10" FontWeight="SemiBold" Foreground="#34D399" />
-                        </StackPanel>
+                        <TextBlock x:Name="CompactNetText" Text="0 KB/s" FontSize="10" FontWeight="SemiBold" Foreground="#34D399" />
                     </StackPanel>
                 </StackPanel>
 
@@ -325,19 +281,24 @@
                 <!-- ═══════════════════════════════════════════════════════════════ -->
                 <StackPanel x:Name="BadgeViewPanel" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Visibility="Collapsed">
                     <TextBlock x:Name="BadgeFpsText" Text="60 FPS" FontWeight="Bold" FontSize="11" Foreground="#34D399" VerticalAlignment="Center" />
-                    <TextBlock Text="·" Foreground="#475569" FontSize="10" VerticalAlignment="Center" />
+                    <TextBlock x:Name="BadgeSepDelay" Text="·" Foreground="#475569" FontSize="10" VerticalAlignment="Center" />
                     <TextBlock x:Name="BadgeDelayText" Text="16.6ms" FontWeight="Bold" FontSize="11" Foreground="#22D3EE" VerticalAlignment="Center" />
-                    <TextBlock Text="·" Foreground="#475569" FontSize="10" VerticalAlignment="Center" />
+                    <TextBlock x:Name="BadgeSepApi" Text="·" Foreground="#475569" FontSize="10" VerticalAlignment="Center" />
                     <TextBlock x:Name="BadgeApiText" Text="DX12" FontWeight="ExtraBold" FontSize="10" Foreground="#C084FC" VerticalAlignment="Center" />
-                    <TextBlock Text="·" Foreground="#475569" FontSize="10" VerticalAlignment="Center" />
-                    <TextBlock x:Name="BadgeCpuText" Text="⚡ 0%" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" VerticalAlignment="Center" />
-                    <TextBlock Text="·" Foreground="#475569" FontSize="10" VerticalAlignment="Center" />
-                    <TextBlock x:Name="BadgeGpuText" Text="🎮 0%" FontSize="11" FontWeight="Bold" Foreground="#C084FC" VerticalAlignment="Center" />
-                    <Button Click="OpenSettings_Click" Padding="4,2" CornerRadius="4" Background="Transparent" BorderThickness="0" Margin="4,0,0,0">
-                        <TextBlock Text="⚙️" FontSize="10" Foreground="#94A3B8" />
+                    <TextBlock x:Name="BadgeSepCpu" Text="·" Foreground="#475569" FontSize="10" VerticalAlignment="Center" />
+                    <TextBlock x:Name="BadgeCpuText" Text="CPU 0%" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" VerticalAlignment="Center" />
+                    <TextBlock x:Name="BadgeSepGpu" Text="·" Foreground="#475569" FontSize="10" VerticalAlignment="Center" />
+                    <TextBlock x:Name="BadgeGpuText" Text="GPU 0%" FontSize="11" FontWeight="Bold" Foreground="#C084FC" VerticalAlignment="Center" />
+                    <Border x:Name="BadgeClickThroughBadge" Background="#30A855F7" BorderThickness="0" CornerRadius="4" Padding="4,1" Visibility="Collapsed"
+                            ToolTipService.ToolTip="滑鼠穿透中 [按 Ctrl+Shift+H 關閉]">
+                        <TextBlock Text="👻" FontSize="10" Foreground="#C084FC" VerticalAlignment="Center" />
+                    </Border>
+                    <Button Flyout="{StaticResource HudStyleThemeMenu}" Padding="4,2" CornerRadius="4" Background="Transparent" BorderThickness="0" Margin="4,0,0,0"
+                            ToolTipService.ToolTip="HUD 主題色彩與外觀型態">
+                        <FontIcon Glyph="&#xE790;" FontSize="10" Foreground="#94A3B8" />
                     </Button>
                     <Button Click="CloseBtn_Click" Padding="4,2" CornerRadius="4" Background="Transparent" BorderThickness="0">
-                        <TextBlock Text="✕" FontSize="10" FontWeight="Bold" Foreground="#EF4444" />
+                        <FontIcon Glyph="&#xE711;" FontSize="10" Foreground="#EF4444" />
                     </Button>
                 </StackPanel>
             </Grid>

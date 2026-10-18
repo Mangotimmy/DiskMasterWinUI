@@ -527,15 +527,71 @@ public sealed partial class DiskToolsPage : Page
 
     private void OpenPathDir_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is Button btn && btn.DataContext is Services.PathDirectoryEntry entry)
+        if (sender is FrameworkElement elem && elem.DataContext is Services.PathDirectoryEntry entry)
         {
             ViewModel.OpenPathDirectoryInExplorerCommand.Execute(entry);
         }
     }
 
+    private void CopyPathDir_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement elem && elem.DataContext is Services.PathDirectoryEntry entry)
+        {
+            var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            dp.SetText(entry.RawPath);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
+            ViewModel.StatusMessage = $"已複製 PATH 目錄路徑：{entry.RawPath}";
+        }
+    }
+
+    private void CopyExpandedPathDir_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement elem && elem.DataContext is Services.PathDirectoryEntry entry)
+        {
+            var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            dp.SetText(entry.ExpandedPath);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
+            ViewModel.StatusMessage = $"已複製展開後目錄路徑：{entry.ExpandedPath}";
+        }
+    }
+
+    private async void AddPathToUserScope_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement elem && elem.DataContext is Services.PathDirectoryEntry entry)
+        {
+            await ViewModel.AddToUserPathCommand.ExecuteAsync(entry.RawPath);
+        }
+    }
+
+    private async void AddPathToMachineScope_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement elem && elem.DataContext is Services.PathDirectoryEntry entry)
+        {
+            await ViewModel.AddToSystemPathCommand.ExecuteAsync(entry.RawPath);
+        }
+    }
+
+    private async void LargeFileAddToUserPath_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement elem && elem.DataContext is Models.TopLargeFileItem item)
+        {
+            var targetDir = !string.IsNullOrEmpty(item.DirectoryPath) ? item.DirectoryPath : System.IO.Path.GetDirectoryName(item.FilePath);
+            await ViewModel.AddToUserPathCommand.ExecuteAsync(targetDir);
+        }
+    }
+
+    private async void LargeFileAddToSystemPath_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement elem && elem.DataContext is Models.TopLargeFileItem item)
+        {
+            var targetDir = !string.IsNullOrEmpty(item.DirectoryPath) ? item.DirectoryPath : System.IO.Path.GetDirectoryName(item.FilePath);
+            await ViewModel.AddToSystemPathCommand.ExecuteAsync(targetDir);
+        }
+    }
+
     private async void RemovePathDir_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is Button btn && btn.DataContext is Services.PathDirectoryEntry entry)
+        if (sender is FrameworkElement elem && elem.DataContext is Services.PathDirectoryEntry entry)
         {
             if (XamlRoot != null)
             {

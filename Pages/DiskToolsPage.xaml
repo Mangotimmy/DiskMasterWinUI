@@ -49,7 +49,7 @@
 
                 <!-- ── Tab 0: Disk Health & Integrity ── -->
                 <TabViewItem x:Name="TabHealth" Header="🩺 磁碟健康 (Disk Health)" IsClosable="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                     <StackPanel x:Name="HealthCardsStack" Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                         <!-- S.M.A.R.T. Health Overview -->
@@ -88,7 +88,15 @@
                                 <ListView ItemsSource="{x:Bind ViewModel.DiskHealthItems, Mode=OneWay}"
                                           SelectedItem="{x:Bind ViewModel.SelectedDiskHealth, Mode=TwoWay}"
                                           SelectionChanged="DiskList_SelectionChanged"
-                                          SelectionMode="Single" MaxHeight="220">
+                                          SelectionMode="Single" MaxHeight="220"
+                                          HorizontalAlignment="Stretch"
+                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                          ScrollViewer.HorizontalScrollMode="Disabled">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
                                     <ListView.ItemTemplate>
                                         <DataTemplate>
                                             <Grid ColumnSpacing="12" Padding="4,6">
@@ -252,7 +260,15 @@
                                     <TextBlock x:Name="AtaSmartTableTitle" Text="🗄️ ATA S.M.A.R.T. 30 項硬體診斷指標資料表" FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
 
                                     <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="8">
-                                        <ListView ItemsSource="{x:Bind ViewModel.AtaSmartAttributes, Mode=OneWay}" SelectionMode="None" MaxHeight="280">
+                                        <ListView ItemsSource="{x:Bind ViewModel.AtaSmartAttributes, Mode=OneWay}" SelectionMode="None" MaxHeight="280"
+                                                  HorizontalAlignment="Stretch"
+                                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                  ScrollViewer.HorizontalScrollMode="Disabled">
+                                            <ListView.ItemContainerStyle>
+                                                <Style TargetType="ListViewItem">
+                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                </Style>
+                                            </ListView.ItemContainerStyle>
                                             <ListView.HeaderTemplate>
                                                 <DataTemplate>
                                                     <Grid Padding="4,4" ColumnSpacing="10">
@@ -340,7 +356,15 @@
                                     <MenuFlyoutItem Text="📌 移至最底部" Click="CardReliability_MoveBottom_Click" />
                                 </MenuFlyout>
                             </Expander.ContextFlyout>
-                            <ListView ItemsSource="{x:Bind ViewModel.ReliabilityItems, Mode=OneWay}" SelectionMode="None">
+                            <ListView ItemsSource="{x:Bind ViewModel.ReliabilityItems, Mode=OneWay}" SelectionMode="None"
+                                      HorizontalAlignment="Stretch"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                      ScrollViewer.HorizontalScrollMode="Disabled">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
                                 <ListView.HeaderTemplate>
                                     <DataTemplate>
                                         <Grid ColumnSpacing="16" Padding="4,4">
@@ -441,7 +465,7 @@
 
             <!-- ── Tab 1: Windows License Keys & Serials ── -->
             <TabViewItem x:Name="TabKeys" Header="金鑰與硬體序號 (Keys &amp; Serials)" IsClosable="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                     <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                         <!-- OEM BIOS Key Card -->
@@ -565,7 +589,7 @@
 
             <!-- ── Tab 2: Environment Table Setting & Doctor (環境變數表格、PATH 健檢與系統工具) ── -->
             <TabViewItem x:Name="TabEnv" Header="🛠️ 環境變數表與套件健檢 (Environment Table &amp; Doctor)" IsClosable="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                     <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,24">
 
                         <!-- Top Filter, Search & Backup Toolbar Card -->
@@ -694,10 +718,18 @@
                                 <ListView ItemsSource="{x:Bind ViewModel.FilteredEnvVariables, Mode=OneWay}"
                                           SelectedItem="{x:Bind ViewModel.SelectedEnvVariable, Mode=TwoWay}"
                                           MaxHeight="300" SelectionMode="Single"
+                                          HorizontalAlignment="Stretch"
+                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                          ScrollViewer.HorizontalScrollMode="Disabled"
                                           AutomationProperties.Name="環境變數資料表">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
                                     <ListView.ItemTemplate>
                                         <DataTemplate x:DataType="services:EnvironmentVariableEntry">
-                                            <Grid Padding="8,6" ColumnSpacing="12"
+                                            <Grid Padding="8,6" ColumnSpacing="12" HorizontalAlignment="Stretch"
                                                   BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="135" />
@@ -923,11 +955,31 @@
                                 <ListView ItemsSource="{x:Bind ViewModel.FilteredPathDirectories, Mode=OneWay}"
                                           SelectedItem="{x:Bind ViewModel.SelectedPathDirectory, Mode=TwoWay}"
                                           MaxHeight="280" SelectionMode="Single"
+                                          HorizontalAlignment="Stretch"
+                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                          ScrollViewer.HorizontalScrollMode="Disabled"
                                           AutomationProperties.Name="PATH 執行路徑資料表">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
                                     <ListView.ItemTemplate>
                                         <DataTemplate x:DataType="services:PathDirectoryEntry">
-                                            <Grid Padding="8,6" ColumnSpacing="12"
+                                            <Grid Padding="8,6" ColumnSpacing="12" HorizontalAlignment="Stretch"
                                                   BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                                                <Grid.ContextFlyout>
+                                                    <MenuFlyout>
+                                                        <MenuFlyoutItem Text="📋 複製原始路徑 (Copy Raw Path)" Click="CopyPathDir_Click" />
+                                                        <MenuFlyoutItem Text="📋 複製展開後完整路徑 (Copy Expanded)" Click="CopyExpandedPathDir_Click" />
+                                                        <MenuFlyoutItem Text="📂 在檔案總管中開啟" Click="OpenPathDir_Click" IsEnabled="{x:Bind Exists}" />
+                                                        <MenuFlyoutSeparator />
+                                                        <MenuFlyoutItem Text="👤 加入使用者 PATH (User PATH)" Click="AddPathToUserScope_Click" />
+                                                        <MenuFlyoutItem Text="🛡️ 加入系統 PATH (System PATH)" Click="AddPathToMachineScope_Click" />
+                                                        <MenuFlyoutSeparator />
+                                                        <MenuFlyoutItem Text="🗑️ 從 PATH 中移除" Click="RemovePathDir_Click" />
+                                                    </MenuFlyout>
+                                                </Grid.ContextFlyout>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="52" />
                                                     <ColumnDefinition Width="125" />
@@ -1014,10 +1066,18 @@
 
                                 <ListView ItemsSource="{x:Bind ViewModel.ToolItems, Mode=OneWay}"
                                           SelectionMode="None"
+                                          HorizontalAlignment="Stretch"
+                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                          ScrollViewer.HorizontalScrollMode="Disabled"
                                           AutomationProperties.Name="系統核心 CLI 工具健檢表">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
                                     <ListView.ItemTemplate>
                                         <DataTemplate x:DataType="services:ToolEnvironmentItem">
-                                            <Grid Padding="8,8" ColumnSpacing="12"
+                                            <Grid Padding="8,8" ColumnSpacing="12" HorizontalAlignment="Stretch"
                                                   BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="130" />
@@ -1093,7 +1153,7 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <ScrollViewer Grid.Row="0" MaxHeight="380" VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer Grid.Row="0" MaxHeight="380" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
                         <Grid ColumnSpacing="12" RowSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -1181,10 +1241,18 @@
                                     <!-- Structured VSS Shadows List -->
                                     <ListView ItemsSource="{x:Bind ViewModel.AllShadows, Mode=OneWay}"
                                               SelectedItem="{x:Bind ViewModel.SelectedShadow, Mode=TwoWay}"
-                                              MaxHeight="120" SelectionMode="Single">
+                                              MaxHeight="120" SelectionMode="Single"
+                                              HorizontalAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                              ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="models:VssShadowItem">
-                                                <Grid Padding="2" ColumnSpacing="6">
+                                                <Grid Padding="2" ColumnSpacing="6" HorizontalAlignment="Stretch">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*" />
                                                         <ColumnDefinition Width="Auto" />
@@ -1368,10 +1436,18 @@
                                     </Grid>
                                     <ListView ItemsSource="{x:Bind ViewModel.FilteredDrivers, Mode=OneWay}"
                                               SelectedItem="{x:Bind ViewModel.SelectedDriver, Mode=TwoWay}"
-                                              MaxHeight="120" SelectionMode="Single">
+                                              MaxHeight="120" SelectionMode="Single"
+                                              HorizontalAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                              ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="models:OemDriverItem">
-                                                <Grid Padding="2" ColumnSpacing="6">
+                                                <Grid HorizontalAlignment="Stretch" Padding="2" ColumnSpacing="6">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="Auto" />
                                                         <ColumnDefinition Width="*" />
@@ -1408,7 +1484,9 @@
                                 <Button Content="Clear" Command="{x:Bind ViewModel.ClearLogCommand}" Padding="8,2" FontSize="11" />
                             </StackPanel>
                             <ScrollViewer Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
-                                          CornerRadius="6" Padding="10">
+                                          CornerRadius="6" Padding="10"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          HorizontalScrollMode="Disabled">
                                 <TextBlock Text="{x:Bind ViewModel.OutputLog, Mode=OneWay}"
                                            FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"
                                            IsTextSelectionEnabled="True" />
@@ -1420,7 +1498,7 @@
 
             <!-- ── Tab 4: VHD / VHDX 虛擬硬碟與暫存清理管理箱 ── -->
             <TabViewItem x:Name="TabVhdx" Header="💽 VHD/VHDX 虛擬磁碟與快取清理" IsClosable="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                     <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                         <!-- Card 1: VHD/VHDX Virtual Disk Manager -->
@@ -1591,7 +1669,7 @@
 
             <!-- ── Tab 5: 磁碟複製與格式化 (Raw Block Clone / VHDX Image / ReFS Format) ── -->
             <TabViewItem x:Name="TabCloneFormat" Header="🧬 複製與格式化 (Clone &amp; Format)" IsClosable="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                     <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                         <!-- Card 1: Raw block level clone + VHDX image mode -->
@@ -1716,7 +1794,9 @@
                                             Padding="8,2" FontSize="11" HorizontalAlignment="Left" />
                                 </Grid>
                                 <ScrollViewer MaxHeight="220" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
-                                              CornerRadius="6" Padding="10">
+                                              CornerRadius="6" Padding="10"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              HorizontalScrollMode="Disabled">
                                     <TextBlock Text="{x:Bind ViewModel.CloneLog, Mode=OneWay}"
                                                FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
                                 </ScrollViewer>
@@ -1804,7 +1884,9 @@
                                             Padding="8,2" FontSize="11" HorizontalAlignment="Left" />
                                 </Grid>
                                 <ScrollViewer MaxHeight="200" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
-                                              CornerRadius="6" Padding="10">
+                                              CornerRadius="6" Padding="10"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              HorizontalScrollMode="Disabled">
                                     <TextBlock Text="{x:Bind ViewModel.FormatLog, Mode=OneWay}"
                                                FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
                                 </ScrollViewer>
@@ -1817,7 +1899,7 @@
 
             <!-- ── Tab 7: 磁碟目錄空間與功能指南 (Storage Directory Encyclopedia) ── -->
             <TabViewItem x:Name="TabDirectoryAnalyzer" Header="📁 目錄空間指南 (Storage Directory Guide)" IsClosable="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                     <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                         <!-- Hero Header Card -->
@@ -1958,10 +2040,28 @@
                                     <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
                                         <StackPanel Spacing="8">
                                             <TextBlock Text="🏆 Top 巨型檔案排行 (最耗空間前 100 名)" FontWeight="SemiBold" FontSize="13" />
-                                            <ListView ItemsSource="{x:Bind ViewModel.TopLargeFiles, Mode=OneWay}" MaxHeight="320" SelectionMode="None">
+                                            <ListView ItemsSource="{x:Bind ViewModel.TopLargeFiles, Mode=OneWay}" MaxHeight="320" SelectionMode="None"
+                                                      HorizontalAlignment="Stretch"
+                                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                      ScrollViewer.HorizontalScrollMode="Disabled">
+                                                <ListView.ItemContainerStyle>
+                                                    <Style TargetType="ListViewItem">
+                                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                    </Style>
+                                                </ListView.ItemContainerStyle>
                                                 <ListView.ItemTemplate>
                                                     <DataTemplate x:DataType="models:TopLargeFileItem">
-                                                        <Grid Padding="4,6" ColumnSpacing="8" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                        <Grid HorizontalAlignment="Stretch" Padding="4,6" ColumnSpacing="8" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                            <Grid.ContextFlyout>
+                                                                <MenuFlyout>
+                                                                    <MenuFlyoutItem Text="📂 在檔案總管中開啟"
+                                                                                    Command="{Binding ElementName=TabDirectoryAnalyzer, Path=DataContext.OpenFolderForFileCommand}"
+                                                                                    CommandParameter="{x:Bind FilePath}" />
+                                                                    <MenuFlyoutSeparator />
+                                                                    <MenuFlyoutItem Text="👤 將所在資料夾加至使用者 PATH" Click="LargeFileAddToUserPath_Click" />
+                                                                    <MenuFlyoutItem Text="🛡️ 將所在資料夾加至系統 PATH" Click="LargeFileAddToSystemPath_Click" />
+                                                                </MenuFlyout>
+                                                            </Grid.ContextFlyout>
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="*" />
                                                                 <ColumnDefinition Width="Auto" />
@@ -1986,10 +2086,18 @@
                                     <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
                                         <StackPanel Spacing="8">
                                             <TextBlock Text="📦 副檔名類型空間佔比" FontWeight="SemiBold" FontSize="13" />
-                                            <ListView ItemsSource="{x:Bind ViewModel.ExtensionBreakdowns, Mode=OneWay}" MaxHeight="320" SelectionMode="None">
+                                            <ListView ItemsSource="{x:Bind ViewModel.ExtensionBreakdowns, Mode=OneWay}" MaxHeight="320" SelectionMode="None"
+                                                      HorizontalAlignment="Stretch"
+                                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                      ScrollViewer.HorizontalScrollMode="Disabled">
+                                                <ListView.ItemContainerStyle>
+                                                    <Style TargetType="ListViewItem">
+                                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                    </Style>
+                                                </ListView.ItemContainerStyle>
                                                 <ListView.ItemTemplate>
                                                     <DataTemplate x:DataType="models:FileExtensionBreakdownItem">
-                                                        <Grid Padding="4,6" RowSpacing="3">
+                                                        <Grid HorizontalAlignment="Stretch" Padding="4,6" RowSpacing="3">
                                                             <Grid.RowDefinitions>
                                                                 <RowDefinition Height="Auto" />
                                                                 <RowDefinition Height="Auto" />

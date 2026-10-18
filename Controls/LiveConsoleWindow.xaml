@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Window
+    x:Class="DiskMasterWinUI.Controls.LiveConsoleWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="using:DiskMasterWinUI.Models"
+    Title="DiskMaster Pro — Live Console"
+    mc:Ignorable="d">
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TitleBar x:Name="ConsoleTitleBar" Grid.Row="0" Title="Live Console">
+            <TitleBar.IconSource>
+                <ImageIconSource ImageSource="Assets/AppIcon.ico" />
+            </TitleBar.IconSource>
+        </TitleBar>
+
+        <Border Grid.Row="1" Padding="12,8"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <Button x:Name="PauseBtn" Click="PauseBtn_Click" Padding="10,5" FontSize="12">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon x:Name="PauseIcon" Glyph="&#xE769;" FontSize="12" />
+                            <TextBlock x:Name="PauseText" Text="Pause" />
+                        </StackPanel>
+                    </Button>
+                    <ComboBox x:Name="LevelFilterCombo" Width="180" SelectionChanged="LevelFilterCombo_SelectionChanged" />
+                    <CheckBox x:Name="AutoScrollCheck" Content="Auto-scroll" IsChecked="True" VerticalAlignment="Center" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <Button x:Name="CopyBtn" Click="CopyBtn_Click" Padding="10,5" FontSize="12" />
+                    <Button x:Name="ClearBtn" Click="ClearBtn_Click" Padding="10,5" FontSize="12" />
+                    <Button x:Name="OpenFolderBtn" Click="OpenFolderBtn_Click" Padding="10,5" FontSize="12" />
+                    <Button x:Name="OpenCmdBtn" Click="OpenCmdBtn_Click" Padding="10,5" FontSize="12" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2" Margin="12,10,12,8"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                CornerRadius="8" Padding="4">
+            <Grid>
+                <ListView x:Name="LogList" SelectionMode="Single"
+                          HorizontalAlignment="Stretch"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                          ScrollViewer.HorizontalScrollMode="Disabled">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="MinHeight" Value="0" />
+                            <Setter Property="Padding" Value="4,2" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid ColumnSpacing="8" Margin="2,1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding FormattedTime}"
+                                           FontFamily="Consolas, Cascadia Mono, Courier New" FontSize="11"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Top" />
+                                <Border Grid.Column="1" Background="{Binding Level, Converter={StaticResource LogLevelToBrushConverter}}"
+                                        CornerRadius="3" Padding="4,1" VerticalAlignment="Top">
+                                    <TextBlock Text="{Binding Level}" FontSize="9" FontWeight="Bold" Foreground="White" />
+                                </Border>
+                                <TextBlock Grid.Column="2" Text="{Binding FullLineForConsole}"
+                                           FontFamily="Consolas, Cascadia Mono, Courier New" FontSize="11"
+                                           TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <TextBlock x:Name="EmptyStateText" HorizontalAlignment="Center" VerticalAlignment="Center"
+                           FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           Text="No log entries yet" IsHitTestVisible="False" />
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="3" Padding="12,6"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="FooterStateText" Grid.Column="0" FontSize="11"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                <TextBlock x:Name="BufferCountText" Grid.Column="1" FontSize="11" Margin="12,0,0,0"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

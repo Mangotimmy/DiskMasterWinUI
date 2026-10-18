@@ -6,10 +6,15 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:models="using:DiskMasterWinUI.Models"
-    Title="📝 即時操作與請求動態檢視器 (Live Action &amp; Request Inspector)"
+    xmlns:helpers="using:DiskMasterWinUI.Helpers"
+    Title="📝 即時操作與請求動態檢視器 (Live Action - Request Inspector)"
     CloseButtonText="關閉"
-    DefaultButton="Close"
     mc:Ignorable="d">
+
+    <ContentDialog.Resources>
+        <helpers:LogLevelToBrushConverter x:Key="LogLevelToBrushConverter" />
+        <helpers:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
+    </ContentDialog.Resources>
 
     <Grid MinWidth="760" MinHeight="520" MaxWidth="960" MaxHeight="680" RowSpacing="12">
         <Grid.RowDefinitions>
@@ -32,8 +37,7 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBox x:Name="SearchBox" Grid.Column="0"
-                         PlaceholderText="🔍 即時搜尋動作、類別或細節..."
-                         TextChanged="SearchBox_TextChanged" />
+                         PlaceholderText="🔍 即時搜尋動作、類別或細節..." />
                 <TextBlock x:Name="CountStatusText" Grid.Column="1"
                            Text="共 0 筆紀錄" VerticalAlignment="Center"
                            Style="{StaticResource CaptionTextBlockStyle}"
@@ -50,7 +54,7 @@
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                     <TextBlock Text="類別:" VerticalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <ComboBox x:Name="CategoryFilterCombo" Width="180" SelectionChanged="Filter_SelectionChanged">
+                    <ComboBox x:Name="CategoryFilterCombo" Width="180">
                         <ComboBoxItem Content="全部類別" IsSelected="True" Tag="ALL" />
                         <ComboBoxItem Content="導航 (Navigation)" Tag="Navigation" />
                         <ComboBoxItem Content="效能監控 (Performance)" Tag="Performance" />
@@ -71,7 +75,7 @@
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                     <TextBlock Text="等級:" VerticalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <ComboBox x:Name="LevelFilterCombo" Width="170" SelectionChanged="Filter_SelectionChanged">
+                    <ComboBox x:Name="LevelFilterCombo" Width="170">
                         <ComboBoxItem Content="全部等級" IsSelected="True" Tag="ALL" />
                         <ComboBoxItem Content="僅操作 (ACTION)" Tag="ACTION" />
                         <ComboBoxItem Content="僅請求 (REQUEST)" Tag="REQUEST" />
@@ -89,10 +93,18 @@
         <Border Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                 CornerRadius="8" Padding="4">
-            <ListView x:Name="LogListView" SelectionMode="Extended">
+            <ListView x:Name="LogListView" SelectionMode="Extended"
+                      HorizontalAlignment="Stretch"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                      ScrollViewer.HorizontalScrollMode="Disabled">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    </Style>
+                </ListView.ItemContainerStyle>
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="models:ActionLogItem">
-                        <Grid Margin="4,4,4,4" ColumnSpacing="10">
+                        <Grid Margin="4,4,4,4" ColumnSpacing="10" HorizontalAlignment="Stretch">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
@@ -107,7 +119,7 @@
                                        VerticalAlignment="Top" Margin="0,3,0,0" />
 
                             <!-- Level Pill -->
-                            <Border Grid.Column="1" Background="{x:Bind LevelBadgeBrush}"
+                            <Border Grid.Column="1" Background="{x:Bind Level, Converter={StaticResource LogLevelToBrushConverter}}"
                                     CornerRadius="4" Padding="6,2" VerticalAlignment="Top" HorizontalAlignment="Center">
                                 <TextBlock Text="{x:Bind Level}" FontSize="10" FontWeight="Bold" Foreground="White" />
                             </Border>
@@ -127,7 +139,7 @@
                                 <TextBlock Text="{x:Bind Details}" FontSize="11"
                                            TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                            FontFamily="Consolas, Cascadia Code, Courier New"
-                                           Visibility="{x:Bind HasDetailsVisibility}" />
+                                           Visibility="{x:Bind Details, Converter={StaticResource StringToVisibilityConverter}}" />
                             </StackPanel>
                         </Grid>
                     </DataTemplate>
@@ -150,6 +162,7 @@
             </StackPanel>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="OpenCmdBtn" Content="💻 CMD 即時監控" Click="OpenCmd_Click" Padding="10,5" />
                 <Button x:Name="OpenFolderBtn" Content="📂 日誌資料夾" Click="OpenFolder_Click" Padding="10,5" />
                 <Button x:Name="OpenNotepadBtn" Content="📝 記事本開啟" Click="OpenNotepad_Click" Padding="10,5" />
             </StackPanel>

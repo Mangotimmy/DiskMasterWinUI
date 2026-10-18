@@ -24,8 +24,10 @@ public partial class ProgressAndEtaTracker
     private readonly object _sync = new();
 
     private readonly Stopwatch _stopwatch = new();
+    private readonly ChkdskProgressParser _chkdskParser = new();
     private double _currentPercentage;
     private long _processedFiles;
+    private TimeSpan? _expectedDuration;
     private volatile bool _isActive;
 
     public event Action<double, string, string>? ProgressUpdated;
@@ -34,12 +36,14 @@ public partial class ProgressAndEtaTracker
     public double CurrentPercentage { get { lock (_sync) return _currentPercentage; } }
     public TimeSpan ElapsedTime { get { lock (_sync) return _stopwatch.Elapsed; } }
 
-    public void Start(string initialOperation = "Running...")
+    public void Start(string initialOperation = "Running...", TimeSpan? expectedDuration = null)
     {
         lock (_sync)
         {
             _currentPercentage = 0;
             _processedFiles = 0;
+            _expectedDuration = expectedDuration;
+            _chkdskParser.Reset();
             _stopwatch.Restart();
             _isActive = true;
         }
@@ -60,6 +64,20 @@ public partial class ProgressAndEtaTracker
         NotifyUpdate(percent, elapsed, "Completed");
     }
 
+    /// <summary>Marks completion at exactly 100% before the status bar shows its completed state.</summary>
+    public void Complete()
+    {
+        double elapsedSeconds;
+        lock (_sync)
+        {
+            _currentPercentage = 100;
+            _stopwatch.Stop();
+            _isActive = false;
+            elapsedSeconds = _stopwatch.Elapsed.TotalSeconds;
+        }
+        NotifyUpdate(100, FormatTimeSpan(TimeSpan.FromSeconds(elapsedSeconds)), "Completed");
+    }
+
     public void Reset()
     {
         lock (_sync)
@@ -67,6 +85,8 @@ public partial class ProgressAndEtaTracker
             _stopwatch.Reset();
             _currentPercentage = 0;
             _processedFiles = 0;
+            _expectedDuration = null;
+            _chkdskParser.Reset();
             _isActive = false;
         }
     }
@@ -103,6 +123,13 @@ public partial class ProgressAndEtaTracker
                 elapsed = _stopwatch.Elapsed;
             }
             NotifyUpdate(0, FormatTimeSpan(elapsed), $"{files:N0} files processed");
+            return;
+        }
+
+        var chkdskProgress = _chkdskParser.ProcessLine(line);
+        if (chkdskProgress.HasValue)
+        {
+            UpdateProgress(chkdskProgress.Value);
         }
     }
 
@@ -113,18 +140,74 @@ public partial class ProgressAndEtaTracker
         string etaStr;
         lock (_sync)
         {
-            _currentPercentage = Math.Clamp(percentage, 0.0, 100.0);
-            percent = _currentPercentage;
             var elapsed = _stopwatch.Elapsed;
+            double candidate = Math.Clamp(percentage, 0.0, 100.0);
+            double timePercent = GetTimeBasedPercent(elapsed);
+            // Never let a late stage line move the bar backwards after the countdown has advanced.
+            _currentPercentage = Math.Max(_currentPercentage, Math.Max(candidate, timePercent));
+            percent = _currentPercentage;
             elapsedStr = FormatTimeSpan(elapsed);
-            etaStr = CalculateEta(elapsed, _currentPercentage);
+            etaStr = BuildEta(elapsed, percent);
         }
 
         NotifyUpdate(percent, elapsedStr, etaStr);
     }
 
+    /// <summary>
+    /// Live snapshot for the status-bar timer. Unlike <see cref="UpdateProgress"/>, this does not
+    /// depend on a process output line arriving, so elapsed time and the ETA keep updating for
+    /// operations whose output never matches a progress regex.
+    /// </summary>
+    public (double Percent, string Elapsed, string Eta) GetLiveSnapshot()
+    {
+        lock (_sync)
+        {
+            if (!_isActive) return (_currentPercentage, "00:00", string.Empty);
+
+            var elapsed = _stopwatch.Elapsed;
+            double timePercent = GetTimeBasedPercent(elapsed);
+            _currentPercentage = Math.Max(_currentPercentage, timePercent);
+            string eta = BuildEta(elapsed, _currentPercentage);
+            return (_currentPercentage, FormatTimeSpan(elapsed), eta);
+        }
+    }
+
+    private double GetTimeBasedPercent(TimeSpan elapsed)
+    {
+        if (_expectedDuration is not { TotalSeconds: > 0 } expected) return 0;
+        double percent = elapsed.TotalSeconds / expected.TotalSeconds * 100.0;
+        return Math.Clamp(percent, 0, 98);
+    }
+
+    private string BuildEta(TimeSpan elapsed, double percentage)
+    {
+        if (percentage >= 100) return "Completed";
+
+        if (_expectedDuration is { TotalSeconds: > 0 } expected)
+        {
+            var remaining = expected - elapsed;
+            if (remaining > TimeSpan.FromSeconds(10))
+            {
+                return FormatRemaining(remaining);
+            }
+            return "Almost done...";
+        }
+
+        return percentage > 2.0 ? CalculateEta(elapsed, percentage) : string.Empty;
+    }
+
+    private static string FormatRemaining(TimeSpan remaining)
+    {
+        if (remaining.TotalSeconds < 10) return "Almost done...";
+        if (remaining.TotalHours >= 1)
+            return $"~{(int)remaining.TotalHours}h {remaining.Minutes}m remaining";
+        return $"~{remaining.Minutes:D2}:{remaining.Seconds:D2} remaining";
+    }
+
     private string CalculateEta(TimeSpan elapsed, double percentage)
     {
+        if (percentage >= 100.0)
+            return "Completed";
         if (percentage <= 2.0)
             return "Calculating ETA...";
         if (percentage >= 99.5)
@@ -132,11 +215,7 @@ public partial class ProgressAndEtaTracker
 
         var totalSeconds = elapsed.TotalSeconds / (percentage / 100.0);
         var remainingSeconds = Math.Max(0, totalSeconds - elapsed.TotalSeconds);
-        var remainingTime = TimeSpan.FromSeconds(remainingSeconds);
-
-        if (remainingTime.TotalHours >= 1)
-            return $"~{remainingTime.Hours}h {remainingTime.Minutes}m remaining";
-        return $"~{remainingTime.Minutes:D2}:{remainingTime.Seconds:D2} remaining";
+        return FormatRemaining(TimeSpan.FromSeconds(remainingSeconds));
     }
 
     private static string FormatTimeSpan(TimeSpan ts)

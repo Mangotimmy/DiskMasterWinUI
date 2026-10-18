@@ -9,8 +9,8 @@
     mc:Ignorable="d"
     Loaded="Page_Loaded">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
-        <StackPanel Spacing="20" HorizontalAlignment="Stretch" Margin="0,0,16,20">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Padding="20" HorizontalContentAlignment="Stretch">
+        <StackPanel Spacing="20" HorizontalAlignment="Center" MaxWidth="1200" Margin="0,0,0,24">
 
             <!-- Hero Health Score Card -->
             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"

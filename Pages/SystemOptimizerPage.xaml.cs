@@ -217,7 +217,7 @@ public sealed partial class SystemOptimizerPage : Page
             if (!_hasLoadedOnce)
             {
                 _hasLoadedOnce = true;
-                await ViewModel.RefreshAllCommand.ExecuteAsync(null);
+                await ViewModel.RefreshFastCoreSettingsCommand.ExecuteAsync(null);
             }
         }
         finally
@@ -228,31 +228,78 @@ public sealed partial class SystemOptimizerPage : Page
 
     private void GameDvr_Toggled(object sender, RoutedEventArgs e)
     {
-        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically && ViewModel.ToggleGameDvrCommand.CanExecute(null))
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsGameDvrDisabled) return;
+        if (ViewModel.ToggleGameDvrCommand.CanExecute(null))
             ViewModel.ToggleGameDvrCommand.Execute(null);
     }
 
     private void Hags_Toggled(object sender, RoutedEventArgs e)
     {
-        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically && ViewModel.ToggleHagsCommand.CanExecute(null))
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsHagsEnabled) return;
+        if (ViewModel.ToggleHagsCommand.CanExecute(null))
             ViewModel.ToggleHagsCommand.Execute(null);
     }
 
     private void InputLatency_Toggled(object sender, RoutedEventArgs e)
     {
-        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically && ViewModel.ToggleInputLatencyCommand.CanExecute(null))
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsLowInputLatencyEnabled) return;
+        if (ViewModel.ToggleInputLatencyCommand.CanExecute(null))
             ViewModel.ToggleInputLatencyCommand.Execute(null);
+    }
+
+    private void PureVulkanMode_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsPureVulkanMode) return;
+        if (ViewModel.TogglePureVulkanModeCommand.CanExecute(null))
+            ViewModel.TogglePureVulkanModeCommand.Execute(null);
+    }
+
+    private void ExplorerSetting_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.Tag is string key)
+        {
+            bool currentSetting = key switch
+            {
+                "TaskbarAnimations" => ViewModel.ExplorerAdvState.TaskbarAnimationsDisabled,
+                "DesktopLivePreview" => ViewModel.ExplorerAdvState.DesktopLivePreviewInstant,
+                "DisallowShaking" => ViewModel.ExplorerAdvState.DisallowShakingEnabled,
+                "SeparateProcess" => ViewModel.ExplorerAdvState.SeparateProcessEnabled,
+                "nonetcrawling" => ViewModel.ExplorerAdvState.NonetCrawlingDisabled,
+                "IconsOnly" => ViewModel.ExplorerAdvState.IconsOnlyEnabled,
+                "HideFileExt" => ViewModel.ExplorerAdvState.HideFileExtDisabled,
+                "TaskbarDa" => ViewModel.ExplorerAdvState.TaskbarDaDisabled,
+                "ShowCopilotButton" => ViewModel.ExplorerAdvState.ShowCopilotButtonDisabled,
+                "Start_IrisRecommendations" => ViewModel.ExplorerAdvState.StartIrisRecommendationsDisabled,
+                "Start_TrackDocs" => ViewModel.ExplorerAdvState.StartTrackDocsDisabled,
+                "ShowSecondsInSystemClock" => ViewModel.ExplorerAdvState.ShowSecondsInSystemClockDisabled,
+                "QuickAccessRecent" => ViewModel.ExplorerAdvState.QuickAccessRecentDisabled,
+                _ => !ts.IsOn
+            };
+            if (ts.IsOn == currentSetting) return;
+
+            if (ViewModel.ToggleExplorerAdvancedSettingCommand.CanExecute(key))
+                ViewModel.ToggleExplorerAdvancedSettingCommand.Execute(key);
+        }
     }
 
     private void PowerThrottling_Toggled(object sender, RoutedEventArgs e)
     {
-        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically && ViewModel.TogglePowerThrottlingCommand.CanExecute(null))
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsPowerThrottlingDisabled) return;
+        if (ViewModel.TogglePowerThrottlingCommand.CanExecute(null))
             ViewModel.TogglePowerThrottlingCommand.Execute(null);
     }
 
     private void SystemResponsiveness_Toggled(object sender, RoutedEventArgs e)
     {
-        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically && ViewModel.ToggleSystemResponsivenessCommand.CanExecute(null))
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsSystemResponsivenessZero) return;
+        if (ViewModel.ToggleSystemResponsivenessCommand.CanExecute(null))
             ViewModel.ToggleSystemResponsivenessCommand.Execute(null);
     }
 
@@ -273,19 +320,25 @@ public sealed partial class SystemOptimizerPage : Page
 
     private void NetworkThrottling_Toggled(object sender, RoutedEventArgs e)
     {
-        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically && ViewModel.ToggleNetworkThrottlingCommand.CanExecute(null))
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsNetworkThrottlingDisabled) return;
+        if (ViewModel.ToggleNetworkThrottlingCommand.CanExecute(null))
             ViewModel.ToggleNetworkThrottlingCommand.Execute(null);
     }
 
     private void CoreUnparking_Toggled(object sender, RoutedEventArgs e)
     {
-        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically && ViewModel.ToggleCoreUnparkingCommand.CanExecute(null))
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsCoreUnparked) return;
+        if (ViewModel.ToggleCoreUnparkingCommand.CanExecute(null))
             ViewModel.ToggleCoreUnparkingCommand.Execute(null);
     }
 
     private void MinProcessorState_Toggled(object sender, RoutedEventArgs e)
     {
-        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically && ViewModel.ToggleMinProcessorStateCommand.CanExecute(null))
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsMinProcessorState100) return;
+        if (ViewModel.ToggleMinProcessorStateCommand.CanExecute(null))
             ViewModel.ToggleMinProcessorStateCommand.Execute(null);
     }
 
@@ -405,58 +458,58 @@ public sealed partial class SystemOptimizerPage : Page
 
     private void Nagle_Toggled(object sender, RoutedEventArgs e)
     {
-        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically)
-        {
-            ViewModel.ToggleNagleAlgorithmCommand.Execute(null);
-        }
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsNagleDisabled) return;
+        ViewModel.ToggleNagleAlgorithmCommand.Execute(null);
     }
 
     private void DisablePagingExecutive_Toggled(object sender, RoutedEventArgs e)
     {
-        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically)
-        {
-            ViewModel.ToggleDisablePagingExecutiveCommand.Execute(null);
-        }
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsDisablePagingExecutive) return;
+        ViewModel.ToggleDisablePagingExecutiveCommand.Execute(null);
     }
 
     private void GroupPolicyTelemetry_Toggled(object sender, RoutedEventArgs e)
     {
-        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically)
-        {
-            ViewModel.ToggleGroupPolicyTelemetryCommand.Execute(null);
-        }
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsGroupPolicyTelemetryDisabled) return;
+        ViewModel.ToggleGroupPolicyTelemetryCommand.Execute(null);
     }
 
     private void DpsService_Toggled(object sender, RoutedEventArgs e)
     {
-        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically && ViewModel.ToggleDpsServiceCommand.CanExecute(null))
-        {
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsDpsServiceDisabled) return;
+        if (ViewModel.ToggleDpsServiceCommand.CanExecute(null))
             ViewModel.ToggleDpsServiceCommand.Execute(null);
-        }
     }
 
     private void L2tpVpnNatFix_Toggled(object sender, RoutedEventArgs e)
     {
-        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically && ViewModel.ToggleL2tpVpnNatFixCommand.CanExecute(null))
-        {
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsL2tpVpnNatFixEnabled) return;
+        if (ViewModel.ToggleL2tpVpnNatFixCommand.CanExecute(null))
             ViewModel.ToggleL2tpVpnNatFixCommand.Execute(null);
-        }
     }
 
     private void ExplorerWatchdog_Toggled(object sender, RoutedEventArgs e)
     {
-        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically)
-        {
-            ViewModel.ToggleExplorerWatchdogCommand.Execute(null);
-        }
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is not ToggleSwitch ts) return;
+
+        // The OneWay binding raises Toggled when the VM changes (e.g. ExplorerWatchdogService.StatusChanged).
+        // Only a real user action leaves IsOn different from the VM; otherwise ignore to avoid a feedback loop.
+        if (ts.IsOn == ViewModel.IsExplorerWatchdogEnabled) return;
+
+        ViewModel.SetExplorerWatchdogEnabled(ts.IsOn);
     }
 
     private void GlobalFastFolder_Toggled(object sender, RoutedEventArgs e)
     {
-        if (!_suppressToggled && !ViewModel.IsUpdatingProgrammatically)
-        {
-            ViewModel.ToggleGlobalFastFolderDiscoveryCommand.Execute(null);
-        }
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsGlobalFastFolderDiscoveryEnabled) return;
+        ViewModel.ToggleGlobalFastFolderDiscoveryCommand.Execute(null);
     }
 
     private void PopularIconCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -503,6 +556,15 @@ public sealed partial class SystemOptimizerPage : Page
         else if (ReferenceEquals(OptimizerTabView.SelectedItem, TabDrivers) && ViewModel.OemDrivers.Count == 0 && !ViewModel.IsLoadingDrivers)
         {
             ViewModel.RefreshDriversCommand.Execute(null);
+        }
+        else if (ReferenceEquals(OptimizerTabView.SelectedItem, TabPower) && ViewModel.PowerPlans.Count == 0 && !ViewModel.IsLoadingPowerPlans)
+        {
+            ViewModel.RefreshPowerPlansCommand.Execute(null);
+            ViewModel.RefreshWakeDevicesCommand.Execute(null);
+        }
+        else if (ReferenceEquals(OptimizerTabView.SelectedItem, TabBackup) && ViewModel.RestorePoints.Count == 0 && !ViewModel.IsLoadingRestorePoints)
+        {
+            ViewModel.RefreshRestorePointsCommand.Execute(null);
         }
         else if (ReferenceEquals(OptimizerTabView.SelectedItem, TabCpu))
         {

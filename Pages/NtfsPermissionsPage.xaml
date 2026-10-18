@@ -52,7 +52,7 @@
 
                 <!-- ════ Tab 1: 常用快捷操作 (Quick Actions) ════ -->
                 <TabViewItem x:Name="TabQuickActions" Header="⚡ 常用快捷操作 (Quick Actions)" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                         <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
                             
                             <!-- Presets Grid -->
@@ -170,7 +170,7 @@
 
                 <!-- ════ Tab 2: NTFS 深度特性探索 (NTFS Explorer) ════ -->
                 <TabViewItem x:Name="TabNtfsExplorer" Header="🔍 NTFS 深度特性探索" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                         <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
 
                             <!-- Status & Quick Stats Overview -->
@@ -263,7 +263,15 @@
                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
 
                                     <ListView ItemsSource="{x:Bind ViewModel.CurrentNtfsSummary.AlternateStreams, Mode=OneWay}"
-                                              SelectionMode="None" MaxHeight="220" Margin="0,4,0,0">
+                                              SelectionMode="None" MaxHeight="220" Margin="0,4,0,0"
+                                              HorizontalAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                              ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
                                         <ListView.Header>
                                             <Grid Padding="12,6" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4">
                                                 <Grid.ColumnDefinitions>
@@ -278,7 +286,7 @@
                                         </ListView.Header>
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="models:AlternateDataStreamItem">
-                                                <Grid Padding="12,8" ColumnSpacing="8">
+                                                <Grid Padding="12,8" ColumnSpacing="8" HorizontalAlignment="Stretch">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*" />
                                                         <ColumnDefinition Width="140" />
@@ -307,7 +315,15 @@
                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
 
                                     <ListView ItemsSource="{x:Bind ViewModel.CurrentNtfsSummary.AclEntries, Mode=OneWay}"
-                                              SelectionMode="None" MaxHeight="300" Margin="0,4,0,0">
+                                              SelectionMode="None" MaxHeight="300" Margin="0,4,0,0"
+                                              HorizontalAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                              ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
                                         <ListView.Header>
                                             <Grid Padding="12,6" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4">
                                                 <Grid.ColumnDefinitions>
@@ -324,7 +340,7 @@
                                         </ListView.Header>
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="models:NtfsAceItem">
-                                                <Grid Padding="12,8" ColumnSpacing="8">
+                                                <Grid Padding="12,8" ColumnSpacing="8" HorizontalAlignment="Stretch">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="220" />
                                                         <ColumnDefinition Width="100" />
@@ -348,7 +364,7 @@
 
                 <!-- ════ Tab 3: 自訂 icacls 規則建置器 ════ -->
                 <TabViewItem x:Name="TabRuleBuilder" Header="🛠️ 自訂 icacls 規則建置器" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                         <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
@@ -422,6 +438,7 @@
                         </Grid>
 
                         <ScrollViewer Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                      HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled"
                                       CornerRadius="8" Padding="12">
                             <TextBlock Text="{x:Bind ViewModel.TerminalOutput, Mode=OneWay}"
                                        FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"

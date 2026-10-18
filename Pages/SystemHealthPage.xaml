@@ -174,7 +174,7 @@
         </Grid>
 
         <!-- ═══ System Health Tools, Windows Update & Cleanup ═══ -->
-        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
             <StackPanel Spacing="12">
                 <!-- ═══ Windows Update 修復與更新管理 ═══ -->
                 <Expander x:Name="WindowsUpdateExpander" Header="🔄 Windows Update 修復與更新管理 (Update Repair &amp; Reset)"
@@ -313,10 +313,18 @@
 
                         <!-- Items ListView -->
                         <ListView ItemsSource="{x:Bind ViewModel.TempCategories, Mode=OneWay}"
-                                  MaxHeight="220" SelectionMode="None">
+                                  MaxHeight="220" SelectionMode="None"
+                                  HorizontalAlignment="Stretch"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                  ScrollViewer.HorizontalScrollMode="Disabled">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
                             <ListView.ItemTemplate>
                                 <DataTemplate x:DataType="models:TempCategoryItem">
-                                    <Grid Padding="6,4" ColumnSpacing="12">
+                                    <Grid Padding="6,4" ColumnSpacing="12" HorizontalAlignment="Stretch">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="Auto" />
@@ -429,10 +437,18 @@
                         <ListView Visibility="{x:Bind ViewModel.HasFeatures, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
                                   ItemsSource="{x:Bind ViewModel.FilteredFeatures, Mode=OneWay}"
                                   SelectedItem="{x:Bind ViewModel.SelectedFeature, Mode=TwoWay}"
-                                  MaxHeight="260" SelectionMode="Single">
+                                  MaxHeight="260" SelectionMode="Single"
+                                  HorizontalAlignment="Stretch"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                  ScrollViewer.HorizontalScrollMode="Disabled">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
                             <ListView.ItemTemplate>
                                 <DataTemplate x:DataType="models:WindowsFeatureItem">
-                                    <Grid Padding="8,4" ColumnSpacing="12">
+                                    <Grid Padding="8,4" ColumnSpacing="12" HorizontalAlignment="Stretch">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
@@ -509,10 +525,18 @@
                         <ListView Visibility="{x:Bind ViewModel.HasPackages, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
                                   ItemsSource="{x:Bind ViewModel.FilteredPackages, Mode=OneWay}"
                                   SelectedItem="{x:Bind ViewModel.SelectedPackage, Mode=TwoWay}"
-                                  MaxHeight="240" SelectionMode="Single">
+                                  MaxHeight="240" SelectionMode="Single"
+                                  HorizontalAlignment="Stretch"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                  ScrollViewer.HorizontalScrollMode="Disabled">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
                             <ListView.ItemTemplate>
                                 <DataTemplate x:DataType="models:WindowsPackageItem">
-                                    <Grid Padding="8,4" ColumnSpacing="12">
+                                    <Grid Padding="8,4" ColumnSpacing="12" HorizontalAlignment="Stretch">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
@@ -617,6 +641,7 @@
             </Grid>
 
             <ScrollViewer Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                          HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled"
                           CornerRadius="8" Padding="12">
                 <TextBlock Text="{x:Bind ViewModel.TerminalOutput, Mode=OneWay}"
                            FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"

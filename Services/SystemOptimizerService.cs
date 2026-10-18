@@ -848,8 +848,9 @@ public class SystemOptimizerService
         var list = new List<SystemRestorePointItem>();
         try
         {
+            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(3.5));
             var psCmd = "Get-ComputerRestorePoint | Select-Object SequenceNumber, Description, CreationTime, RestorePointType | ConvertTo-Csv -NoTypeInformation";
-            var (output, _, code) = await ProcessHelper.RunProcessAsync("powershell.exe", $"-NoProfile -Command \"{psCmd}\"");
+            var (output, _, code) = await ProcessHelper.RunProcessAsync("powershell.exe", $"-NoProfile -Command \"{psCmd}\"", cancellationToken: cts.Token);
             if (code == 0)
             {
                 var lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);

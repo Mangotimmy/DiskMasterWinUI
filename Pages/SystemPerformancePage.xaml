@@ -38,12 +38,42 @@
                         <TextBlock Text="一鍵終結所有無響應程式" />
                     </StackPanel>
                 </Button>
-                <Button Click="TogglePerformanceOverlay_Click">
+                <Button Click="TogglePerformanceOverlay_Click" AutomationProperties.AutomationId="HudToggleButton">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <FontIcon Glyph="&#xE737;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                        <TextBlock x:Name="OverlayToggleBtnText" Text="🪟 置頂效能懸浮窗 (FPS HUD)" />
+                        <TextBlock x:Name="OverlayToggleBtnText" Text="置頂效能懸浮窗 (FPS HUD)" />
                     </StackPanel>
                 </Button>
+                <Button x:Name="HudClickThroughBtn" Click="ToggleHudClickThrough_Click" ToolTipService.ToolTip="切換 HUD 滑鼠穿透 (滑鼠動作直接穿透 HUD 操作背景視窗，全域快捷鍵 [Ctrl+Shift+H])">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon x:Name="HudClickThroughIcon" Glyph="&#xE8C0;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                        <TextBlock x:Name="HudClickThroughBtnText" Text="滑鼠穿透 [Ctrl+Shift+H]" />
+                    </StackPanel>
+                </Button>
+                <DropDownButton AutomationProperties.AutomationId="HudStyleMenuButton" ToolTipService.ToolTip="HUD 外觀樣式、色彩主題與進階設定">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE790;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                        <TextBlock Text="HUD 樣式與主題" />
+                    </StackPanel>
+                    <DropDownButton.Flyout>
+                        <MenuFlyout>
+                            <MenuFlyoutSubItem Text="🎨 主題色彩 (Theme)">
+                                <MenuFlyoutItem Text="⚡ 賽博霓虹 (Cyberpunk)" Click="PageHudTheme_Click" Tag="Cyberpunk" />
+                                <MenuFlyoutItem Text="🟢 矩陣幽綠 (Emerald)" Click="PageHudTheme_Click" Tag="Emerald" />
+                                <MenuFlyoutItem Text="🔵 冰晶蔚藍 (Ocean)" Click="PageHudTheme_Click" Tag="Ocean" />
+                                <MenuFlyoutItem Text="🟣 炫彩日冕 (Solar)" Click="PageHudTheme_Click" Tag="Solar" />
+                                <MenuFlyoutItem Text="⚫ 曜石黑魂 (Midnight)" Click="PageHudTheme_Click" Tag="Midnight" />
+                            </MenuFlyoutSubItem>
+                            <MenuFlyoutSubItem Text="🎛️ 懸浮型態 (Style)">
+                                <MenuFlyoutItem Text="橫向長條型 (Bar)" Click="PageHudStyle_Click" Tag="Bar" />
+                                <MenuFlyoutItem Text="完整卡片型 (Card)" Click="PageHudStyle_Click" Tag="Card" />
+                                <MenuFlyoutItem Text="極簡徽章型 (Badge)" Click="PageHudStyle_Click" Tag="Badge" />
+                            </MenuFlyoutSubItem>
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Text="⚙️ 開啟進階設定面板" Click="OpenHudSettings_Click" AutomationProperties.AutomationId="OpenHudSettingsMenuItem" />
+                        </MenuFlyout>
+                    </DropDownButton.Flyout>
+                </DropDownButton>
             </StackPanel>
 
             <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
@@ -59,7 +89,7 @@
 
                 <!-- ════ Tab 1: Real-Time Hardware Performance ════ -->
                 <TabViewItem x:Name="TabPerfMetrics" Header="📊 即時硬體效能" ToolTipService.ToolTip="即時硬體資源與磁碟延遲監控 (typeperf &amp; Win32)" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                         <StackPanel Spacing="16" Margin="0,0,16,20">
 
                             <!-- Live Resource Cards (CPU, RAM with DDR4/DDR5 & MHz, GPU with Graphics API & VRAM, LAN) -->
@@ -517,10 +547,18 @@
                                 CornerRadius="8" Padding="8">
                             <ListView ItemsSource="{x:Bind ViewModel.FilteredProcesses, Mode=OneWay}"
                                       SelectedItem="{x:Bind ViewModel.SelectedProcess, Mode=TwoWay}"
-                                      SelectionMode="Single">
+                                      SelectionMode="Single"
+                                      HorizontalAlignment="Stretch"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                      ScrollViewer.HorizontalScrollMode="Disabled">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
                                 <ListView.ItemTemplate>
                                     <DataTemplate x:DataType="models:ProcessHunterItem">
-                                        <Grid Padding="8,6" ColumnSpacing="12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                        <Grid Padding="8,6" ColumnSpacing="12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" HorizontalAlignment="Stretch">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="2*" />
                                                 <ColumnDefinition Width="1*" />
@@ -565,7 +603,7 @@
 
                 <!-- ════ Tab 3: SystemInfo Hardware Profile ════ -->
                 <TabViewItem x:Name="TabSystemInfo" Header="📋 系統硬體與修補報告" ToolTipService.ToolTip="系統硬體基本規格與 Windows 修補程式報告 (systeminfo)" IsClosable="False">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,10,0,0">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                         <StackPanel Spacing="16" Margin="0,0,16,20">
 
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -624,7 +662,15 @@
                                 <StackPanel Spacing="10">
                                     <TextBlock Text="{x:Bind ViewModel.SystemInfo.HotfixCount, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='已安裝 Windows 更新修補程式 ({0} 項)'}"
                                                FontWeight="Bold" FontSize="15" />
-                                    <ListView ItemsSource="{x:Bind ViewModel.SystemInfo.Hotfixes, Mode=OneWay}" MaxHeight="240" SelectionMode="None">
+                                    <ListView ItemsSource="{x:Bind ViewModel.SystemInfo.Hotfixes, Mode=OneWay}" MaxHeight="240" SelectionMode="None"
+                                              HorizontalAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                              ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="x:String">
                                                 <TextBlock Text="{x:Bind}" FontSize="12" FontFamily="Consolas" Padding="4,2" />

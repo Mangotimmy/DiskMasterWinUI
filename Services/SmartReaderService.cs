@@ -415,6 +415,41 @@ public class SmartReaderService
         });
     }
 
+    private static int _temperatureQueryBusy;
+
+    /// <summary>
+    /// Async wrapper for the synchronous DeviceIoControl temperature query. The raw IOCTL can
+    /// block indefinitely on a busy/buggy storage driver; callers must never wait on it from the
+    /// UI thread. On timeout the abandoned native call is allowed to finish but no new call is
+    /// started while it is still marked busy.
+    /// </summary>
+    public async Task<(int? Temperature, short? WarningTemp, short? CriticalTemp, List<int> Sensors)> GetStorageTemperatureAsync(
+        int diskNumber, TimeSpan? timeout = null)
+    {
+        if (Interlocked.CompareExchange(ref _temperatureQueryBusy, 1, 0) != 0)
+        {
+            return (null, null, null, new List<int>());
+        }
+
+        var task = Task.Run(() => GetStorageTemperature(diskNumber));
+        _ = task.ContinueWith(_ => Interlocked.Exchange(ref _temperatureQueryBusy, 0), TaskScheduler.Default);
+
+        try
+        {
+            return await task.WaitAsync(timeout ?? TimeSpan.FromSeconds(2));
+        }
+        catch (TimeoutException)
+        {
+            DebugLogService.Instance.Warning($"Storage temperature IOCTL timed out for disk {diskNumber}", "SmartReader");
+            return (null, null, null, new List<int>());
+        }
+        catch (Exception ex)
+        {
+            DebugLogService.Instance.Warning($"Storage temperature IOCTL failed for disk {diskNumber}: {ex.Message}", "SmartReader");
+            return (null, null, null, new List<int>());
+        }
+    }
+
     /// <summary>
     /// Gets physical drive temperature (°C) via native storage property, NVMe IOCTL, or ATA SMART query.
     /// Guaranteed to return valid hardware temperature for supported NVMe and SATA drives.
@@ -423,21 +458,37 @@ public class SmartReaderService
     {
         // 1. Direct hardware temperature query via StorageDeviceTemperatureProperty (52/51)
         // Works on all NVMe SSDs in Windows 10/11 even with zero access rights!
-        var (hwTemp, _, _, _) = GetStorageTemperature(diskNumber);
+        var (hwTemp, _, _, _) = await GetStorageTemperatureAsync(diskNumber);
         if (hwTemp.HasValue && hwTemp.Value > 0 && hwTemp.Value < 130)
         {
             return hwTemp.Value;
         }
 
         // 2. Try NVMe IOCTL log page
-        var nvme = await GetNvmeHealthAsync(diskNumber);
-        if (nvme != null && nvme.CompositeTemperatureCelsius > 0 && nvme.CompositeTemperatureCelsius < 130)
+        try
         {
-            return nvme.CompositeTemperatureCelsius;
+            var nvme = await GetNvmeHealthAsync(diskNumber).WaitAsync(TimeSpan.FromSeconds(3));
+            if (nvme != null && nvme.CompositeTemperatureCelsius > 0 && nvme.CompositeTemperatureCelsius < 130)
+            {
+                return nvme.CompositeTemperatureCelsius;
+            }
+        }
+        catch (TimeoutException)
+        {
+            DebugLogService.Instance.Warning($"NVMe health query timed out for disk {diskNumber}", "SmartReader");
         }
 
         // 3. Try ATA SMART attributes (0xC2 or 0xBE)
-        var attrs = await GetAtaSmartAttributesAsync(diskNumber);
+        List<SmartAttributeItem> attrs;
+        try
+        {
+            attrs = await GetAtaSmartAttributesAsync(diskNumber).WaitAsync(TimeSpan.FromSeconds(3));
+        }
+        catch (TimeoutException)
+        {
+            DebugLogService.Instance.Warning($"ATA SMART query timed out for disk {diskNumber}", "SmartReader");
+            return null;
+        }
         var tempAttr = attrs.FirstOrDefault(a => a.Id == 0xC2 || a.Id == 0xBE);
         if (tempAttr != null)
         {

@@ -11,6 +11,7 @@ using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
 using Microsoft.UI.Xaml.Shapes;
 using DiskMasterWinUI.Helpers;
+using DiskMasterWinUI.Services;
 
 namespace DiskMasterWinUI;
 
@@ -94,10 +95,53 @@ public partial class App : Application
             isNewInstance = true;
         }
 
+        string[] rawCmd = Environment.GetCommandLineArgs();
+        string? earlyAddPathUser = null;
+        string? earlyAddPathSystem = null;
+        for (int i = 1; i < rawCmd.Length; i++)
+        {
+            if (rawCmd[i].Equals("--add-path-user", StringComparison.OrdinalIgnoreCase) && i + 1 < rawCmd.Length)
+            {
+                earlyAddPathUser = rawCmd[++i];
+            }
+            else if (rawCmd[i].Equals("--add-path-system", StringComparison.OrdinalIgnoreCase) && i + 1 < rawCmd.Length)
+            {
+                earlyAddPathSystem = rawCmd[++i];
+            }
+        }
+
         if (!isNewInstance)
         {
             try
             {
+                if (!string.IsNullOrEmpty(earlyAddPathUser))
+                {
+                    var (_, msg) = EnvironmentCheckService.AddPathDirectoryDirect(earlyAddPathUser, EnvironmentVariableTarget.User);
+                    try { WindowsNotificationService.Instance.ShowNotification("PATH 環境變數 (User)", msg, "DiskTools"); } catch { }
+                }
+                else if (!string.IsNullOrEmpty(earlyAddPathSystem))
+                {
+                    if (!AdminHelper.IsRunningAsAdmin())
+                    {
+                        try
+                        {
+                            var psi = new System.Diagnostics.ProcessStartInfo
+                            {
+                                FileName = Environment.ProcessPath ?? System.IO.Path.Combine(AppContext.BaseDirectory, "DiskMasterWinUI.exe"),
+                                Arguments = $"--add-path-system \"{earlyAddPathSystem}\"",
+                                UseShellExecute = true,
+                                Verb = "runas"
+                            };
+                            System.Diagnostics.Process.Start(psi);
+                            Environment.Exit(0);
+                            return;
+                        }
+                        catch { }
+                    }
+                    var (_, sysMsg) = EnvironmentCheckService.AddPathDirectoryDirect(earlyAddPathSystem, EnvironmentVariableTarget.Machine);
+                    try { WindowsNotificationService.Instance.ShowNotification("PATH 環境變數 (System)", sysMsg, "DiskTools"); } catch { }
+                }
+
                 PostMessage(HWND_BROADCAST, WM_ACTIVATE_INSTANCE, IntPtr.Zero, IntPtr.Zero);
 
                 int currentPid = Environment.ProcessId;
@@ -142,6 +186,24 @@ public partial class App : Application
             return;
         }
 
+        if (!string.IsNullOrEmpty(earlyAddPathSystem) && !AdminHelper.IsRunningAsAdmin())
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = Environment.ProcessPath ?? System.IO.Path.Combine(AppContext.BaseDirectory, "DiskMasterWinUI.exe"),
+                    Arguments = $"--add-path-system \"{earlyAddPathSystem}\"",
+                    UseShellExecute = true,
+                    Verb = "runas"
+                };
+                System.Diagnostics.Process.Start(psi);
+                Environment.Exit(0);
+                return;
+            }
+            catch { }
+        }
+
         try
         {
             System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
@@ -177,7 +239,7 @@ public partial class App : Application
             if (e.ExceptionObject is Exception ex)
             {
                 Services.DebugLogService.Instance.Error("[AppDomain UnhandledException]", ex, "CrashGuard");
-                GlobalExceptionHandler.ReportException(ex, "[AppDomain UnhandledException]");
+                GlobalExceptionHandler.ReportFatalException(ex, "[AppDomain UnhandledException]", e.IsTerminating);
             }
         };
 
@@ -204,6 +266,8 @@ public partial class App : Application
             string? sharePath = null;
             string? imagePath = null;
             string? drivePath = null;
+            string? addPathUser = null;
+            string? addPathSystem = null;
 
             for (int i = 0; i < cmd.Length; i++)
             {
@@ -239,13 +303,22 @@ public partial class App : Application
                 {
                     drivePath = cmd[++i];
                 }
+                else if (cmd[i].Equals("--add-path-user", StringComparison.OrdinalIgnoreCase) && i + 1 < cmd.Length)
+                {
+                    addPathUser = cmd[++i];
+                }
+                else if (cmd[i].Equals("--add-path-system", StringComparison.OrdinalIgnoreCase) && i + 1 < cmd.Length)
+                {
+                    addPathSystem = cmd[++i];
+                }
             }
 
             _window = new MainWindow();
             GlobalExceptionHandler.Initialize(_window.DispatcherQueue);
             _window.Activate();
+            DiskMasterWinUI.Helpers.UiHeartbeatMonitor.Start(_window.DispatcherQueue);
 
-            if (startInBackground && string.IsNullOrEmpty(PendingRecoverPath) && string.IsNullOrEmpty(ntfsPath) && string.IsNullOrEmpty(sharePath) && string.IsNullOrEmpty(imagePath) && string.IsNullOrEmpty(drivePath) && string.IsNullOrEmpty(tabTag))
+            if (startInBackground && string.IsNullOrEmpty(PendingRecoverPath) && string.IsNullOrEmpty(ntfsPath) && string.IsNullOrEmpty(sharePath) && string.IsNullOrEmpty(imagePath) && string.IsNullOrEmpty(drivePath) && string.IsNullOrEmpty(tabTag) && string.IsNullOrEmpty(addPathUser) && string.IsNullOrEmpty(addPathSystem))
             {
                 _window.MinimizeToTrayOnStartup();
             }
@@ -294,6 +367,28 @@ public partial class App : Application
                 {
                     diskPage.ViewModel.ChkdskDrive = drivePath;
                     diskPage.ViewModel.OptimizeDriveLetter = drivePath;
+                }
+            }
+            else if (!string.IsNullOrEmpty(addPathUser))
+            {
+                var (_, msg) = EnvironmentCheckService.AddPathDirectoryDirect(addPathUser, EnvironmentVariableTarget.User);
+                try { WindowsNotificationService.Instance.ShowNotification("PATH 環境變數 (User)", msg, "DiskTools"); } catch { }
+                _window.NavigateToTag("DiskTools");
+                if (_window.GetOrCreatePageForTag("DiskTools") is DiskMasterWinUI.Pages.DiskToolsPage diskPage)
+                {
+                    diskPage.ViewModel.StatusMessage = msg;
+                    _ = diskPage.ViewModel.LoadEnvironmentTablesCommand.ExecuteAsync(null);
+                }
+            }
+            else if (!string.IsNullOrEmpty(addPathSystem))
+            {
+                var (_, msg) = EnvironmentCheckService.AddPathDirectoryDirect(addPathSystem, EnvironmentVariableTarget.Machine);
+                try { WindowsNotificationService.Instance.ShowNotification("PATH 環境變數 (System)", msg, "DiskTools"); } catch { }
+                _window.NavigateToTag("DiskTools");
+                if (_window.GetOrCreatePageForTag("DiskTools") is DiskMasterWinUI.Pages.DiskToolsPage diskPage)
+                {
+                    diskPage.ViewModel.StatusMessage = msg;
+                    _ = diskPage.ViewModel.LoadEnvironmentTablesCommand.ExecuteAsync(null);
                 }
             }
             else if (!string.IsNullOrEmpty(tabTag))

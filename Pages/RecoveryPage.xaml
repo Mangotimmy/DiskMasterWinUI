@@ -141,7 +141,15 @@
 
                     <ListView Grid.Row="1" x:Name="ResultsList"
                               ItemsSource="{x:Bind ViewModel.Results, Mode=OneWay}"
-                              SelectionMode="None" MinHeight="260" MaxHeight="560">
+                              SelectionMode="None" MinHeight="260" MaxHeight="560"
+                              HorizontalAlignment="Stretch"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                              ScrollViewer.HorizontalScrollMode="Disabled">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
                         <ListView.Header>
                             <Grid Padding="12,6" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" ColumnSpacing="8">
                                 <Grid.ColumnDefinitions>
@@ -162,7 +170,7 @@
                         </ListView.Header>
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="models:RecoveredFileItem">
-                                <Grid Padding="12,8" ColumnSpacing="8">
+                                <Grid Padding="12,8" ColumnSpacing="8" HorizontalAlignment="Stretch">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="36" />
                                         <ColumnDefinition Width="120" />
@@ -287,7 +295,8 @@
                     <Button x:Name="ClearLogBtn" Grid.Column="1" Content="清除記錄"
                             Command="{x:Bind ViewModel.ClearTerminalCommand}" />
                 </Grid>
-                <ScrollViewer Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" Padding="8">
+                <ScrollViewer Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                              HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Padding="8">
                     <TextBlock Text="{x:Bind ViewModel.TerminalOutput, Mode=OneWay}"
                                FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"
                                IsTextSelectionEnabled="True" />

@@ -1033,27 +1033,32 @@ public partial class SystemPerformanceService
 
         try
         {
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeoutCts.CancelAfter(TimeSpan.FromSeconds(4));
-            var (wmicOut, _, code) = await ProcessHelper.RunProcessAsync("wmic.exe", "process get ProcessId,ParentProcessId,CommandLine,ExecutablePath /format:csv", cancellationToken: timeoutCts.Token);
-            if (code == 0 && !string.IsNullOrWhiteSpace(wmicOut))
+            var wmicPath = Path.Combine(Environment.SystemDirectory, "wbem", "wmic.exe");
+            var altWmicPath = Path.Combine(Environment.SystemDirectory, "wmic.exe");
+            if (File.Exists(wmicPath) || File.Exists(altWmicPath))
             {
-                var lines = wmicOut.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
-                foreach (var line in lines.Skip(1))
+                using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(3));
+                var (wmicOut, _, code) = await ProcessHelper.RunProcessAsync("wmic.exe", "process get ProcessId,ParentProcessId,CommandLine,ExecutablePath /format:csv", cancellationToken: timeoutCts.Token);
+                if (code == 0 && !string.IsNullOrWhiteSpace(wmicOut))
                 {
-                    var parts = line.Split(',');
-                    // Format: Node, CommandLine, ExecutablePath, ParentProcessId, ProcessId
-                    if (parts.Length >= 5 && int.TryParse(parts[^1].Trim(), out int pid))
+                    var lines = wmicOut.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var line in lines.Skip(1))
                     {
-                        if (int.TryParse(parts[^2].Trim(), out int ppid))
+                        var parts = line.Split(',');
+                        // Format: Node, CommandLine, ExecutablePath, ParentProcessId, ProcessId
+                        if (parts.Length >= 5 && int.TryParse(parts[^1].Trim(), out int pid))
                         {
-                            parentPidMap[pid] = ppid;
-                        }
-                        var exe = parts[^3].Trim();
-                        if (!string.IsNullOrEmpty(exe)) exePathMap[pid] = exe;
+                            if (int.TryParse(parts[^2].Trim(), out int ppid))
+                            {
+                                parentPidMap[pid] = ppid;
+                            }
+                            var exe = parts[^3].Trim();
+                            if (!string.IsNullOrEmpty(exe)) exePathMap[pid] = exe;
 
-                        var cmd = string.Join(",", parts.Skip(1).Take(parts.Length - 4)).Trim();
-                        if (!string.IsNullOrEmpty(cmd)) commandLineMap[pid] = cmd;
+                            var cmd = string.Join(",", parts.Skip(1).Take(parts.Length - 4)).Trim();
+                            if (!string.IsNullOrEmpty(cmd)) commandLineMap[pid] = cmd;
+                        }
                     }
                 }
             }

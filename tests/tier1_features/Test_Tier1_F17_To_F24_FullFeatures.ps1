@@ -605,7 +605,7 @@ Register-E2ETest -Tier 1 -Feature "F27" -Source "Items 11 & 12: Context Menu, Fa
 
 Register-E2ETest -Tier 1 -Feature "F27" -Source "Items 13 & 14: IconCacheRepairService & ExplorerWatchdogService" `
     -Name "T1.F27.07_ExplorerWatchdogAndIconCacheServiceContract" `
-    -Description "Verifies ExplorerWatchdogService singleton, suppression window, and IconCacheRepairService NotifyShellIconChange." `
+    -Description "Verifies ExplorerWatchdogService singleton, suppression window, ResumeAutoRestart, LaunchExplorerShell, and IconCacheRepairService NotifyShellIconChange." `
     -TestBlock {
         $asm = Initialize-TestAssembly
         $wdType = $asm.GetType("DiskMasterWinUI.Services.ExplorerWatchdogService")
@@ -614,9 +614,29 @@ Register-E2ETest -Tier 1 -Feature "F27" -Source "Items 13 & 14: IconCacheRepairS
         $wd = $wdType.GetProperty("Instance").GetValue($null)
         Assert-NotNull $wd "ExplorerWatchdogService.Instance must not be null"
         $wd.SuppressAutoRestartFor([TimeSpan]::FromSeconds(2))
-        $alive = $wdType.GetMethod("CheckExplorerRunning").Invoke($null, @())
+
+        # Verify ResumeAutoRestart method exists and executes cleanly
+        $resumeMethod = $wdType.GetMethod("ResumeAutoRestart")
+        Assert-NotNull $resumeMethod "ResumeAutoRestart method must exist on ExplorerWatchdogService"
+        $resumeMethod.Invoke($wd, @())
+
+        # Verify IsDesktopShellAlive method
+        $isShellAliveMethod = $wdType.GetMethod("IsDesktopShellAlive", [System.Reflection.BindingFlags]::Static -bor [System.Reflection.BindingFlags]::Public)
+        Assert-NotNull $isShellAliveMethod "IsDesktopShellAlive static method must exist"
+        $shellAlive = $isShellAliveMethod.Invoke($null, @())
+        Assert-True ($shellAlive -is [bool]) "IsDesktopShellAlive must return boolean"
+
+        # Verify CheckExplorerRunning method
+        $checkMethod = $wdType.GetMethod("CheckExplorerRunning", [System.Reflection.BindingFlags]::Static -bor [System.Reflection.BindingFlags]::Public)
+        Assert-NotNull $checkMethod "CheckExplorerRunning static method must exist"
+        $alive = $checkMethod.Invoke($null, @())
         Assert-True ($alive -is [bool]) "CheckExplorerRunning must return boolean"
 
+        # Verify LaunchExplorerShell static method exists
+        $launchMethod = $wdType.GetMethod("LaunchExplorerShell", [System.Reflection.BindingFlags]::Static -bor [System.Reflection.BindingFlags]::Public)
+        Assert-NotNull $launchMethod "LaunchExplorerShell static method must exist"
+
+        # Verify IconCacheRepairService
         $icType = $asm.GetType("DiskMasterWinUI.Services.IconCacheRepairService")
         Assert-NotNull $icType "IconCacheRepairService must exist"
         $notifyMethod = $icType.GetMethod("NotifyShellIconChange", [System.Reflection.BindingFlags]::Static -bor [System.Reflection.BindingFlags]::Public)

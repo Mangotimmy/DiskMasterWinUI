@@ -21,10 +21,11 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _shellEnableLanShare = true;
     [ObservableProperty] private bool _shellEnableImageMount = true;
     [ObservableProperty] private bool _shellEnableDiskCheck = true;
+    [ObservableProperty] private bool _shellEnableAddToPath = true;
     [ObservableProperty] private string _shellStatusSummary = "尚未檢測右鍵選單狀態";
 
-    /// <summary>Explorer context-menu integration is only offered by the installer build.</summary>
-    public bool IsShellIntegrationAvailable => AppEnvironmentHelper.IsInstallerMode;
+    /// <summary>Explorer context-menu integration is available across environments.</summary>
+    public bool IsShellIntegrationAvailable => true;
 
     // ── Tab Reordering & Visibility Management ──
     public ObservableCollection<TabOrderItem> TabOrderItems { get; } = new();
@@ -217,6 +218,13 @@ public partial class SettingsViewModel : ObservableObject
             };
 
             EnableSafetyConfirmations = s.EnableSafetyConfirmations;
+            ShellAllUsersScope = s.ShellAllUsersScope;
+            ShellEnableRecovery = s.ShellEnableRecovery;
+            ShellEnableNtfs = s.ShellEnableNtfs;
+            ShellEnableLanShare = s.ShellEnableLanShare;
+            ShellEnableImageMount = s.ShellEnableImageMount;
+            ShellEnableDiskCheck = s.ShellEnableDiskCheck;
+            ShellEnableAddToPath = s.ShellEnableAddToPath;
             DefaultPartitionStyle = s.DefaultPartitionStyle;
             DefaultFileSystem = s.DefaultFileSystem;
             DefaultBackupFolder = s.DefaultBackupFolder;
@@ -363,6 +371,13 @@ public partial class SettingsViewModel : ObservableObject
         };
 
         s.EnableSafetyConfirmations = EnableSafetyConfirmations;
+        s.ShellAllUsersScope = ShellAllUsersScope;
+        s.ShellEnableRecovery = ShellEnableRecovery;
+        s.ShellEnableNtfs = ShellEnableNtfs;
+        s.ShellEnableLanShare = ShellEnableLanShare;
+        s.ShellEnableImageMount = ShellEnableImageMount;
+        s.ShellEnableDiskCheck = ShellEnableDiskCheck;
+        s.ShellEnableAddToPath = ShellEnableAddToPath;
         s.DefaultPartitionStyle = DefaultPartitionStyle;
         s.DefaultFileSystem = DefaultFileSystem;
         s.DefaultBackupFolder = DefaultBackupFolder;
@@ -901,7 +916,9 @@ public partial class SettingsViewModel : ObservableObject
             ShellEnableNtfs,
             ShellEnableLanShare,
             ShellEnableImageMount,
-            ShellEnableDiskCheck);
+            ShellEnableDiskCheck,
+            ShellEnableAddToPath);
+        SaveSettings();
         StatusMessage = res.Headline;
         RefreshShellIntegrationStatus();
     }
@@ -1100,6 +1117,13 @@ public partial class SettingsViewModel : ObservableObject
     public void ViewCurrentDebugLog()
     {
         DebugLogService.Instance.ViewCurrentLog();
+    }
+
+    [RelayCommand]
+    public void OpenCmdLiveLog()
+    {
+        DebugLogService.Instance.OpenLiveConsole();
+        StatusMessage = LocalizationService.T("已啟動 CMD 即時日誌監控終端！", "已启动 CMD 实时日志监控终端！", "CMD Live Log Stream Console launched!", "CMD リアルタイムログ監視コンソールを起動しました！");
     }
 
     [RelayCommand]

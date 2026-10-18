@@ -16,6 +16,7 @@
             <helpers:BoolToVisibilityConverter x:Key="InvertBoolToVisibilityConverter" Invert="True" />
             <helpers:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
             <helpers:StringFormatConverter x:Key="StringFormatConverter" />
+            <helpers:LogLevelToBrushConverter x:Key="LogLevelToBrushConverter" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

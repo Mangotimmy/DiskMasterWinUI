@@ -10,6 +10,14 @@ namespace DiskMasterWinUI.Services;
 /// </summary>
 public class HealthMonitorService
 {
+    private static readonly TimeSpan WmiTimeout = TimeSpan.FromSeconds(6);
+
+    private static ManagementScope CreateScope(string path) =>
+        new(path, new System.Management.ConnectionOptions { Timeout = WmiTimeout });
+
+    private static System.Management.EnumerationOptions CreateOptions() =>
+        new() { Timeout = WmiTimeout, ReturnImmediately = false, Rewindable = false };
+
     public async Task<List<DiskHealthInfo>> GetDiskHealthAsync()
     {
         return await Task.Run(async () =>
@@ -19,12 +27,13 @@ public class HealthMonitorService
             // Attempt 1: Fast in-process Storage WMI (root\Microsoft\Windows\Storage)
             try
             {
-                var scope = new ManagementScope(@"\\.\root\Microsoft\Windows\Storage");
+                var scope = CreateScope(@"\\.\root\Microsoft\Windows\Storage");
                 scope.Connect();
 
                 using var searcher = new ManagementObjectSearcher(
                     scope,
-                    new ObjectQuery("SELECT DeviceId, FriendlyName, MediaType, BusType, HealthStatus, OperationalStatus, Size FROM MSFT_PhysicalDisk"));
+                    new ObjectQuery("SELECT DeviceId, FriendlyName, MediaType, BusType, HealthStatus, OperationalStatus, Size FROM MSFT_PhysicalDisk"),
+                    CreateOptions());
                 using var collection = searcher.Get();
 
                 foreach (ManagementObject obj in collection)
@@ -107,7 +116,8 @@ public class HealthMonitorService
         {
             using var searcher = new ManagementObjectSearcher(
                 scope,
-                new ObjectQuery("SELECT DeviceId, Temperature FROM MSFT_StorageReliabilityCounter"));
+                new ObjectQuery("SELECT DeviceId, Temperature FROM MSFT_StorageReliabilityCounter"),
+                CreateOptions());
             using var collection = searcher.Get();
 
             foreach (ManagementObject obj in collection)
@@ -136,7 +146,8 @@ public class HealthMonitorService
             {
                 if (disk.TemperatureCelsius == null || disk.TemperatureCelsius <= 0)
                 {
-                    var nativeTemp = await smartReader.GetDiskTemperatureCelsiusAsync(disk.DeviceId, disk.BusType);
+                    var nativeTemp = await smartReader.GetDiskTemperatureCelsiusAsync(disk.DeviceId, disk.BusType)
+                        .WaitAsync(TimeSpan.FromSeconds(3));
                     if (nativeTemp.HasValue && nativeTemp.Value > 0)
                     {
                         disk.TemperatureCelsius = nativeTemp.Value;
@@ -153,8 +164,9 @@ public class HealthMonitorService
         try
         {
             using var searcher = new ManagementObjectSearcher(
-                @"root\cimv2",
-                "SELECT Index, Model, InterfaceType, Status, Size, MediaType FROM Win32_DiskDrive");
+                CreateScope(@"\\.\root\cimv2"),
+                new ObjectQuery("SELECT Index, Model, InterfaceType, Status, Size, MediaType FROM Win32_DiskDrive"),
+                CreateOptions());
             using var collection = searcher.Get();
 
             foreach (ManagementObject obj in collection)
@@ -197,12 +209,13 @@ public class HealthMonitorService
             var list = new List<DiskReliabilityInfo>();
             try
             {
-                var scope = new ManagementScope(@"\\.\root\Microsoft\Windows\Storage");
+                var scope = CreateScope(@"\\.\root\Microsoft\Windows\Storage");
                 scope.Connect();
 
                 using var searcher = new ManagementObjectSearcher(
                     scope,
-                    new ObjectQuery("SELECT DeviceId, Temperature, Wear, PowerOnHours, ReadErrorsTotal, ReadErrorsUncorrected, WriteErrorsTotal, WriteErrorsUncorrected, FlushLatencyMax FROM MSFT_StorageReliabilityCounter"));
+                    new ObjectQuery("SELECT DeviceId, Temperature, Wear, PowerOnHours, ReadErrorsTotal, ReadErrorsUncorrected, WriteErrorsTotal, WriteErrorsUncorrected, FlushLatencyMax FROM MSFT_StorageReliabilityCounter"),
+                    CreateOptions());
                 using var collection = searcher.Get();
 
                 foreach (ManagementObject obj in collection)
@@ -245,7 +258,8 @@ public class HealthMonitorService
                     var disks = await FallbackToWin32DiskDriveAsync();
                     foreach (var d in disks)
                     {
-                        var nvme = await smartReader.GetNvmeHealthAsync(d.DeviceId, d.FriendlyName, d.SizeBytes);
+                        var nvme = await smartReader.GetNvmeHealthAsync(d.DeviceId, d.FriendlyName, d.SizeBytes)
+                            .WaitAsync(TimeSpan.FromSeconds(3));
                         list.Add(new DiskReliabilityInfo
                         {
                             DeviceId = d.DeviceId,
@@ -274,12 +288,13 @@ public class HealthMonitorService
         {
             try
             {
-                var scope = new ManagementScope(@"\\.\root\wmi");
+                var scope = CreateScope(@"\\.\root\wmi");
                 scope.Connect();
 
                 using var searcher = new ManagementObjectSearcher(
                     scope,
-                    new ObjectQuery("SELECT InstanceName, Active, PredictFailure, Reason FROM MSStorageDriver_FailurePredictStatus"));
+                    new ObjectQuery("SELECT InstanceName, Active, PredictFailure, Reason FROM MSStorageDriver_FailurePredictStatus"),
+                    CreateOptions());
                 using var collection = searcher.Get();
 
                 var sb = new StringBuilder();

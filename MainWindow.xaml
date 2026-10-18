@@ -541,7 +541,7 @@
 
                         <!-- Central Main Viewport -->
                         <ScrollViewer x:Name="ContentScrollViewer" Grid.Column="0"
-                                      HorizontalScrollBarVisibility="Hidden"
+                                      HorizontalScrollBarVisibility="Disabled"
                                       HorizontalScrollMode="Disabled"
                                       VerticalScrollBarVisibility="Auto"
                                       HorizontalContentAlignment="Left"
@@ -606,7 +606,7 @@
                                 </Border>
 
                                 <!-- Right Dock Content Frame -->
-                                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" VerticalScrollBarVisibility="Auto">
                                     <Frame x:Name="RightDockFrame" HorizontalAlignment="Stretch" />
                                 </ScrollViewer>
                             </Grid>
@@ -662,7 +662,7 @@
                             </Border>
 
                             <!-- Bottom Dock Content Frame -->
-                            <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                            <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" VerticalScrollBarVisibility="Auto">
                                 <Frame x:Name="BottomDockFrame" HorizontalAlignment="Stretch" />
                             </ScrollViewer>
                         </Grid>

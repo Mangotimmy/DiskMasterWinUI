@@ -177,7 +177,10 @@ public class EnvironmentCheckService
         {
             try
             {
-                var full = Path.Combine(p.Trim().Trim('"'), exeName);
+                var candidate = p.Trim().Trim('"');
+                // A disconnected UNC entry makes File.Exists wait for SMB timeouts.
+                if (candidate.StartsWith(@"\\", StringComparison.Ordinal)) continue;
+                var full = Path.Combine(candidate, exeName);
                 if (File.Exists(full))
                 {
                     item.IsAvailable = true;
@@ -346,6 +349,8 @@ public class EnvironmentCheckService
                         if (string.IsNullOrWhiteSpace(trimmed)) continue;
 
                         var expanded = Environment.ExpandEnvironmentVariables(trimmed);
+                        // Never probe disconnected SMB shares while building the PATH table.
+                        if (expanded.StartsWith(@"\\", StringComparison.Ordinal)) continue;
                         var normalized = expanded.TrimEnd('\\', '/');
                         bool isDup = !seen.Add($"{scopeName}:{normalized}");
                         bool exists = Directory.Exists(expanded);
@@ -397,44 +402,68 @@ public class EnvironmentCheckService
         });
     }
 
+    public static (bool Success, string Message) AddPathDirectoryDirect(
+        string directoryPath,
+        EnvironmentVariableTarget target)
+    {
+        if (string.IsNullOrWhiteSpace(directoryPath))
+            return (false, "請輸入或瀏覽要加入 PATH 的資料夾路徑。");
+
+        var cleanDir = directoryPath.Trim().Trim('"');
+        if (File.Exists(cleanDir) || (!Directory.Exists(cleanDir) && Path.HasExtension(cleanDir)))
+        {
+            var parent = Path.GetDirectoryName(cleanDir);
+            if (!string.IsNullOrEmpty(parent)) cleanDir = parent;
+        }
+
+        if (cleanDir.Length == 2 && char.IsLetter(cleanDir[0]) && cleanDir[1] == ':')
+        {
+            cleanDir += "\\";
+        }
+        else if (cleanDir.Length > 3)
+        {
+            cleanDir = cleanDir.TrimEnd('\\', '/');
+        }
+
+        if (string.IsNullOrWhiteSpace(cleanDir))
+            return (false, "無效的資料夾路徑。");
+
+        if (target == EnvironmentVariableTarget.Machine && !AdminHelper.IsRunningAsAdmin())
+            return (false, "修改「系統 PATH」需要系統管理員權限，請改選「使用者 PATH」或以管理員身分執行。");
+
+        try
+        {
+            var current = Environment.GetEnvironmentVariable("Path", target) ?? "";
+            var parts = current.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+            if (parts.Any(p => string.Equals(p.TrimEnd('\\', '/'), cleanDir.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase)))
+            {
+                var scopeText = target == EnvironmentVariableTarget.Machine ? "系統" : "使用者";
+                return (false, $"路徑 [{cleanDir}] 已存在於 {scopeText} PATH 中，無需重複加入。");
+            }
+
+            parts.Add(cleanDir);
+            var updated = string.Join(";", parts);
+            Environment.SetEnvironmentVariable("Path", updated, target);
+
+            // Also append to current process PATH
+            var procPath = Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.Process) ?? "";
+            Environment.SetEnvironmentVariable("Path", procPath.TrimEnd(';') + ";" + cleanDir, EnvironmentVariableTarget.Process);
+
+            BroadcastEnvironmentChange();
+            var targetScopeName = target == EnvironmentVariableTarget.Machine ? "系統 (System)" : "使用者 (User)";
+            return (true, $"已將 [{cleanDir}] 成功加入 {targetScopeName} PATH 並立即生效。");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"加入 PATH 失敗: {ex.Message}");
+        }
+    }
+
     public Task<(bool Success, string Message)> AddPathDirectoryAsync(
         string directoryPath,
         EnvironmentVariableTarget target)
     {
-        return Task.Run(() =>
-        {
-            if (string.IsNullOrWhiteSpace(directoryPath))
-                return (false, "請輸入或瀏覽要加入 PATH 的資料夾路徑。");
-
-            if (target == EnvironmentVariableTarget.Machine && !AdminHelper.IsRunningAsAdmin())
-                return (false, "修改「系統 PATH」需要系統管理員權限，請改選「使用者 PATH」或以管理員身分執行。");
-
-            var cleanDir = directoryPath.Trim().Trim('"');
-            try
-            {
-                var current = Environment.GetEnvironmentVariable("Path", target) ?? "";
-                var parts = current.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-                if (parts.Any(p => string.Equals(p.TrimEnd('\\', '/'), cleanDir.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase)))
-                {
-                    return (false, $"路徑 [{cleanDir}] 已存在於 {target} PATH 中，無需重複加入。");
-                }
-
-                parts.Add(cleanDir);
-                var updated = string.Join(";", parts);
-                Environment.SetEnvironmentVariable("Path", updated, target);
-
-                // Also append to current process PATH
-                var procPath = Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.Process) ?? "";
-                Environment.SetEnvironmentVariable("Path", procPath.TrimEnd(';') + ";" + cleanDir, EnvironmentVariableTarget.Process);
-
-                BroadcastEnvironmentChange();
-                return (true, $"已將 [{cleanDir}] 加入 {target} PATH 並立即生效。");
-            }
-            catch (Exception ex)
-            {
-                return (false, $"加入 PATH 失敗: {ex.Message}");
-            }
-        });
+        return Task.Run(() => AddPathDirectoryDirect(directoryPath, target));
     }
 
     public Task<(bool Success, string Message)> RemovePathDirectoryAsync(

@@ -136,22 +136,29 @@ public class IconCacheRepairService
 
                 // 4. Restart explorer.exe
                 progress?.Report("正在重新啟動 Windows 檔案總管與桌面程序...");
-                DebugLogService.Instance.Info("Restarting explorer.exe...", "IconCacheRepair");
-                try
+                DebugLogService.Instance.Info("Restarting explorer.exe via ExplorerWatchdogService...", "IconCacheRepair");
+
+                ExplorerWatchdogService.LaunchExplorerShell();
+
+                // Poll for up to 3 seconds for recovery
+                bool recovered = false;
+                for (int i = 0; i < 6; i++)
                 {
-                    Process.Start(new ProcessStartInfo
+                    await Task.Delay(500);
+                    if (ExplorerWatchdogService.CheckExplorerRunning())
                     {
-                        FileName = "explorer.exe",
-                        UseShellExecute = true
-                    });
-                }
-                catch (Exception ex)
-                {
-                    DebugLogService.Instance.Error("Failed to launch explorer.exe", ex, "IconCacheRepair");
-                    try { await ProcessHelper.RunProcessAsync("cmd.exe", "/c start explorer.exe"); } catch { }
+                        recovered = true;
+                        break;
+                    }
                 }
 
-                await Task.Delay(900);
+                if (!recovered)
+                {
+                    ExplorerWatchdogService.LaunchExplorerShell();
+                    await Task.Delay(800);
+                }
+
+                ExplorerWatchdogService.Instance.ResumeAutoRestart();
                 NotifyShellIconChange();
                 progress?.Report("圖示快取重建完成！");
 
@@ -164,8 +171,13 @@ public class IconCacheRepairService
             catch (Exception ex)
             {
                 DebugLogService.Instance.Error("Rebuild error", ex, "IconCacheRepair");
-                try { Process.Start(new ProcessStartInfo("explorer.exe") { UseShellExecute = true }); } catch { }
+                ExplorerWatchdogService.LaunchExplorerShell();
+                ExplorerWatchdogService.Instance.ResumeAutoRestart();
                 return new IconRepairResult(false, $"❌ 重建圖示快取過程發生錯誤: {ex.Message}", deletedCount);
+            }
+            finally
+            {
+                ExplorerWatchdogService.Instance.ResumeAutoRestart();
             }
         });
     }

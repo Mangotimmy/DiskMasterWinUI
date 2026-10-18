@@ -45,18 +45,23 @@ public class TcpOptimizerService
                 if (rtoMatch.Success) item.InitialRto = rtoMatch.Groups[1].Value.Trim();
             }
 
-            // Also check NetTCPSetting for precise CongestionProvider (BBR / CUBIC / CTCP)
-            try
+            // Only check NetTCPSetting via PowerShell if netsh couldn't determine CongestionProvider, and strictly limit to 1.5s
+            if (string.IsNullOrWhiteSpace(item.CongestionProvider) || item.CongestionProvider.Equals("none", StringComparison.OrdinalIgnoreCase))
             {
-                var (psOut, _, psCode) = await ProcessHelper.RunProcessAsync(
-                    "powershell.exe",
-                    "-NoProfile -Command \"(Get-NetTCPSetting -SettingName Internet -ErrorAction SilentlyContinue).CongestionProvider\"");
-                if (psCode == 0 && !string.IsNullOrWhiteSpace(psOut))
+                try
                 {
-                    item.CongestionProvider = psOut.Trim();
+                    using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(1.5));
+                    var (psOut, _, psCode) = await ProcessHelper.RunProcessAsync(
+                        "powershell.exe",
+                        "-NoProfile -Command \"(Get-NetTCPSetting -SettingName Internet -ErrorAction SilentlyContinue).CongestionProvider\"",
+                        cancellationToken: cts.Token);
+                    if (psCode == 0 && !string.IsNullOrWhiteSpace(psOut))
+                    {
+                        item.CongestionProvider = psOut.Trim();
+                    }
                 }
+                catch { }
             }
-            catch { }
         }
         catch (Exception ex)
         {
