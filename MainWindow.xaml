@@ -66,6 +66,9 @@
                     <InfoBar x:Name="GlobalExceptionBar" Severity="Error" IsOpen="False" IsClosable="True"
                              Title="系統已成功攔截並防止崩潰"
                              Message="">
+                        <InfoBar.Content>
+                            <HyperlinkButton Content="📝 查看即時操作日誌 (Action Log)" Click="ActionLogBtn_Click" Margin="0,2,0,0" />
+                        </InfoBar.Content>
                         <InfoBar.ActionButton>
                             <Button Content="📋 複製錯誤詳情" Click="CopyErrorDetails_Click" Style="{StaticResource AccentButtonStyle}" />
                         </InfoBar.ActionButton>
@@ -500,6 +503,14 @@
                                 </StackPanel>
                             </Button>
 
+
+                            <Button x:Name="ActionLogBtn" Click="ActionLogBtn_Click"
+                                    Padding="6,2" FontSize="11" ToolTipService.ToolTip="即時操作與請求動態檢視器 [Ctrl+Shift+L]">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Text="📝" FontSize="11" />
+                                    <TextBlock Text="即時日誌" FontSize="11" />
+                                </StackPanel>
+                            </Button>
 
                             <Button x:Name="CompanionToggleBtn" Content="🎭 2D 助手" Click="CompanionToggle_Click"
                                     Padding="6,2" FontSize="11" ToolTipService.ToolTip="顯示 / 隱藏 2D 守護助手" />

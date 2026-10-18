@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentDialog
+    x:Class="DiskMasterWinUI.Controls.ActionLogViewerDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="using:DiskMasterWinUI.Models"
+    Title="📝 即時操作與請求動態檢視器 (Live Action &amp; Request Inspector)"
+    CloseButtonText="關閉"
+    DefaultButton="Close"
+    mc:Ignorable="d">
+
+    <Grid MinWidth="760" MinHeight="520" MaxWidth="960" MaxHeight="680" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Top Filters and Search -->
+        <Grid Grid.Row="0" RowSpacing="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Search Box & Count -->
+            <Grid Grid.Row="0" ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="SearchBox" Grid.Column="0"
+                         PlaceholderText="🔍 即時搜尋動作、類別或細節..."
+                         TextChanged="SearchBox_TextChanged" />
+                <TextBlock x:Name="CountStatusText" Grid.Column="1"
+                           Text="共 0 筆紀錄" VerticalAlignment="Center"
+                           Style="{StaticResource CaptionTextBlockStyle}"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </Grid>
+
+            <!-- Filters & Auto-scroll Check -->
+            <Grid Grid.Row="1" ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <TextBlock Text="類別:" VerticalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <ComboBox x:Name="CategoryFilterCombo" Width="180" SelectionChanged="Filter_SelectionChanged">
+                        <ComboBoxItem Content="全部類別" IsSelected="True" Tag="ALL" />
+                        <ComboBoxItem Content="導航 (Navigation)" Tag="Navigation" />
+                        <ComboBoxItem Content="效能監控 (Performance)" Tag="Performance" />
+                        <ComboBoxItem Content="系統優化 (Optimizer)" Tag="Optimizer" />
+                        <ComboBoxItem Content="系統健康 (Health)" Tag="Health" />
+                        <ComboBoxItem Content="磁碟工具 (DiskTools)" Tag="DiskTools" />
+                        <ComboBoxItem Content="網路工具 (NetworkTools)" Tag="NetworkTools" />
+                        <ComboBoxItem Content="開機管理 (BootManager)" Tag="BootManager" />
+                        <ComboBoxItem Content="映像部署 (WimDeploy)" Tag="WimDeploy" />
+                        <ComboBoxItem Content="隱私防護 (Privacy)" Tag="Privacy" />
+                        <ComboBoxItem Content="底層呼叫 (ProcessHelper)" Tag="ProcessHelper" />
+                        <ComboBoxItem Content="例外防護 (CrashGuard)" Tag="CrashGuard" />
+                        <ComboBoxItem Content="回復復原 (UndoCut)" Tag="UndoCut" />
+                        <ComboBoxItem Content="版面/分頁/快捷鍵" Tag="Layout" />
+                        <ComboBoxItem Content="其他模組" Tag="OTHER" />
+                    </ComboBox>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <TextBlock Text="等級:" VerticalAlignment="Center" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <ComboBox x:Name="LevelFilterCombo" Width="170" SelectionChanged="Filter_SelectionChanged">
+                        <ComboBoxItem Content="全部等級" IsSelected="True" Tag="ALL" />
+                        <ComboBoxItem Content="僅操作 (ACTION)" Tag="ACTION" />
+                        <ComboBoxItem Content="僅請求 (REQUEST)" Tag="REQUEST" />
+                        <ComboBoxItem Content="僅警告與錯誤 (WARN/ERROR)" Tag="WARN_ERROR" />
+                        <ComboBoxItem Content="僅資訊 (INFO)" Tag="INFO" />
+                    </ComboBox>
+                </StackPanel>
+
+                <CheckBox x:Name="AutoScrollCheck" Grid.Column="2" Content="自動滾動至最新" IsChecked="True"
+                          HorizontalAlignment="Right" VerticalAlignment="Center" />
+            </Grid>
+        </Grid>
+
+        <!-- Log List -->
+        <Border Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                CornerRadius="8" Padding="4">
+            <ListView x:Name="LogListView" SelectionMode="Extended">
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="models:ActionLogItem">
+                        <Grid Margin="4,4,4,4" ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Time -->
+                            <TextBlock Grid.Column="0" Text="{x:Bind FormattedTime}"
+                                       FontFamily="Consolas, Cascadia Code, Courier New" FontSize="11"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       VerticalAlignment="Top" Margin="0,3,0,0" />
+
+                            <!-- Level Pill -->
+                            <Border Grid.Column="1" Background="{x:Bind LevelBadgeBrush}"
+                                    CornerRadius="4" Padding="6,2" VerticalAlignment="Top" HorizontalAlignment="Center">
+                                <TextBlock Text="{x:Bind Level}" FontSize="10" FontWeight="Bold" Foreground="White" />
+                            </Border>
+
+                            <!-- Category Badge -->
+                            <Border Grid.Column="2" Background="{ThemeResource LayerFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="4" Padding="6,2" VerticalAlignment="Top">
+                                <TextBlock Text="{x:Bind Category}" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            </Border>
+
+                            <!-- Action & Details -->
+                            <StackPanel Grid.Column="3" Spacing="2" VerticalAlignment="Top">
+                                <TextBlock Text="{x:Bind Action}" FontSize="12" FontWeight="SemiBold"
+                                           TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                <TextBlock Text="{x:Bind Details}" FontSize="11"
+                                           TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                           FontFamily="Consolas, Cascadia Code, Courier New"
+                                           Visibility="{x:Bind HasDetailsVisibility}" />
+                            </StackPanel>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Border>
+
+        <!-- Bottom Action Bar -->
+        <Grid Grid.Row="2" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="CopySelectedBtn" Content="📋 複製選取" Click="CopySelected_Click" Padding="10,5" />
+                <Button x:Name="CopyAllBtn" Content="📋 複製全部" Click="CopyAll_Click" Padding="10,5" />
+                <Button x:Name="ClearViewBtn" Content="🧹 清空視圖" Click="ClearView_Click" Padding="10,5" />
+                <Button x:Name="ExportFileBtn" Content="💾 匯出日誌..." Click="ExportFile_Click" Padding="10,5" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="OpenFolderBtn" Content="📂 日誌資料夾" Click="OpenFolder_Click" Padding="10,5" />
+                <Button x:Name="OpenNotepadBtn" Content="📝 記事本開啟" Click="OpenNotepad_Click" Padding="10,5" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</ContentDialog>

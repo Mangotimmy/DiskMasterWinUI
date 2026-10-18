@@ -49,6 +49,7 @@ public partial class BootManagerViewModel : ObservableObject
     [RelayCommand]
     public async Task RefreshEntriesAsync()
     {
+        DebugLogService.Instance.LogAction("開機管理 (BootManager)", "重新整理 BCD 開機項目清單");
         try
         {
             IsLoading = true;
@@ -292,6 +293,7 @@ public partial class BootManagerViewModel : ObservableObject
     [RelayCommand]
     public async Task MountEspAsync()
     {
+        DebugLogService.Instance.LogAction("開機管理 (BootManager)", $"掛載 ESP 分割區至 {EspMountLetter}");
         try
         {
             IsLoading = true;
@@ -307,6 +309,7 @@ public partial class BootManagerViewModel : ObservableObject
     [RelayCommand]
     public async Task UnmountEspAsync()
     {
+        DebugLogService.Instance.LogAction("開機管理 (BootManager)", $"卸載 ESP 分割區 {EspMountLetter}");
         try
         {
             IsLoading = true;
@@ -326,6 +329,7 @@ public partial class BootManagerViewModel : ObservableObject
         var filePath = await FilePickerHelper.PickSaveFileAsync(suggestedName, ".bcd", "BCD Backup File");
         if (string.IsNullOrWhiteSpace(filePath)) return;
 
+        DebugLogService.Instance.LogAction("開機管理 (BootManager)", $"匯出並備份 BCD 開機組態至 {filePath}");
         try
         {
             IsLoading = true;
@@ -343,6 +347,7 @@ public partial class BootManagerViewModel : ObservableObject
         var filePath = await FilePickerHelper.PickSingleFileAsync([".bcd", "*"]);
         if (string.IsNullOrWhiteSpace(filePath)) return;
 
+        DebugLogService.Instance.LogAction("開機管理 (BootManager)", $"還原 BCD 開機組態: {filePath}");
         try
         {
             IsLoading = true;
@@ -419,6 +424,7 @@ public partial class BootManagerViewModel : ObservableObject
             };
 
             var result = await _bcdService.ApplySafeBootConfigAsync(config);
+            DebugLogService.Instance.LogAction("開機管理 (BootManager)", $"套用安全開機設定 (模式: {SafeBootMode})");
             SafeBootConfig = config;
             SafeBootOperationStatus = "安全開機與啟動旗標設定已成功生效！";
             AudioFeedbackService.PlaySuccess();

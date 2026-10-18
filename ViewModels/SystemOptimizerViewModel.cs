@@ -441,6 +441,7 @@ public partial class SystemOptimizerViewModel : ObservableObject
     [RelayCommand]
     public async Task ApplyGamingProfileAsync()
     {
+        DebugLogService.Instance.LogAction("系統優化 (SystemOptimizer)", "套用電競遊戲極致模式 (FPSHeaven 0x26)");
         try
         {
             IsLoading = true;
@@ -523,6 +524,7 @@ public partial class SystemOptimizerViewModel : ObservableObject
             "Restore Defaults");
         if (!confirmed) return;
 
+        DebugLogService.Instance.LogAction("系統優化 (SystemOptimizer)", "還原 Windows 官方原生設定 (Restore Defaults)");
         try
         {
             IsLoading = true;

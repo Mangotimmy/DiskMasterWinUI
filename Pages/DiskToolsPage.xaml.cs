@@ -520,6 +520,7 @@ public sealed partial class DiskToolsPage : Page
                 };
                 if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
             }
+            DebugLogService.Instance.LogAction("磁碟工具 (DiskTools)", $"刪除環境變數: {entry.Name}");
             await ViewModel.DeleteEnvVariableDirectCommand.ExecuteAsync(entry);
         }
     }
@@ -549,6 +550,7 @@ public sealed partial class DiskToolsPage : Page
                 };
                 if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
             }
+            DebugLogService.Instance.LogAction("磁碟工具 (DiskTools)", $"移除 PATH 目錄: {entry.RawPath}");
             await ViewModel.RemovePathDirectoryDirectCommand.ExecuteAsync(entry);
         }
     }
@@ -568,6 +570,7 @@ public sealed partial class DiskToolsPage : Page
             };
             if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
         }
+        DebugLogService.Instance.LogAction("磁碟工具 (DiskTools)", "清理無效與重複之 PATH 目錄");
         await ViewModel.CleanInvalidPathsCommand.ExecuteAsync(null);
     }
 
@@ -575,6 +578,7 @@ public sealed partial class DiskToolsPage : Page
     {
         if (sender is Button btn && btn.DataContext is Models.VssShadowItem item)
         {
+            DebugLogService.Instance.LogAction("磁碟工具 (DiskTools)", $"刪除磁碟陰影複製: {item.ShadowId}");
             ViewModel.DeleteShadowDirectCommand.Execute(item);
         }
     }
@@ -612,6 +616,7 @@ public sealed partial class DiskToolsPage : Page
                 var result = await dialog.ShowAsync();
                 if (result != ContentDialogResult.Primary) return;
             }
+            DebugLogService.Instance.LogAction("磁碟工具 (DiskTools)", $"強制解除安裝並刪除驅動程式: {item.PublishedName} ({item.OriginalFileName})");
             await ViewModel.DeleteDriverDirectCommand.ExecuteAsync(item);
         }
     }
@@ -650,6 +655,7 @@ public sealed partial class DiskToolsPage : Page
             var result = await dialog.ShowAsync();
             if (result != ContentDialogResult.Primary) return;
         }
+        DebugLogService.Instance.LogAction("磁碟工具 (DiskTools)", $"批次強制解除安裝並刪除驅動程式 ({selected.Count} 個)");
         await ViewModel.DeleteSelectedDriversCommand.ExecuteAsync(null);
     }
 

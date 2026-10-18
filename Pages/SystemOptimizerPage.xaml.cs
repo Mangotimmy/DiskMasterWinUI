@@ -491,6 +491,11 @@ public sealed partial class SystemOptimizerPage : Page
 
     private void OptimizerTabView_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (OptimizerTabView.SelectedItem is TabViewItem tabItem)
+        {
+            DebugLogService.Instance.LogAction("系統優化 (SystemOptimizer)", $"切換優化子分頁至 [{tabItem.Header}]");
+        }
+
         if (ReferenceEquals(OptimizerTabView.SelectedItem, TabOneDrive))
         {
             ViewModel.RefreshOneDriveStatusCommand.Execute(null);

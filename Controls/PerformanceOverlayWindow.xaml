@@ -138,15 +138,15 @@
 
                                         <!-- Visibility Toggles -->
                                         <TextBlock Text="指標顯示開關" FontSize="11" FontWeight="SemiBold" Margin="0,4,0,0" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                        <ToggleSwitch x:Name="ToggleFps" Header="FPS 即時影格率" IsOn="True" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
-                                        <ToggleSwitch x:Name="ToggleLow1Pct" Header="1% Low 最低影格" IsOn="True" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
-                                        <ToggleSwitch x:Name="ToggleMsDelay" Header="幀延遲 (ms delay)" IsOn="True" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
-                                        <ToggleSwitch x:Name="ToggleCpu" Header="CPU 使用率" IsOn="True" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
-                                        <ToggleSwitch x:Name="ToggleGpu" Header="GPU 負載 &amp; 顯存" IsOn="True" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
-                                        <ToggleSwitch x:Name="ToggleRam" Header="RAM 記憶體" IsOn="True" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
-                                        <ToggleSwitch x:Name="ToggleNet" Header="LAN 網路速率" IsOn="True" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
-                                        <ToggleSwitch x:Name="ToggleApi" Header="圖形渲染 API 標籤" IsOn="True" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
-                                        <ToggleSwitch x:Name="ToggleAppName" Header="前景程式名稱" IsOn="True" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
+                                        <ToggleSwitch x:Name="ToggleFps" Header="FPS 即時影格率" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
+                                        <ToggleSwitch x:Name="ToggleLow1Pct" Header="1% Low 最低影格" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
+                                        <ToggleSwitch x:Name="ToggleMsDelay" Header="幀延遲 (ms delay)" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
+                                        <ToggleSwitch x:Name="ToggleCpu" Header="CPU 使用率" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
+                                        <ToggleSwitch x:Name="ToggleGpu" Header="GPU 負載 &amp; 顯存" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
+                                        <ToggleSwitch x:Name="ToggleRam" Header="RAM 記憶體" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
+                                        <ToggleSwitch x:Name="ToggleNet" Header="LAN 網路速率" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
+                                        <ToggleSwitch x:Name="ToggleApi" Header="圖形渲染 API 標籤" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
+                                        <ToggleSwitch x:Name="ToggleAppName" Header="前景程式名稱" Toggled="MetricToggle_Toggled" OffContent="" OnContent="" />
                                     </StackPanel>
                                 </Flyout>
                             </Button.Flyout>

@@ -488,4 +488,37 @@ public sealed partial class SettingsPage : Page
         }
         return null;
     }
+
+    private bool _isOpeningLogViewer = false;
+
+    private async void OpenActionLogViewerBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isOpeningLogViewer) return;
+        _isOpeningLogViewer = true;
+        DebugLogService.Instance.LogAction("設定頁面 (Settings)", "使用者點擊開啟即時操作動態檢視器");
+        var xamlRoot = this.XamlRoot ?? WindowHelper.RootXamlRoot;
+        if (xamlRoot != null)
+        {
+            try
+            {
+                var dlg = new Controls.ActionLogViewerDialog
+                {
+                    XamlRoot = xamlRoot
+                };
+                await dlg.ShowAsync();
+            }
+            catch (Exception ex)
+            {
+                DebugLogService.Instance.Error("開啟即時日誌檢視器失敗", ex, "Settings");
+            }
+            finally
+            {
+                _isOpeningLogViewer = false;
+            }
+        }
+        else
+        {
+            _isOpeningLogViewer = false;
+        }
+    }
 }

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.UI.Dispatching;
 using Windows.ApplicationModel.DataTransfer;
+using DiskMasterWinUI.Services;
 
 namespace DiskMasterWinUI.Helpers;
 
@@ -49,6 +50,12 @@ public static class GlobalExceptionHandler
             _lastException = ex;
             _lastExceptionContext = context;
         }
+
+        try
+        {
+            DebugLogService.Instance.LogAction("例外防護 (CrashGuard)", $"攔截異常: {ex.GetType().Name} - {ex.Message}", ex.StackTrace ?? "", "ERROR");
+        }
+        catch { }
 
         var logEntry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{context}]\nException: {ex.GetType().FullName}: {ex.Message}\nStackTrace:\n{ex.StackTrace}\n\n";
         AppendCrashLog(logEntry);

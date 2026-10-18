@@ -78,6 +78,7 @@ public partial class StarterViewModel : ObservableObject
     [RelayCommand]
     public async Task OneClickGameBoostAsync()
     {
+        DebugLogService.Instance.LogAction("首頁嚮導 (Starter)", "使用者點擊一鍵電競極致加速方案");
         try
         {
             IsOperating = true;
@@ -101,6 +102,7 @@ public partial class StarterViewModel : ObservableObject
     [RelayCommand]
     public async Task OneClickFreeSsdAsync()
     {
+        DebugLogService.Instance.LogAction("首頁嚮導 (Starter)", "使用者點擊一鍵釋放 SSD 空間 (刪除休眠檔)");
         try
         {
             IsOperating = true;
@@ -136,6 +138,7 @@ public partial class StarterViewModel : ObservableObject
             "UNINSTALL_ONEDRIVE");
         if (!confirmed) return;
 
+        DebugLogService.Instance.LogAction("首頁嚮導 (Starter)", "使用者點擊新手一鍵徹底卸載 OneDrive");
         try
         {
             IsOperating = true;
@@ -163,6 +166,7 @@ public partial class StarterViewModel : ObservableObject
     [RelayCommand]
     public async Task OneClickSystemRepairAsync()
     {
+        DebugLogService.Instance.LogAction("首頁嚮導 (Starter)", "使用者點擊一鍵修復系統完整性 (SFC)");
         try
         {
             IsOperating = true;

@@ -75,6 +75,7 @@ public sealed partial class SystemPerformancePage : Page
 
     private void TogglePerformanceOverlay_Click(object sender, RoutedEventArgs e)
     {
+        DebugLogService.Instance.LogAction("效能監控 (Performance)", "使用者點擊切換 FPS HUD 懸浮窗");
         DiskMasterWinUI.Controls.PerformanceOverlayWindow.Toggle();
         UpdateOverlayButtonState();
     }

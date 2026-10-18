@@ -89,6 +89,7 @@ public partial class SystemHealthViewModel : ObservableObject
     private async Task RunOneClickRepairAsync()
     {
         if (IsRunning) return;
+        DebugLogService.Instance.LogAction("系統健康 (SystemHealth)", "開始一鍵全自動系統修復 (SFC + DISM)");
         try
         {
             IsRunning = true;
@@ -109,6 +110,7 @@ public partial class SystemHealthViewModel : ObservableObject
     private async Task RunSfcScanNowAsync()
     {
         if (IsRunning) return;
+        DebugLogService.Instance.LogAction("系統健康 (SystemHealth)", "啟動 SFC /scannow 系統檔案完整掃描與修復");
         try
         {
             IsRunning = true;
@@ -189,6 +191,7 @@ public partial class SystemHealthViewModel : ObservableObject
     private async Task RunDismRestoreHealthAsync()
     {
         if (IsRunning) return;
+        DebugLogService.Instance.LogAction("系統健康 (SystemHealth)", "執行 DISM RestoreHealth 線上映像還原修復");
         try
         {
             IsRunning = true;

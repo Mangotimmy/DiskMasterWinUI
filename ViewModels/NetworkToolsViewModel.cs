@@ -484,10 +484,11 @@ public partial class NetworkToolsViewModel : ObservableObject
     public async Task ApplySelectedDnsAsync()
     {
         if (SelectedDnsPreset == null) return;
+        string targetName = SelectedAdapter?.Name ?? "";
+        DebugLogService.Instance.LogAction("網路工具 (NetworkTools)", $"套用 DNS ({SelectedDnsPreset.Name}) 至網卡 '{targetName}'");
         try
         {
             IsApplyingDns = true;
-            string targetName = SelectedAdapter?.Name ?? "";
             StatusMessage = $"正在套用 DNS ({SelectedDnsPreset.Name}) 至網卡 '{targetName}'...";
             var (ok, msg) = await _diagService.ApplyDnsAsync(SelectedDnsPreset.PrimaryDns, SelectedDnsPreset.SecondaryDns, targetName);
             StatusMessage = msg;
@@ -512,6 +513,7 @@ public partial class NetworkToolsViewModel : ObservableObject
         {
             IsApplyingDns = true;
             string targetName = SelectedAdapter?.Name ?? "";
+            DebugLogService.Instance.LogAction("網路工具 (NetworkTools)", $"套用自訂 DNS ({CustomPrimaryDns}, {CustomSecondaryDns}) 至網卡 '{targetName}'");
             StatusMessage = $"正在套用自訂 DNS 至網卡 '{targetName}'...";
             var (ok, msg) = await _diagService.ApplyDnsAsync(CustomPrimaryDns, CustomSecondaryDns, targetName);
             StatusMessage = msg;
@@ -536,6 +538,7 @@ public partial class NetworkToolsViewModel : ObservableObject
         {
             IsApplyingDns = true;
             string targetName = SelectedAdapter?.Name ?? "";
+            DebugLogService.Instance.LogAction("網路工具 (NetworkTools)", $"還原網卡 '{targetName}' 為自動 DHCP DNS");
             StatusMessage = $"正在還原網卡 '{targetName}' 為自動 DHCP DNS...";
             var (ok, msg) = await _diagService.ApplyDnsAsync("", "", targetName);
             StatusMessage = msg;
@@ -630,6 +633,7 @@ public partial class NetworkToolsViewModel : ObservableObject
     [RelayCommand]
     public void FlushDns()
     {
+        DebugLogService.Instance.LogAction("網路工具 (NetworkTools)", "清除 Windows DNS 解析器快取 (ipconfig /flushdns)");
         HostsService.FlushDnsCache();
         StatusMessage = "已成功清除 Windows DNS 解析器快取 (ipconfig /flushdns)！";
         AudioFeedbackService.PlaySuccess();
@@ -642,6 +646,7 @@ public partial class NetworkToolsViewModel : ObservableObject
     [RelayCommand]
     public async Task RunSmartDiagnosticsAsync()
     {
+        DebugLogService.Instance.LogAction("網路工具 (NetworkTools)", "啟動 5 階段自動網路卡頓與延遲診斷");
         try
         {
             IsRunningDiagnostics = true;

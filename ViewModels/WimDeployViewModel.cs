@@ -817,6 +817,7 @@ public partial class WimDeployViewModel : ObservableObject
     {
         if (!string.IsNullOrWhiteSpace(MountedIsoPath))
         {
+            DebugLogService.Instance.LogAction("映像部署 (WimDeploy)", $"卸載 ISO 映像: {MountedIsoPath}");
             var msg = await _wimService.DismountIsoAsync(MountedIsoPath);
             LogTimestamped(msg);
             StatusMessage = msg;
@@ -888,6 +889,7 @@ public partial class WimDeployViewModel : ObservableObject
         }
 
         var cleanTarget = TargetDrive.Split(' ')[0].TrimEnd('\\') + @"\";
+        DebugLogService.Instance.LogAction("映像部署 (WimDeploy)", $"啟動映像套用部署: {SelectedImage.Name} -> {cleanTarget}");
 
         try
         {

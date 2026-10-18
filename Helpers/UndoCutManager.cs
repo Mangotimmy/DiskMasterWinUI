@@ -43,6 +43,11 @@ public static class UndoCutManager
             }
         }
         _undoStack.Push(new UndoEntry(description, restoreAction, targetObject));
+        try
+        {
+            DebugLogService.Instance.LogAction("回復復原 (UndoCut)", $"註冊可復原動作: {description}");
+        }
+        catch { }
     }
 
     public static bool CanUndo => _undoStack.Count > 0;

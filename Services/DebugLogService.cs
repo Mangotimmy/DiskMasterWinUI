@@ -1,15 +1,19 @@
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
 using DiskMasterWinUI.Helpers;
+using DiskMasterWinUI.Models;
 
 namespace DiskMasterWinUI.Services;
 
 /// <summary>
 /// High-performance, zero-overhead diagnostic and debug logging service for DiskMaster Pro.
-/// When disabled, all logging calls return immediately on the fast path without memory allocation or I/O.
+/// When disabled, disk file logging returns immediately without I/O.
+/// Maintains an in-memory ring buffer (up to 2,000 items) for instant live action & request inspection.
 /// When enabled, logs are written to %LOCALAPPDATA%\DiskMaster_Portable\Logs\diskmaster_debug.log with automatic size rolling.
 /// </summary>
 public class DebugLogService
@@ -22,6 +26,11 @@ public class DebugLogService
     private readonly string _logFilePath;
     private const long MaxLogFileSizeBytes = 10 * 1024 * 1024; // 10 MB limit before roll
     private const int MaxRollingFiles = 5;
+
+    // In-memory real-time ring buffer capped at 2,000 items for instant action inspection
+    private const int MaxMemoryLogItems = 2000;
+    private readonly ConcurrentQueue<ActionLogItem> _memoryLogQueue = new();
+    public event Action<ActionLogItem>? LogItemAdded;
 
     // How much log text to accumulate before stat-ing the file again for the roll check.
     private const int SizeCheckIntervalChars = 64 * 1024;
@@ -48,6 +57,87 @@ public class DebugLogService
         catch { }
     }
 
+    private void EnqueueMemoryLog(ActionLogItem item)
+    {
+        _memoryLogQueue.Enqueue(item);
+        while (_memoryLogQueue.Count > MaxMemoryLogItems)
+        {
+            _memoryLogQueue.TryDequeue(out _);
+        }
+        try
+        {
+            LogItemAdded?.Invoke(item);
+        }
+        catch { }
+    }
+
+    public void LogAction(string category, string action, string details = "", string level = "ACTION")
+    {
+        var item = new ActionLogItem
+        {
+            Timestamp = DateTime.Now,
+            Level = level,
+            Category = category,
+            Action = action,
+            Details = details
+        };
+        EnqueueMemoryLog(item);
+
+        if (IsEnabled)
+        {
+            WriteEntry(level, category, string.IsNullOrEmpty(details) ? action : $"{action} | {details}");
+        }
+    }
+
+    public void LogRequest(string category, string request, string parameters = "", long? durationMs = null, bool success = true)
+    {
+        var detailsBuilder = new StringBuilder();
+        if (!string.IsNullOrEmpty(parameters))
+        {
+            detailsBuilder.Append($"參數: {parameters}");
+        }
+        if (durationMs.HasValue)
+        {
+            if (detailsBuilder.Length > 0) detailsBuilder.Append(" | ");
+            detailsBuilder.Append($"耗時: {durationMs.Value}ms");
+        }
+        if (durationMs.HasValue || !success)
+        {
+            if (detailsBuilder.Length > 0) detailsBuilder.Append(" | ");
+            detailsBuilder.Append($"狀態: {(success ? "成功" : "失敗")}");
+        }
+
+        var details = detailsBuilder.ToString();
+        var level = success ? "REQUEST" : "ERROR";
+
+        var item = new ActionLogItem
+        {
+            Timestamp = DateTime.Now,
+            Level = level,
+            Category = category,
+            Action = request,
+            Details = details
+        };
+        EnqueueMemoryLog(item);
+
+        if (IsEnabled)
+        {
+            WriteEntry(level, category, string.IsNullOrEmpty(details) ? request : $"{request} | {details}");
+        }
+    }
+
+    public int LogBufferCount => _memoryLogQueue.Count;
+
+    public IReadOnlyList<ActionLogItem> GetRecentLogItems()
+    {
+        return _memoryLogQueue.ToArray();
+    }
+
+    public void ClearLogBuffer()
+    {
+        while (_memoryLogQueue.TryDequeue(out _)) { }
+    }
+
     /// <summary>
     /// Initializes the logger state from application settings.
     /// </summary>
@@ -63,29 +153,63 @@ public class DebugLogService
 
     public void Debug(string message, string? category = null, [CallerMemberName] string? caller = null)
     {
+        var cat = category ?? caller ?? "General";
+        EnqueueMemoryLog(new ActionLogItem
+        {
+            Timestamp = DateTime.Now,
+            Level = "INFO",
+            Category = cat,
+            Action = message,
+            Details = caller != null ? $"Caller: {caller}" : ""
+        });
         if (!IsEnabled) return;
-        WriteEntry("DEBUG", category ?? caller ?? "General", message);
+        WriteEntry("DEBUG", cat, message);
     }
 
     public void Info(string message, string? category = null)
     {
+        var cat = category ?? "General";
+        EnqueueMemoryLog(new ActionLogItem
+        {
+            Timestamp = DateTime.Now,
+            Level = "INFO",
+            Category = cat,
+            Action = message
+        });
         if (!IsEnabled) return;
-        WriteEntry("INFO ", category ?? "General", message);
+        WriteEntry("INFO ", cat, message);
     }
 
     public void Warning(string message, string? category = null)
     {
+        var cat = category ?? "General";
+        EnqueueMemoryLog(new ActionLogItem
+        {
+            Timestamp = DateTime.Now,
+            Level = "WARN",
+            Category = cat,
+            Action = message
+        });
         if (!IsEnabled) return;
-        WriteEntry("WARN ", category ?? "General", message);
+        WriteEntry("WARN ", cat, message);
     }
 
     public void Error(string message, Exception? ex = null, string? category = null)
     {
-        if (!IsEnabled) return;
+        var cat = category ?? "General";
         var fullMessage = ex != null
             ? $"{message} | Exception: {ex.GetType().Name}: {ex.Message}{Environment.NewLine}{ex.StackTrace}"
             : message;
-        WriteEntry("ERROR", category ?? "General", fullMessage);
+        EnqueueMemoryLog(new ActionLogItem
+        {
+            Timestamp = DateTime.Now,
+            Level = "ERROR",
+            Category = cat,
+            Action = message,
+            Details = ex != null ? $"{ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}" : ""
+        });
+        if (!IsEnabled) return;
+        WriteEntry("ERROR", cat, fullMessage);
     }
 
     private void WriteEntry(string level, string category, string message)

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using DiskMasterWinUI.Services;
 
 namespace DiskMasterWinUI.Helpers;
 
@@ -37,6 +38,9 @@ public static class ProcessHelper
         string? workingDirectory = null,
         CancellationToken cancellationToken = default)
     {
+        var sw = Stopwatch.StartNew();
+        DebugLogService.Instance.LogRequest("ProcessHelper", $"啟動呼叫: {fileName}", arguments);
+
         var encoding = GetConsoleEncoding();
         var psi = new ProcessStartInfo
         {
@@ -58,7 +62,12 @@ public static class ProcessHelper
         try
         {
             using var process = Process.Start(psi);
-            if (process == null) return ("", $"ERROR: Failed to launch {fileName}", -1);
+            if (process == null)
+            {
+                sw.Stop();
+                DebugLogService.Instance.LogRequest("ProcessHelper", $"啟動失敗: {fileName}", arguments, sw.ElapsedMilliseconds, false);
+                return ("", $"ERROR: Failed to launch {fileName}", -1);
+            }
 
             using var reg = cancellationToken.Register(() =>
             {
@@ -78,14 +87,22 @@ public static class ProcessHelper
             var stdout = await stdoutTask;
             var stderr = await stderrTask;
 
-            return (stdout, stderr, process.ExitCode);
+            sw.Stop();
+            int exitCode = process.ExitCode;
+            DebugLogService.Instance.LogRequest("ProcessHelper", $"完成呼叫: {fileName} (ExitCode: {exitCode})", arguments, sw.ElapsedMilliseconds, exitCode == 0);
+
+            return (stdout, stderr, exitCode);
         }
         catch (OperationCanceledException)
         {
+            sw.Stop();
+            DebugLogService.Instance.LogRequest("ProcessHelper", $"取消呼叫: {fileName}", arguments, sw.ElapsedMilliseconds, false);
             return ("", "Operation cancelled by user.", -1);
         }
         catch (Exception ex)
         {
+            sw.Stop();
+            DebugLogService.Instance.LogRequest("ProcessHelper", $"異常失敗: {fileName} ({ex.Message})", arguments, sw.ElapsedMilliseconds, false);
             return ("", $"ERROR: {ex.Message}", -1);
         }
     }

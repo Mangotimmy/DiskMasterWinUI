@@ -639,6 +639,7 @@ public sealed partial class MainWindow : Window
         if (_suppressWorkspaceSelectionChanged) return;
         if (WorkspaceCombo.SelectedItem is ComboBoxItem item && item.Tag is string key)
         {
+            DebugLogService.Instance.LogAction("工作區 (Workspace)", $"切換工作區排版至 [{key}]");
             ApplyWorkspacePreset(key);
         }
     }
@@ -998,6 +999,7 @@ public sealed partial class MainWindow : Window
         if (string.IsNullOrEmpty(tag)) return;
         if (_rightDockTag == tag) return;
 
+        DebugLogService.Instance.LogAction("版面佈局 (Layout)", $"將分頁 [{tag}] 停靠至右側面板");
         var page = GetOrCreatePageForTag(tag);
 
         // Release every other host that may currently own this tag/page.
@@ -1054,6 +1056,7 @@ public sealed partial class MainWindow : Window
         if (string.IsNullOrEmpty(tag)) return;
         if (_bottomDockTag == tag) return;
 
+        DebugLogService.Instance.LogAction("版面佈局 (Layout)", $"將分頁 [{tag}] 停靠至底部面板");
         var page = GetOrCreatePageForTag(tag);
 
         // Release every other host that may currently own this tag/page.
@@ -1184,6 +1187,7 @@ public sealed partial class MainWindow : Window
         if (MainTabs.TabItems.Count <= 1) return;
 
         var header = tabItem.Header?.ToString() ?? tag;
+        DebugLogService.Instance.LogAction("版面佈局 (Layout)", $"將分頁 [{tag} - {header}] 浮動為獨立視窗");
         var page = GetOrCreatePageForTag(tag);
 
         // The tab may also be sitting in a dock pane (right-click "float" on a docked tag).
@@ -1245,6 +1249,7 @@ public sealed partial class MainWindow : Window
 
     private void MainTabs_TabDragCompleted(TabView sender, TabViewTabDragCompletedEventArgs args)
     {
+        DebugLogService.Instance.LogAction("分頁操作 (Tabs)", "拖曳調整分頁順序完成");
         _draggedTabItem = null;
     }
 
@@ -1253,6 +1258,7 @@ public sealed partial class MainWindow : Window
         var tab = args.Tab ?? _draggedTabItem;
         if (tab != null)
         {
+            DebugLogService.Instance.LogAction("分頁操作 (Tabs)", $"將分頁 [{tab.Tag}] 拖曳至視窗外撕離為浮動視窗");
             var cursor = DisplayHelper.GetCurrentCursorPosition();
             FloatTab(tab, cursor);
         }
@@ -1345,6 +1351,7 @@ public sealed partial class MainWindow : Window
 
     private void DockAll_Click(object sender, RoutedEventArgs e)
     {
+        DebugLogService.Instance.LogAction("版面佈局 (Layout)", "一鍵將所有浮動與停靠視窗嵌回主視窗");
         CloseRightDock(reinsertToTabs: true);
         CloseBottomDock(reinsertToTabs: true);
 
@@ -1986,6 +1993,35 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async void ActionLogBtn_Click(object sender, RoutedEventArgs e)
+    {
+        DebugLogService.Instance.LogAction("使用者介面 (UI)", "點擊開啟即時操作日誌檢視器");
+        await ShowActionLogViewerAsync();
+    }
+
+    public async Task ShowActionLogViewerAsync()
+    {
+        var xamlRoot = this.Content?.XamlRoot ?? WindowHelper.RootXamlRoot;
+        if (_isShowingDialog || xamlRoot == null) return;
+        _isShowingDialog = true;
+        try
+        {
+            var dlg = new Controls.ActionLogViewerDialog
+            {
+                XamlRoot = xamlRoot
+            };
+            await dlg.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            DebugLogService.Instance.Error("開啟即時日誌檢視器異常", ex, "ActionLog");
+        }
+        finally
+        {
+            _isShowingDialog = false;
+        }
+    }
+
     private void SetupKeyboardAccelerators()
     {
         NormalView.KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
@@ -2038,17 +2074,18 @@ public sealed partial class MainWindow : Window
 
         // F5 & Ctrl+R for Smart Refresh
         var f5Accel = new KeyboardAccelerator { Key = VirtualKey.F5 };
-        f5Accel.Invoked += (s, e) => { SmartRefreshCurrentPage(); e.Handled = true; };
+        f5Accel.Invoked += (s, e) => { DebugLogService.Instance.LogAction("快捷鍵 (Shortcut)", "使用者按下 F5 重新整理分頁"); SmartRefreshCurrentPage(); e.Handled = true; };
         AddHiddenAccel(f5Accel);
 
         var ctrlRAccel = new KeyboardAccelerator { Key = VirtualKey.R, Modifiers = VirtualKeyModifiers.Control };
-        ctrlRAccel.Invoked += (s, e) => { SmartRefreshCurrentPage(); e.Handled = true; };
+        ctrlRAccel.Invoked += (s, e) => { DebugLogService.Instance.LogAction("快捷鍵 (Shortcut)", "使用者按下 Ctrl+R 重新整理分頁"); SmartRefreshCurrentPage(); e.Handled = true; };
         AddHiddenAccel(ctrlRAccel);
 
         // Ctrl+Shift+F for Float Tab
         var floatAccel = new KeyboardAccelerator { Key = VirtualKey.F, Modifiers = VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift };
         floatAccel.Invoked += (s, e) =>
         {
+            DebugLogService.Instance.LogAction("快捷鍵 (Shortcut)", "使用者按下 Ctrl+Shift+F 浮動目前分頁");
             if (MainTabs.SelectedItem is TabViewItem tab) FloatTab(tab);
             e.Handled = true;
         };
@@ -2056,7 +2093,7 @@ public sealed partial class MainWindow : Window
 
         // Ctrl+Shift+D for Dock All
         var dockAllAccel = new KeyboardAccelerator { Key = VirtualKey.D, Modifiers = VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift };
-        dockAllAccel.Invoked += (s, e) => { DockAll_Click(this, new RoutedEventArgs()); e.Handled = true; };
+        dockAllAccel.Invoked += (s, e) => { DebugLogService.Instance.LogAction("快捷鍵 (Shortcut)", "使用者按下 Ctrl+Shift+D 嵌回所有浮動分頁"); DockAll_Click(this, new RoutedEventArgs()); e.Handled = true; };
         AddHiddenAccel(dockAllAccel);
 
         // Alt+Left (Move Tab Left)
@@ -2139,6 +2176,7 @@ public sealed partial class MainWindow : Window
         var exportDiagAccel = new KeyboardAccelerator { Key = VirtualKey.D, Modifiers = VirtualKeyModifiers.Control };
         exportDiagAccel.Invoked += async (s, e) =>
         {
+            DebugLogService.Instance.LogAction("快捷鍵 (Shortcut)", "使用者按下 Ctrl+D 匯出系統診斷報告");
             e.Handled = true;
             await DiagnosticExportService.Instance.ExportReportToFileAsync(autoOpenFile: true);
         };
@@ -2148,6 +2186,7 @@ public sealed partial class MainWindow : Window
         var clearLogAccel = new KeyboardAccelerator { Key = VirtualKey.L, Modifiers = VirtualKeyModifiers.Control };
         clearLogAccel.Invoked += (s, e) =>
         {
+            DebugLogService.Instance.LogAction("快捷鍵 (Shortcut)", "使用者按下 Ctrl+L 清除目前分頁記錄");
             var currentTag = (MainTabs.SelectedItem as TabViewItem)?.Tag?.ToString();
             switch (currentTag)
             {
@@ -2195,6 +2234,16 @@ public sealed partial class MainWindow : Window
             e.Handled = true;
         };
         NormalView.KeyboardAccelerators.Add(clearLogAccel);
+
+        // Ctrl+Shift+L for Action Log Viewer
+        var actionLogViewerAccel = new KeyboardAccelerator { Key = VirtualKey.L, Modifiers = VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift };
+        actionLogViewerAccel.Invoked += async (s, e) =>
+        {
+            DebugLogService.Instance.LogAction("快捷鍵 (Shortcut)", "使用者按下 Ctrl+Shift+L 呼叫即時操作檢視器");
+            e.Handled = true;
+            await ShowActionLogViewerAsync();
+        };
+        NormalView.KeyboardAccelerators.Add(actionLogViewerAccel);
 
         // Global & per-page Ctrl+Z (Undo) and Ctrl+X (Cut) support across all 14 pages
         UndoCutManager.Attach(NormalView, () => ContentFrame.Content as Page);
@@ -2362,6 +2411,7 @@ public sealed partial class MainWindow : Window
 
             if (tag == _currentNavigatedTag && ReferenceEquals(ContentFrame.Content, page)) return;
             _currentNavigatedTag = tag;
+            DebugLogService.Instance.LogAction("導航 (Navigation)", $"切換至分頁 [{tag}]");
             var sw = System.Diagnostics.Stopwatch.StartNew();
             DebugLogService.Instance.Debug($"Navigating to tab '{tag}'...", "Navigation");
 

@@ -29,6 +29,7 @@ public sealed partial class PerformanceOverlayWindow : Window
     private double _lastFrameMs = 16.6;
 
     private bool _isCompact;
+    private bool _isInitialized = false;
     private IntPtr _hwnd;
     private OverlappedPresenter? _presenter;
 
@@ -85,6 +86,8 @@ public sealed partial class PerformanceOverlayWindow : Window
 
         // Apply saved HUD settings
         LoadSavedSettings();
+        _isInitialized = true;
+        ApplyMetricVisibility();
 
         // Immediate first sample
         _ = RefreshOverlayMetricsAsync();
@@ -147,7 +150,10 @@ public sealed partial class PerformanceOverlayWindow : Window
     private void ApplyOpacity(double opacity)
     {
         opacity = Math.Clamp(opacity, 0.05, 1.0);
-        HudContainer.Opacity = opacity;
+        if (HudContainer != null)
+        {
+            HudContainer.Opacity = opacity;
+        }
         if (OpacityValueText != null)
         {
             OpacityValueText.Text = $"{(int)Math.Round(opacity * 100)}%";
@@ -156,37 +162,38 @@ public sealed partial class PerformanceOverlayWindow : Window
 
     private void ApplyHudStyle(string style)
     {
-        BarViewPanel.Visibility = (style == "Bar") ? Visibility.Visible : Visibility.Collapsed;
-        CardViewPanel.Visibility = (style == "Card") ? Visibility.Visible : Visibility.Collapsed;
-        BadgeViewPanel.Visibility = (style == "Badge") ? Visibility.Visible : Visibility.Collapsed;
+        if (BarViewPanel != null) BarViewPanel.Visibility = (style == "Bar") ? Visibility.Visible : Visibility.Collapsed;
+        if (CardViewPanel != null) CardViewPanel.Visibility = (style == "Card") ? Visibility.Visible : Visibility.Collapsed;
+        if (BadgeViewPanel != null) BadgeViewPanel.Visibility = (style == "Badge") ? Visibility.Visible : Visibility.Collapsed;
 
         ApplyDpiAwareWindowSize(repositionTopRight: false);
     }
 
     private void ApplyMetricVisibility()
     {
+        if (!_isInitialized) return;
         var s = SettingsService.Instance.Current;
 
         // Bar badges
-        BarFpsBadge.Visibility = s.HudShowFps ? Visibility.Visible : Visibility.Collapsed;
-        BarLow1PctBadge.Visibility = s.HudShowLow1Percent ? Visibility.Visible : Visibility.Collapsed;
-        BarMsDelayBadge.Visibility = s.HudShowMsDelay ? Visibility.Visible : Visibility.Collapsed;
-        BarApiBadge.Visibility = s.HudShowApi ? Visibility.Visible : Visibility.Collapsed;
-        BarCpuBadge.Visibility = s.HudShowCpu ? Visibility.Visible : Visibility.Collapsed;
-        BarGpuBadge.Visibility = s.HudShowGpu ? Visibility.Visible : Visibility.Collapsed;
-        BarRamBadge.Visibility = s.HudShowRam ? Visibility.Visible : Visibility.Collapsed;
-        BarNetBadge.Visibility = s.HudShowNet ? Visibility.Visible : Visibility.Collapsed;
-        BarAppNameBadge.Visibility = s.HudShowAppName ? Visibility.Visible : Visibility.Collapsed;
+        if (BarFpsBadge != null) BarFpsBadge.Visibility = s.HudShowFps ? Visibility.Visible : Visibility.Collapsed;
+        if (BarLow1PctBadge != null) BarLow1PctBadge.Visibility = s.HudShowLow1Percent ? Visibility.Visible : Visibility.Collapsed;
+        if (BarMsDelayBadge != null) BarMsDelayBadge.Visibility = s.HudShowMsDelay ? Visibility.Visible : Visibility.Collapsed;
+        if (BarApiBadge != null) BarApiBadge.Visibility = s.HudShowApi ? Visibility.Visible : Visibility.Collapsed;
+        if (BarCpuBadge != null) BarCpuBadge.Visibility = s.HudShowCpu ? Visibility.Visible : Visibility.Collapsed;
+        if (BarGpuBadge != null) BarGpuBadge.Visibility = s.HudShowGpu ? Visibility.Visible : Visibility.Collapsed;
+        if (BarRamBadge != null) BarRamBadge.Visibility = s.HudShowRam ? Visibility.Visible : Visibility.Collapsed;
+        if (BarNetBadge != null) BarNetBadge.Visibility = s.HudShowNet ? Visibility.Visible : Visibility.Collapsed;
+        if (BarAppNameBadge != null) BarAppNameBadge.Visibility = s.HudShowAppName ? Visibility.Visible : Visibility.Collapsed;
 
         // Card badges
-        CardFpsBadge.Visibility = s.HudShowFps ? Visibility.Visible : Visibility.Collapsed;
-        CardLow1PctBadge.Visibility = s.HudShowLow1Percent ? Visibility.Visible : Visibility.Collapsed;
-        CardMsDelayBadge.Visibility = s.HudShowMsDelay ? Visibility.Visible : Visibility.Collapsed;
-        GraphicsApiBadge.Visibility = s.HudShowApi ? Visibility.Visible : Visibility.Collapsed;
-        CardCpuRow.Visibility = s.HudShowCpu ? Visibility.Visible : Visibility.Collapsed;
-        CardGpuRow.Visibility = s.HudShowGpu ? Visibility.Visible : Visibility.Collapsed;
-        CardRamRow.Visibility = s.HudShowRam ? Visibility.Visible : Visibility.Collapsed;
-        CardNetRow.Visibility = s.HudShowNet ? Visibility.Visible : Visibility.Collapsed;
+        if (CardFpsBadge != null) CardFpsBadge.Visibility = s.HudShowFps ? Visibility.Visible : Visibility.Collapsed;
+        if (CardLow1PctBadge != null) CardLow1PctBadge.Visibility = s.HudShowLow1Percent ? Visibility.Visible : Visibility.Collapsed;
+        if (CardMsDelayBadge != null) CardMsDelayBadge.Visibility = s.HudShowMsDelay ? Visibility.Visible : Visibility.Collapsed;
+        if (GraphicsApiBadge != null) GraphicsApiBadge.Visibility = s.HudShowApi ? Visibility.Visible : Visibility.Collapsed;
+        if (CardCpuRow != null) CardCpuRow.Visibility = s.HudShowCpu ? Visibility.Visible : Visibility.Collapsed;
+        if (CardGpuRow != null) CardGpuRow.Visibility = s.HudShowGpu ? Visibility.Visible : Visibility.Collapsed;
+        if (CardRamRow != null) CardRamRow.Visibility = s.HudShowRam ? Visibility.Visible : Visibility.Collapsed;
+        if (CardNetRow != null) CardNetRow.Visibility = s.HudShowNet ? Visibility.Visible : Visibility.Collapsed;
 
         ApplyDpiAwareWindowSize(repositionTopRight: false);
     }
@@ -194,7 +201,7 @@ public sealed partial class PerformanceOverlayWindow : Window
     private void OverlayRoot_Loaded(object sender, RoutedEventArgs e)
     {
         ApplyDpiAwareWindowSize(repositionTopRight: false);
-        if (OverlayRoot.XamlRoot != null)
+        if (OverlayRoot?.XamlRoot != null)
         {
             OverlayRoot.XamlRoot.Changed += (_, _) => ApplyDpiAwareWindowSize(repositionTopRight: false);
         }
@@ -240,10 +247,12 @@ public sealed partial class PerformanceOverlayWindow : Window
 
     private void ApplyDpiAwareWindowSize(bool repositionTopRight)
     {
+        if (_hwnd == IntPtr.Zero) return;
         try
         {
             var windowId = Win32Interop.GetWindowIdFromWindow(_hwnd);
             var appWindow = AppWindow.GetFromWindowId(windowId);
+            if (appWindow == null) return;
             double dpiScale = GetCurrentDpiScale();
 
             var s = SettingsService.Instance.Current;
@@ -563,17 +572,20 @@ public sealed partial class PerformanceOverlayWindow : Window
 
     private void HudStyleCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (!_isInitialized) return;
         if (HudStyleCombo.SelectedItem is ComboBoxItem item && item.Tag is string style)
         {
             var s = SettingsService.Instance.Current;
             s.HudStyle = style;
             SettingsService.Instance.Save();
             ApplyHudStyle(style);
+            DebugLogService.Instance.LogAction("效能監控 (Performance)", $"切換 HUD 風格為 [{style}]");
         }
     }
 
     private void HudOpacitySlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
     {
+        if (!_isInitialized) return;
         double val = e.NewValue / 100.0;
         ApplyOpacity(val);
         var s = SettingsService.Instance.Current;
@@ -586,6 +598,7 @@ public sealed partial class PerformanceOverlayWindow : Window
 
     private void MetricToggle_Toggled(object sender, RoutedEventArgs e)
     {
+        if (!_isInitialized) return;
         var s = SettingsService.Instance.Current;
         if (ToggleFps != null) s.HudShowFps = ToggleFps.IsOn;
         if (ToggleLow1Pct != null) s.HudShowLow1Percent = ToggleLow1Pct.IsOn;
@@ -599,6 +612,7 @@ public sealed partial class PerformanceOverlayWindow : Window
 
         SettingsService.Instance.Save();
         ApplyMetricVisibility();
+        DebugLogService.Instance.LogAction("效能監控 (Performance)", "變更 FPS HUD 顯示指標開關");
     }
 
     private void OpenSettings_Click(object sender, RoutedEventArgs e)
@@ -642,13 +656,27 @@ public sealed partial class PerformanceOverlayWindow : Window
     {
         if (CurrentInstance != null)
         {
-            CurrentInstance.Close();
+            try
+            {
+                CurrentInstance.Close();
+                DebugLogService.Instance.LogAction("效能監控 (Performance)", "關閉 FPS HUD 懸浮窗");
+            }
+            catch { }
             CurrentInstance = null;
         }
         else
         {
-            var overlay = new PerformanceOverlayWindow();
-            overlay.Activate();
+            try
+            {
+                var overlay = new PerformanceOverlayWindow();
+                overlay.Activate();
+                DebugLogService.Instance.LogAction("效能監控 (Performance)", "開啟 FPS HUD 懸浮窗成功");
+            }
+            catch (Exception ex)
+            {
+                GlobalExceptionHandler.ReportException(ex, "效能懸浮窗啟動 (HUD Launch)");
+                DebugLogService.Instance.Error("效能懸浮窗啟動失敗", ex, "SystemPerformance");
+            }
         }
     }
 }
