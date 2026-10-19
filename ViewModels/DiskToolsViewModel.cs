@@ -1491,7 +1491,13 @@ public partial class DiskToolsViewModel : ObservableObject
             StatusBarViewModel.Instance.StartOperation(title, CancelChkdsk, estimate);
             _chkdskCts = new CancellationTokenSource();
             var stopwatch = Stopwatch.StartNew();
-            int exitCode = await execute(AppendChkdskOutput, _chkdskCts.Token);
+            string? lastBusyLine = null;
+            void OnLine(string line)
+            {
+                AppendChkdskOutput(line);
+                if (ChkdskPromptDetector.IsVolumeBusy(line)) lastBusyLine = line;
+            }
+            int exitCode = await execute(OnLine, _chkdskCts.Token);
             stopwatch.Stop();
 
             bool cancelled = _chkdskCts.IsCancellationRequested;
@@ -1507,12 +1513,36 @@ public partial class DiskToolsViewModel : ObservableObject
                 StatusMessage = completeMessage;
                 StatusBarViewModel.Instance.CompleteOperation(completeMessage, success: true, notify: true);
             }
+            else if (exitCode == -2)
+            {
+                string detail = string.IsNullOrWhiteSpace(lastBusyLine)
+                    ? "磁碟區正在使用中，chkdsk 無法鎖定。"
+                    : lastBusyLine;
+                string message = $"{title}: 磁碟區使用中，無法鎖定。已自動回答「不排程」；請使用『排程開機檢查』。";
+                StatusMessage = message;
+                AppendLog($"[ERROR] {detail}");
+                AppendLog($"[INFO] {message}");
+                DebugLogService.Instance.Warning($"{title}: volume busy; schedule prompt declined", "Chkdsk");
+                StatusBarViewModel.Instance.CompleteOperation(message, success: false, notify: true);
+            }
+            else if (exitCode == -3)
+            {
+                string message = $"{title}: 已超過 10 分鐘沒有輸出，已終止 chkdsk 並保留現況。";
+                StatusMessage = message;
+                AppendLog($"[TIMEOUT] {message}");
+                DebugLogService.Instance.Warning($"{title}: idle timeout", "Chkdsk");
+                StatusBarViewModel.Instance.CompleteOperation(message, success: false, notify: true);
+            }
             else
             {
-                StatusMessage = $"{title} failed (exit code {exitCode}).";
+                string message = $"{title} failed (exit code {exitCode}).";
+                StatusMessage = message;
                 AppendLog($"[ERROR] {title} failed with exit code {exitCode}.");
-                StatusBarViewModel.Instance.CompleteOperation(
-                    $"{title} failed (exit code {exitCode}).", success: false, notify: true);
+                if (!string.IsNullOrWhiteSpace(lastBusyLine))
+                {
+                    AppendLog($"[ERROR] {lastBusyLine}");
+                }
+                StatusBarViewModel.Instance.CompleteOperation(message, success: false, notify: true);
             }
         }
         catch (Exception ex)
@@ -1534,6 +1564,15 @@ public partial class DiskToolsViewModel : ObservableObject
     {
         AppendLog(line);
         StatusBarViewModel.Instance.ProcessOutputLine(line);
+
+        if (ChkdskPromptDetector.IsVolumeBusy(line))
+        {
+            StatusBarViewModel.Instance.UpdateOperationTitle("chkdsk: 磁碟區使用中，無法鎖定 (volume in use)");
+        }
+        else if (ChkdskPromptDetector.IsSchedulePrompt(line))
+        {
+            StatusBarViewModel.Instance.UpdateOperationTitle("chkdsk: 排程提示，已自動回答 N (answering prompt with N)");
+        }
     }
 
     [RelayCommand]

@@ -22,7 +22,9 @@ public static class StreamingProcessRunner
         string fileName,
         string arguments,
         Action<string> onLine,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Func<string, string?>? inputResponder = null,
+        TimeSpan? idleTimeout = null)
     {
         var encoding = ProcessHelper.GetConsoleEncoding();
         var psi = new ProcessStartInfo
@@ -31,6 +33,7 @@ public static class StreamingProcessRunner
             Arguments = arguments,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            RedirectStandardInput = true,
             StandardOutputEncoding = encoding,
             StandardErrorEncoding = encoding,
             UseShellExecute = false,
@@ -45,8 +48,87 @@ public static class StreamingProcessRunner
             using var process = new Process { StartInfo = psi };
             process.Start();
 
-            var stdoutTask = PumpAsync(process.StandardOutput, false, category, onLine, cancellationToken);
-            var stderrTask = PumpAsync(process.StandardError, true, category, onLine, cancellationToken);
+            // A WinUI app has no console stdin. Without this close, a command that asks
+            // a Y/N question can block forever on an inherited or invalid handle.
+            if (inputResponder == null)
+            {
+                try { process.StandardInput.Close(); } catch { }
+            }
+
+            object stdinLock = new();
+            long promptAnsweredTicks = 0;
+            void RespondToText(string text)
+            {
+                if (inputResponder == null || string.IsNullOrWhiteSpace(text)) return;
+
+                string? response;
+                try { response = inputResponder(text); }
+                catch (Exception ex)
+                {
+                    DebugLogService.Instance.Warning($"處理命令提示失敗: {ex.Message}", category);
+                    return;
+                }
+
+                if (response == null) return;
+                string reply = response.TrimEnd('\r', '\n');
+
+                try
+                {
+                    lock (stdinLock)
+                    {
+                        process.StandardInput.WriteLine(reply);
+                        process.StandardInput.Flush();
+                    }
+                    Volatile.Write(ref promptAnsweredTicks, Environment.TickCount64);
+                    TryInvoke(onLine, $"[INPUT] {reply}");
+                    DebugLogService.Instance.LogCommandOutput(category, $"[INPUT] {reply}");
+                }
+                catch (Exception ex)
+                {
+                    DebugLogService.Instance.Warning($"寫入命令輸入失敗: {ex.Message}", category);
+                }
+            }
+
+            long lastOutputTicks = Environment.TickCount64;
+            int idleTimedOut = 0;
+            Timer? idleTimer = null;
+            if (idleTimeout is { TotalMilliseconds: > 0 } timeout)
+            {
+                idleTimer = new Timer(_ =>
+                {
+                    try
+                    {
+                        if (process.HasExited) return;
+
+                        long now = Environment.TickCount64;
+                        long answeredAt = Volatile.Read(ref promptAnsweredTicks);
+                        bool promptStuck = answeredAt != 0 && now - answeredAt > 15_000;
+                        bool idle = now - Volatile.Read(ref lastOutputTicks) >= timeout.TotalMilliseconds;
+                        if (!promptStuck && !idle) return;
+                        if (Interlocked.Exchange(ref idleTimedOut, 1) != 0) return;
+
+                        TryInvoke(onLine, promptStuck
+                            ? $"[TIMEOUT] Prompt was answered but {fileName} did not exit; terminating it."
+                            : $"[TIMEOUT] No output for {timeout.TotalSeconds:F0}s; terminating {fileName}.");
+                        DebugLogService.Instance.Warning(
+                            promptStuck
+                                ? $"命令已回答提示但未結束，強制終止: {fileName} {arguments}"
+                                : $"命令閒置逾時 ({timeout.TotalSeconds:F0}s): {fileName} {arguments}",
+                            category);
+                        try { process.Kill(true); } catch { }
+                    }
+                    catch { }
+                }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+            }
+
+            void MarkOutput(string text)
+            {
+                Volatile.Write(ref lastOutputTicks, Environment.TickCount64);
+                RespondToText(text);
+            }
+
+            var stdoutTask = PumpAsync(process.StandardOutput, false, category, onLine, MarkOutput, cancellationToken);
+            var stderrTask = PumpAsync(process.StandardError, true, category, onLine, MarkOutput, cancellationToken);
 
             using var registration = cancellationToken.Register(() =>
             {
@@ -64,14 +146,19 @@ public static class StreamingProcessRunner
             }
 
             process.WaitForExit(200);
+            idleTimer?.Dispose();
             stopwatch.Stop();
-            int exitCode = process.ExitCode;
+
+            bool timedOut = Volatile.Read(ref idleTimedOut) != 0;
+            int exitCode = timedOut ? -3 : process.ExitCode;
             DebugLogService.Instance.LogRequest(
                 category,
-                $"完成呼叫: {fileName} (ExitCode: {exitCode})",
+                timedOut
+                    ? $"逾時終止: {fileName}"
+                    : $"完成呼叫: {fileName} (ExitCode: {exitCode})",
                 arguments,
                 stopwatch.ElapsedMilliseconds,
-                exitCode == 0);
+                !timedOut && exitCode == 0);
             return new StreamingProcessResult(exitCode, stopwatch.Elapsed, false);
         }
         catch (OperationCanceledException)
@@ -95,6 +182,7 @@ public static class StreamingProcessRunner
         bool isError,
         string category,
         Action<string> onLine,
+        Action<string> onTextSeen,
         CancellationToken cancellationToken)
     {
         var buffer = new char[4096];
@@ -109,13 +197,13 @@ public static class StreamingProcessRunner
 
             if (isError) line = "[STDERR] " + line;
 
+            TryInvoke(onTextSeen, line);
             TryInvoke(onLine, line);
 
             // Progress animations can fire dozens of times per second. The page/ETA still sees
             // every fragment, but the live console and debug file are kept readable.
             bool isProgress = line.Contains('%') ||
                               line.Contains("percent complete", StringComparison.OrdinalIgnoreCase) ||
-                              line.Contains("已完成", StringComparison.Ordinal) ||
                               line.Contains("已完成", StringComparison.Ordinal);
             long now = Environment.TickCount64;
             if (isProgress && now - lastProgressLogTicks < 500) return;
@@ -168,6 +256,13 @@ public static class StreamingProcessRunner
                         Emit(current.ToString());
                         current.Clear();
                     }
+                }
+
+                // A Y/N prompt may not include a newline. Inspect the pending buffer as it
+                // grows so the input responder can answer before the stream deadlocks.
+                if (current.Length > 0)
+                {
+                    TryInvoke(onTextSeen, current.ToString());
                 }
             }
         }

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using DiskMasterWinUI.Helpers;
 
 namespace DiskMasterWinUI.Services;
 
@@ -8,23 +9,29 @@ public class ChkdskService
         string fileName,
         string arguments,
         Action<string> onOutputLine,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Func<string, string?>? inputResponder = null,
+        TimeSpan? idleTimeout = null)
     {
         var result = await DiskMasterWinUI.Helpers.StreamingProcessRunner.RunAsync(
             "chkdsk",
             fileName,
             arguments,
             onOutputLine,
-            cancellationToken);
+            cancellationToken,
+            inputResponder,
+            idleTimeout);
         return result.ExitCode;
     }
+
+    private static TimeSpan FixIdleTimeout => TimeSpan.FromMinutes(10);
 
     /// <summary>Online non-destructive NTFS scan (system keeps running)</summary>
     public async Task<int> ScanAsync(string drive, Action<string> onOutput, CancellationToken ct = default)
     {
         var cleanDrive = drive.TrimEnd(':', '\\') + ":";
         onOutput($"[{DateTime.Now:HH:mm:ss}] Starting chkdsk {cleanDrive} /scan (Online Non-Destructive Scan)...");
-        var code = await RunStreamingProcessAsync("chkdsk.exe", $"{cleanDrive} /scan", onOutput, ct);
+        var code = await RunStreamingProcessAsync("chkdsk.exe", $"{cleanDrive} /scan", onOutput, ct, idleTimeout: FixIdleTimeout);
         onOutput($"[{DateTime.Now:HH:mm:ss}] chkdsk /scan finished with exit code {code}.");
         return code;
     }
@@ -34,7 +41,7 @@ public class ChkdskService
     {
         var cleanDrive = drive.TrimEnd(':', '\\') + ":";
         onOutput($"[{DateTime.Now:HH:mm:ss}] Starting chkdsk {cleanDrive} /spotfix (Quick Spot Fix)...");
-        var code = await RunStreamingProcessAsync("chkdsk.exe", $"{cleanDrive} /spotfix", onOutput, ct);
+        var code = await RunStreamingProcessAsync("chkdsk.exe", $"{cleanDrive} /spotfix", onOutput, ct, idleTimeout: FixIdleTimeout);
         onOutput($"[{DateTime.Now:HH:mm:ss}] chkdsk /spotfix finished with exit code {code}.");
         return code;
     }
@@ -44,8 +51,24 @@ public class ChkdskService
     {
         var cleanDrive = drive.TrimEnd(':', '\\') + ":";
         onOutput($"[{DateTime.Now:HH:mm:ss}] Starting chkdsk {cleanDrive} /f (Fix Filesystem Errors)...");
-        var code = await RunStreamingProcessAsync("chkdsk.exe", $"{cleanDrive} /f", onOutput, ct);
-        onOutput($"[{DateTime.Now:HH:mm:ss}] chkdsk /f finished with exit code {code}.");
+
+        bool volumeBusy = false;
+        bool promptAnswered = false;
+        string? Respond(string text)
+        {
+            if (ChkdskPromptDetector.IsVolumeBusy(text)) volumeBusy = true;
+            if (!ChkdskPromptDetector.IsSchedulePrompt(text) || promptAnswered) return null;
+
+            promptAnswered = true;
+            volumeBusy = true;
+            onOutput("[INFO] chkdsk requested a scheduled boot-time check; answered N (do not schedule).");
+            return ChkdskPromptDetector.DeclineResponse;
+        }
+
+        var code = await RunStreamingProcessAsync(
+            "chkdsk.exe", $"{cleanDrive} /f", onOutput, ct, Respond, FixIdleTimeout);
+        if (volumeBusy) code = -2;
+        onOutput($"[{DateTime.Now:HH:mm:ss}] chkdsk /f finished with code {code}.");
         return code;
     }
 
@@ -55,8 +78,24 @@ public class ChkdskService
         var cleanDrive = drive.TrimEnd(':', '\\') + ":";
         onOutput($"[{DateTime.Now:HH:mm:ss}] Starting chkdsk {cleanDrive} /f /r /x (Deep Bad Sector Repair)...");
         onOutput("[WARNING] This will dismount the volume and may take a very long time on large disks.");
-        var code = await RunStreamingProcessAsync("chkdsk.exe", $"{cleanDrive} /f /r /x", onOutput, ct);
-        onOutput($"[{DateTime.Now:HH:mm:ss}] chkdsk /f /r /x finished with exit code {code}.");
+
+        bool volumeBusy = false;
+        bool promptAnswered = false;
+        string? Respond(string text)
+        {
+            if (ChkdskPromptDetector.IsVolumeBusy(text)) volumeBusy = true;
+            if (!ChkdskPromptDetector.IsSchedulePrompt(text) || promptAnswered) return null;
+
+            promptAnswered = true;
+            volumeBusy = true;
+            onOutput("[INFO] chkdsk requested a scheduled boot-time check; answered N (do not schedule).");
+            return ChkdskPromptDetector.DeclineResponse;
+        }
+
+        var code = await RunStreamingProcessAsync(
+            "chkdsk.exe", $"{cleanDrive} /f /r /x", onOutput, ct, Respond, FixIdleTimeout);
+        if (volumeBusy) code = -2;
+        onOutput($"[{DateTime.Now:HH:mm:ss}] chkdsk /f /r /x finished with code {code}.");
         return code;
     }
 
@@ -65,7 +104,7 @@ public class ChkdskService
     {
         var cleanDrive = drive.TrimEnd(':', '\\') + ":";
         onOutput($"[{DateTime.Now:HH:mm:ss}] Starting chkdsk {cleanDrive} /scan /perf (High-Performance Turbo Scan)...");
-        var code = await RunStreamingProcessAsync("chkdsk.exe", $"{cleanDrive} /scan /perf", onOutput, ct);
+        var code = await RunStreamingProcessAsync("chkdsk.exe", $"{cleanDrive} /scan /perf", onOutput, ct, idleTimeout: FixIdleTimeout);
         onOutput($"[{DateTime.Now:HH:mm:ss}] chkdsk /scan /perf finished with exit code {code}.");
         return code;
     }
@@ -75,7 +114,7 @@ public class ChkdskService
     {
         var cleanDrive = drive.TrimEnd(':', '\\') + ":";
         onOutput($"[{DateTime.Now:HH:mm:ss}] Starting chkdsk {cleanDrive} /offlinescanandfix...");
-        var code = await RunStreamingProcessAsync("chkdsk.exe", $"{cleanDrive} /offlinescanandfix", onOutput, ct);
+        var code = await RunStreamingProcessAsync("chkdsk.exe", $"{cleanDrive} /offlinescanandfix", onOutput, ct, idleTimeout: FixIdleTimeout);
         onOutput($"[{DateTime.Now:HH:mm:ss}] chkdsk /offlinescanandfix finished with exit code {code}.");
         return code;
     }

@@ -110,6 +110,16 @@ public partial class StatusBarViewModel : ObservableObject
         _tracker.ProcessLine(line);
     }
 
+    /// <summary>Updates the operation headline for backend errors without changing progress.</summary>
+    public void UpdateOperationTitle(string title)
+    {
+        if (string.IsNullOrWhiteSpace(title)) return;
+        DispatcherHelper.RunOnUIThread(() =>
+        {
+            if (IsActive) OperationTitle = title;
+        });
+    }
+
     public void UpdateProgressExplicit(double percent, string eta = "")
     {
         DispatcherHelper.RunOnUIThread(() =>
@@ -141,13 +151,23 @@ public partial class StatusBarViewModel : ObservableObject
         var operationTitle = _operationBaseTitle;
         var targetTab = ResolveNotificationTarget(operationTitle);
 
+        double finalPercent = success ? 100 : _tracker.CurrentPercentage;
+
         DispatcherHelper.RunOnUIThread(() =>
         {
             _elapsedTimer.Change(Timeout.Infinite, Timeout.Infinite);
-            _tracker.Complete();
+            if (success)
+            {
+                _tracker.Complete();
+            }
+            else
+            {
+                _tracker.Stop();
+            }
+
             OperationTitle = message;
-            ProgressPercent = 100;
-            ProgressText = "100%";
+            ProgressPercent = finalPercent;
+            ProgressText = success ? "100%" : $"{finalPercent:F1}%";
             IsIndeterminate = false;
             EtaText = success ? LocCompleted() : LocStopped();
             CanCancel = false;
