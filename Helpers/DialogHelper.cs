@@ -6,6 +6,49 @@ namespace DiskMasterWinUI.Helpers;
 
 public static class DialogHelper
 {
+    /// <summary>Shows one consistent finish dialog for a user-triggered operation.</summary>
+    public static async Task ShowOperationResultAsync(
+        XamlRoot? xamlRoot, string title, string message, bool success)
+    {
+        string heading = (success ? "✅ " : "⚠️ ") + title;
+
+        if (xamlRoot == null)
+        {
+            try
+            {
+                WindowsNotificationService.Instance.ShowNotification(heading, message, null, playSound: false);
+            }
+            catch { }
+            return;
+        }
+
+        try
+        {
+            var dialog = new ContentDialog
+            {
+                XamlRoot = xamlRoot,
+                Title = heading,
+                Content = new TextBlock
+                {
+                    Text = message,
+                    TextWrapping = TextWrapping.Wrap,
+                    IsTextSelectionEnabled = true
+                },
+                CloseButtonText = "OK"
+            };
+            await dialog.ShowAsync();
+        }
+        catch
+        {
+            // Another dialog is already open; never throw from a finish notification.
+            try
+            {
+                WindowsNotificationService.Instance.ShowNotification(heading, message, null, playSound: false);
+            }
+            catch { }
+        }
+    }
+
     public static async Task<bool> ConfirmDestructiveOperationAsync(
         XamlRoot? xamlRoot,
         string title,

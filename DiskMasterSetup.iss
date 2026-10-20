@@ -3,7 +3,7 @@
 ; Designed for full upgrade detection, duplicate installation prevention, and multilingual wizard
 
 #ifndef MyAppVersion
-#define MyAppVersion "1.6.2"
+#define MyAppVersion "1.6.3"
 #endif
 
 #define MyAppName "DiskMaster Pro"

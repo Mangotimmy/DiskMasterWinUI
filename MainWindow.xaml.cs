@@ -2622,6 +2622,7 @@ public sealed partial class MainWindow : Window
             UpdateViewportLayout();
 
             sw.Stop();
+            MemoryLeakProbe.RecordNavigation(tag);
             if (sw.ElapsedMilliseconds >= 200)
             {
                 DebugLogService.Instance.Warning($"Tab navigation to '{tag}' took {sw.ElapsedMilliseconds}ms (Potential UI hitch detected!)", "Navigation");

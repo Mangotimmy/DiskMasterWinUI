@@ -589,6 +589,18 @@ public sealed partial class DiskToolsPage : Page
         }
     }
 
+    /// <summary>
+    /// Opens Explorer with the file selected. Wired via Click instead of Command because an
+    /// ElementName binding cannot cross a DataTemplate namescope boundary.
+    /// </summary>
+    private void LargeFileOpenInExplorer_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement elem && elem.DataContext is Models.TopLargeFileItem item)
+        {
+            ViewModel.OpenFolderForFile(item.FilePath);
+        }
+    }
+
     private async void RemovePathDir_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement elem && elem.DataContext is Services.PathDirectoryEntry entry)

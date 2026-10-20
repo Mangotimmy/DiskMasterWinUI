@@ -84,6 +84,49 @@ public partial class DiskToolsViewModel : ObservableObject
     // 7. chkdsk
     [ObservableProperty] private string _chkdskDrive = "C:";
     [ObservableProperty] private bool _isChkdskRunning;
+    public ObservableCollection<ChkdskDriveOption> ChkdskDriveOptions { get; } = new();
+    [ObservableProperty] private ChkdskDriveOption? _selectedChkdskDrive;
+
+    partial void OnSelectedChkdskDriveChanged(ChkdskDriveOption? value)
+    {
+        if (value != null && !string.IsNullOrWhiteSpace(value.Letter))
+        {
+            ChkdskDrive = value.Letter;
+        }
+    }
+
+    /// <summary>
+    /// Populates the chkdsk dropdown from DriveInfo so users pick a real volume instead of
+    /// typing a drive letter. Keeps the current selection when the volume still exists.
+    /// </summary>
+    public void RefreshChkdskDriveOptions()
+    {
+        try
+        {
+            var current = ChkdskDrive?.Trim().TrimEnd(':', '\\').ToUpperInvariant() ?? "C";
+            ChkdskDriveOptions.Clear();
+            foreach (var drive in DriveInfo.GetDrives())
+            {
+                if (drive.DriveType != DriveType.Fixed && drive.DriveType != DriveType.Removable) continue;
+                if (!drive.IsReady) continue;
+                ChkdskDriveOptions.Add(ChkdskDriveOption.FromDrive(drive));
+            }
+
+            if (ChkdskDriveOptions.Count == 0)
+            {
+                ChkdskDriveOptions.Add(new ChkdskDriveOption { Letter = "C:", Display = "C:" });
+            }
+
+            var match = ChkdskDriveOptions.FirstOrDefault(o =>
+                o.Letter.TrimEnd(':').Equals(current, StringComparison.OrdinalIgnoreCase));
+            SelectedChkdskDrive = match ?? ChkdskDriveOptions.FirstOrDefault(o =>
+                o.Letter.StartsWith("C", StringComparison.OrdinalIgnoreCase)) ?? ChkdskDriveOptions[0];
+        }
+        catch (Exception ex)
+        {
+            DebugLogService.Instance.Warning($"chkdsk drive list refresh failed: {ex.Message}", "DiskTools");
+        }
+    }
     private CancellationTokenSource? _chkdskCts;
     private int _isRefreshingAll;
     private int _isHealthRefreshing;
@@ -169,6 +212,7 @@ public partial class DiskToolsViewModel : ObservableObject
         {
             StorageDirectories.Add(dir);
         }
+        RefreshChkdskDriveOptions();
     }
 
     private void AppendLog(string text)
@@ -188,6 +232,7 @@ public partial class DiskToolsViewModel : ObservableObject
         {
             StatusMessage = "Refreshing license, environment, and S.M.A.R.T. health in parallel...";
             AppendLog("[REFRESH] Starting bounded hardware refresh (20s deadline)...");
+            RefreshChkdskDriveOptions();
             var licenseTask = LoadLicenseInfoAsync();
             var envTask = CheckEnvironmentAsync();
             var healthTask = RefreshDiskHealthAsync();
@@ -1211,7 +1256,10 @@ public partial class DiskToolsViewModel : ObservableObject
             IsFullSmartLoading = true;
             AppendLog($"▸ Querying native S.M.A.R.T. telemetry for Disk {disk.DeviceId} ({disk.FriendlyName})...");
 
-            if (disk.BusType.Equals("NVMe", StringComparison.OrdinalIgnoreCase) || disk.FriendlyName.Contains("NVMe", StringComparison.OrdinalIgnoreCase) || disk.MediaType == "SSD")
+            bool isNvme = disk.BusType.Equals("NVMe", StringComparison.OrdinalIgnoreCase)
+                          || disk.FriendlyName.Contains("NVMe", StringComparison.OrdinalIgnoreCase);
+
+            if (isNvme)
             {
                 var nvme = await _smartReader.GetNvmeHealthAsync(disk.DeviceId, disk.FriendlyName, disk.SizeBytes)
                     .WaitAsync(TimeSpan.FromSeconds(3));
@@ -1226,12 +1274,18 @@ public partial class DiskToolsViewModel : ObservableObject
                     {
                         disk.TemperatureCelsius = nvme.CompositeTemperatureCelsius;
                     }
+                    if (nvme.IsEstimated)
+                    {
+                        AppendLog($"[NVMe SMART] 資料來源: {nvme.DataSourceDisplay} (僅溫度為感測器值)");
+                    }
                     AppendLog($"[NVMe SMART] Temperature: {nvme.CompositeTemperatureCelsius}°C, Spare: {nvme.AvailableSpare}%, Wear: {nvme.PercentageUsed}%, TBW: {nvme.TotalBytesWrittenTB:F2} TB");
                     return;
                 }
             }
 
-            // ATA SMART query
+            // ATA SMART query — the correct path for HDD and SATA SSD drives. USB bridge
+            // chips (SAT) frequently pass this through as well; when they do not, the list
+            // stays empty and we fall back to an honest "no telemetry" state.
             var attrs = await _smartReader.GetAtaSmartAttributesAsync(disk.DeviceId)
                 .WaitAsync(TimeSpan.FromSeconds(3));
             AtaSmartAttributes.Clear();
@@ -1246,47 +1300,53 @@ public partial class DiskToolsViewModel : ObservableObject
                 HasSelectedAta = true;
                 HasSelectedNvme = false;
                 HasNoSmartTelemetry = false;
-                AppendLog($"[ATA SMART] Retrieved {AtaSmartAttributes.Count} SMART attributes.");
+                AppendLog($"[ATA SMART] Retrieved {AtaSmartAttributes.Count} SMART attributes ({disk.BusType}).");
+                return;
+            }
+
+            // No SMART attributes at all. Temperature may still be available from the
+            // storage stack; everything else is reported as unavailable instead of being
+            // invented (HDD/SATA/USB drives without SMART support).
+            var (hwTemp, warn, crit, _) = await _smartReader.GetStorageTemperatureAsync(disk.DeviceId);
+            if (hwTemp.HasValue && hwTemp.Value > 0)
+            {
+                disk.TemperatureCelsius = hwTemp.Value;
+            }
+
+            if (isNvme)
+            {
+                // NVMe drive whose log-page IOCTL was denied: show the sensor-based overview,
+                // explicitly marked as estimated.
+                var fallbackNvme = new NvmeHealthDetails
+                {
+                    DeviceId = disk.DeviceId,
+                    ModelName = disk.FriendlyName,
+                    CompositeTemperatureKelvin = (disk.TemperatureCelsius ?? 0) + 273,
+                    IsFahrenheit = IsFahrenheit,
+                    CriticalTemperature = crit ?? 94,
+                    WarningTemperature = warn ?? 90,
+                    AvailableSpare = 100,
+                    AvailableSpareThreshold = 10,
+                    PercentageUsed = 0,
+                    CriticalWarning = 0,
+                    PowerCycles = 1,
+                    PowerOnHours = SmartReaderService.GetFallbackPowerOnHours(),
+                    TotalBytesWrittenTB = 0.0,
+                    TotalBytesReadTB = 0.0,
+                    IsEstimated = true
+                };
+                SelectedNvmeHealth = fallbackNvme;
+                HasSelectedNvme = true;
+                HasSelectedAta = false;
+                HasNoSmartTelemetry = false;
+                AppendLog($"[NVMe SMART] {fallbackNvme.DataSourceDisplay}");
             }
             else
             {
-                // Fallback: If neither NVMe log nor ATA attributes were returned, construct a friendly overview
-                var (hwTemp, warn, crit, _) = await _smartReader.GetStorageTemperatureAsync(disk.DeviceId);
-                if (hwTemp.HasValue && hwTemp.Value > 0)
-                {
-                    disk.TemperatureCelsius = hwTemp.Value;
-                }
-
-                // If SSD or NVMe, show as NVMe telemetry card using hardware sensor data
-                if (disk.MediaType == "SSD" || disk.BusType == "NVMe")
-                {
-                    var fallbackNvme = new NvmeHealthDetails
-                    {
-                        DeviceId = disk.DeviceId,
-                        ModelName = disk.FriendlyName,
-                        CompositeTemperatureKelvin = (disk.TemperatureCelsius ?? 42) + 273,
-                        IsFahrenheit = IsFahrenheit,
-                        CriticalTemperature = crit ?? 94,
-                        WarningTemperature = warn ?? 90,
-                        AvailableSpare = 100,
-                        AvailableSpareThreshold = 10,
-                        PercentageUsed = 0,
-                        CriticalWarning = 0,
-                        PowerCycles = 1,
-                        TotalBytesWrittenTB = disk.SizeBytes > 0 ? Math.Round(disk.SizeBytes / Math.Pow(1024, 4) * 1.5, 2) : 0.0,
-                        TotalBytesReadTB = disk.SizeBytes > 0 ? Math.Round(disk.SizeBytes / Math.Pow(1024, 4) * 2.1, 2) : 0.0
-                    };
-                    SelectedNvmeHealth = fallbackNvme;
-                    HasSelectedNvme = true;
-                    HasSelectedAta = false;
-                    HasNoSmartTelemetry = false;
-                }
-                else
-                {
-                    HasSelectedNvme = false;
-                    HasSelectedAta = false;
-                    HasNoSmartTelemetry = true;
-                }
+                HasSelectedNvme = false;
+                HasSelectedAta = false;
+                HasNoSmartTelemetry = true;
+                AppendLog($"[SMART] {disk.BusType} 磁碟未提供 S.M.A.R.T. 屬性 (USB 橋接晶片或驅動程式限制)；僅顯示可用感測器資料。");
             }
         }
         catch (Exception ex)

@@ -142,9 +142,9 @@ public partial class ProgressAndEtaTracker
         {
             var elapsed = _stopwatch.Elapsed;
             double candidate = Math.Clamp(percentage, 0.0, 100.0);
-            double timePercent = GetTimeBasedPercent(elapsed);
-            // Never let a late stage line move the bar backwards after the countdown has advanced.
-            _currentPercentage = Math.Max(_currentPercentage, Math.Max(candidate, timePercent));
+            // The bar must reflect the ACTUAL process output, not a wall-clock countdown.
+            // A late stage line never moves it backwards.
+            _currentPercentage = Math.Max(_currentPercentage, candidate);
             percent = _currentPercentage;
             elapsedStr = FormatTimeSpan(elapsed);
             etaStr = BuildEta(elapsed, percent);
@@ -164,25 +164,28 @@ public partial class ProgressAndEtaTracker
         {
             if (!_isActive) return (_currentPercentage, "00:00", string.Empty);
 
+            // Elapsed time keeps ticking, but the bar only advances on real parsed output.
+            // No fake time-based percentage: the bar stays indeterminate until the process
+            // itself reports progress.
             var elapsed = _stopwatch.Elapsed;
-            double timePercent = GetTimeBasedPercent(elapsed);
-            _currentPercentage = Math.Max(_currentPercentage, timePercent);
             string eta = BuildEta(elapsed, _currentPercentage);
             return (_currentPercentage, FormatTimeSpan(elapsed), eta);
         }
-    }
-
-    private double GetTimeBasedPercent(TimeSpan elapsed)
-    {
-        if (_expectedDuration is not { TotalSeconds: > 0 } expected) return 0;
-        double percent = elapsed.TotalSeconds / expected.TotalSeconds * 100.0;
-        return Math.Clamp(percent, 0, 98);
     }
 
     private string BuildEta(TimeSpan elapsed, double percentage)
     {
         if (percentage >= 100) return "Completed";
 
+        // Real extrapolation from process-reported progress takes priority over any
+        // pre-flight heuristic estimate.
+        if (percentage > 2.0)
+        {
+            return CalculateEta(elapsed, percentage);
+        }
+
+        // No process-reported progress yet: fall back to the volume-size/prior-run
+        // heuristic countdown (text only — the bar itself stays indeterminate).
         if (_expectedDuration is { TotalSeconds: > 0 } expected)
         {
             var remaining = expected - elapsed;
@@ -193,7 +196,7 @@ public partial class ProgressAndEtaTracker
             return "Almost done...";
         }
 
-        return percentage > 2.0 ? CalculateEta(elapsed, percentage) : string.Empty;
+        return "Calculating ETA...";
     }
 
     private static string FormatRemaining(TimeSpan remaining)

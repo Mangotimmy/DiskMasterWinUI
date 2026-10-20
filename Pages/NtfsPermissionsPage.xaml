@@ -6,6 +6,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:models="using:DiskMasterWinUI.Models"
+    xmlns:controls="using:DiskMasterWinUI.Controls"
     xmlns:vm="using:DiskMasterWinUI.ViewModels"
     mc:Ignorable="d">
 
@@ -366,6 +367,92 @@
                 <TabViewItem x:Name="TabRuleBuilder" Header="🛠️ 自訂 icacls 規則建置器" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                         <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="🧾 目前權限狀態 (Current permissions)" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" />
+                                        <ProgressRing Grid.Column="1" IsActive="{x:Bind ViewModel.IsAclLoading, Mode=OneWay}" Width="18" Height="18" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="2" Text="{x:Bind ViewModel.AclLastUpdated, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                        <Button Grid.Column="3" Content="🔄 重新整理權限" Command="{x:Bind ViewModel.RefreshAclStatusCommand}" />
+                                    </Grid>
+                                    <TextBlock Text="{x:Bind ViewModel.AclStatusText, Mode=OneWay}"
+                                               FontSize="12" TextWrapping="Wrap"
+                                               Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button Content="👁️ 檢視檔案權限" Command="{x:Bind ViewModel.ViewFilePermissionCommand}" />
+                                        <TextBlock Text="Owner / ACE count / Inherited / Deny 會隨每次套用後自動更新。"
+                                                   FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <Expander Header="目前 ACL 規則清單 (Current ACL entries)" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" IsExpanded="False">
+                                        <ListView ItemsSource="{x:Bind ViewModel.CurrentNtfsSummary.AclEntries, Mode=OneWay}"
+                                                  SelectionMode="None" MaxHeight="260"
+                                                  HorizontalAlignment="Stretch"
+                                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                  ScrollViewer.HorizontalScrollMode="Disabled">
+                                            <ListView.ItemContainerStyle>
+                                                <Style TargetType="ListViewItem">
+                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                </Style>
+                                            </ListView.ItemContainerStyle>
+                                            <ListView.Header>
+                                                <Grid Padding="8,4" ColumnSpacing="8" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="1.6*" />
+                                                        <ColumnDefinition Width="80" />
+                                                        <ColumnDefinition Width="1.6*" />
+                                                        <ColumnDefinition Width="80" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="Principal" FontWeight="SemiBold" FontSize="11" />
+                                                    <TextBlock Grid.Column="1" Text="Type" FontWeight="SemiBold" FontSize="11" />
+                                                    <TextBlock Grid.Column="2" Text="Rights" FontWeight="SemiBold" FontSize="11" />
+                                                    <TextBlock Grid.Column="3" Text="Inherited" FontWeight="SemiBold" FontSize="11" />
+                                                </Grid>
+                                            </ListView.Header>
+                                            <ListView.ItemTemplate>
+                                                <DataTemplate x:DataType="models:NtfsAceItem">
+                                                    <Grid Padding="8,4" ColumnSpacing="8" HorizontalAlignment="Stretch">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="1.6*" />
+                                                            <ColumnDefinition Width="80" />
+                                                            <ColumnDefinition Width="1.6*" />
+                                                            <ColumnDefinition Width="80" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0" Text="{x:Bind Principal}" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="1" Text="{x:Bind AccessType}" FontSize="11" />
+                                                        <TextBlock Grid.Column="2" Text="{x:Bind Permissions}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="3" Text="{x:Bind IsInherited}" FontSize="11" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ListView.ItemTemplate>
+                                        </ListView>
+                                    </Expander>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="🔎 尋找帳號 (Find account)" FontWeight="Bold" FontSize="14" />
+                                    <TextBlock Text="先選擇 Administrator 或 User 環境，再從帳號清單挑選主體；選擇後會填入下方 icacls 規則。"
+                                               Style="{StaticResource CaptionTextBlockStyle}"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                    <Expander Header="選擇帳號環境與帳號 (Select account scope and account)"
+                                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                              IsExpanded="False">
+                                        <controls:AccountPickerPanel x:Name="BuilderAccountPicker" />
+                                    </Expander>
+                                    <TextBlock Text="{x:Bind ViewModel.SelectedPrincipal, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='Selected principal: {0}'}"
+                                               FontSize="12" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                </StackPanel>
+                            </Border>
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                                     CornerRadius="8" Padding="16">

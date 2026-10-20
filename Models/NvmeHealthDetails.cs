@@ -28,6 +28,19 @@ public partial class NvmeHealthDetails : ObservableObject
 
     // Critical Warnings bitmask:
     [ObservableProperty] private byte _criticalWarning;
+
+    /// <summary>
+    /// True when the values were synthesized from system sensors because the NVMe Log Page
+    /// IOCTL was unavailable. Estimated data must never be presented as measured hardware data.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DataSourceDisplay))]
+    private bool _isEstimated;
+
+    public string DataSourceDisplay => IsEstimated
+        ? "估算值 (硬體 IOCTL 無法存取)"
+        : "NVMe Log Page 0x02 (硬體直接讀取)";
+
     public bool SpareBelowThreshold => (CriticalWarning & 0x01) != 0;
     public bool TemperatureThresholdExceeded => (CriticalWarning & 0x02) != 0;
     public bool ReliabilityDegraded => (CriticalWarning & 0x04) != 0;

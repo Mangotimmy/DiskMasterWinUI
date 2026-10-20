@@ -373,15 +373,16 @@ Register-E2ETest -Tier 1 -Feature "F27" -Source "Item 1: DPI & Centered Window S
         # Return tuple: (Item1=LayoutWidth, Item2=HorizontalOffset, Item3=BottomMargin, Item4=ClampedScale)
         $calcMethod = $type.GetMethod("CalculateScaledViewportLayout")
         $layout115 = $calcMethod.Invoke($null, @(1200.0, 800.0, 1000.0, 1.15))
-        # Visual width (LayoutWidth * 1.15) must not exceed (1200 - 16) = 1184
-        Assert-True (($layout115.Item1 * 1.15) -le 1184.5) "Scaled visual width at 115% must leave 16px scrollbar clearance without right-edge clipping"
+        # Visual width (LayoutWidth * 1.15) must not exceed the usable viewport: 1200 - 20 gutter = 1180
+        Assert-True (($layout115.Item1 * 1.15) -le 1180.5) "Scaled visual width at 115% must leave the 20px scrollbar/right gutter without right-edge clipping"
         Assert-Equal $layout115.Item2 2.0 "HorizontalOffset at 1200px viewport centers 1184px visual width inside 1188px centerable area"
         Assert-True ($layout115.Item3 -gt 0) "BottomMargin must expand for >100% scale so vertical ScrollViewer reaches bottom"
         Assert-Equal $layout115.Item4 1.15 "ClampedScale must equal 1.15"
 
         # Verify CalculateScaledViewportLayout at <100% scale (e.g. 85%)
         $layout85 = $calcMethod.Invoke($null, @(1200.0, 800.0, 900.0, 0.85))
-        Assert-True ([Math]::Abs(($layout85.Item1 * 0.85) - 1184.0) -lt 0.5) "At 85% scale, LayoutWidth * 0.85 fills usable viewport width (1184px)"
+        # DisplayHelper reserves 20 DIPs (vertical scrollbar + right-edge breathing room).
+        Assert-True ([Math]::Abs(($layout85.Item1 * 0.85) - 1180.0) -lt 0.5) "At 85% scale, LayoutWidth * 0.85 fills usable viewport width (1200 - 20 = 1180px)"
         Assert-Equal $layout85.Item3 0.0 "BottomMargin at <=100% scale must be 0"
     }
 

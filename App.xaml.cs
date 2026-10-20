@@ -217,6 +217,8 @@ public partial class App : Application
         }
         catch { }
 
+        try { StartupCrashGuard.BeginStartup(); } catch { }
+
         // 1. UI Thread unhandled exceptions
         this.UnhandledException += (s, e) =>
         {
@@ -317,13 +319,30 @@ public partial class App : Application
             GlobalExceptionHandler.Initialize(_window.DispatcherQueue);
             _window.Activate();
             DiskMasterWinUI.Helpers.UiHeartbeatMonitor.Start(_window.DispatcherQueue);
+            _ = StartupCrashGuard.MarkStartupHealthyAfterDelayAsync(TimeSpan.FromSeconds(12));
+
+            if (StartupCrashGuard.IsSafeMode)
+            {
+                try
+                {
+                    WindowsNotificationService.Instance.ShowNotification(
+                        "DiskMaster 安全模式 (Safe mode)",
+                        "上次啟動連續失敗，已略過部分背景初始化。請查看即時日誌以取得詳細資訊。",
+                        "CrashGuard",
+                        playSound: false);
+                }
+                catch { }
+            }
 
             if (startInBackground && string.IsNullOrEmpty(PendingRecoverPath) && string.IsNullOrEmpty(ntfsPath) && string.IsNullOrEmpty(sharePath) && string.IsNullOrEmpty(imagePath) && string.IsNullOrEmpty(drivePath) && string.IsNullOrEmpty(tabTag) && string.IsNullOrEmpty(addPathUser) && string.IsNullOrEmpty(addPathSystem))
             {
                 _window.MinimizeToTrayOnStartup();
             }
 
-            _ = Services.JumpListService.InitializeAsync();
+            if (!StartupCrashGuard.IsSafeMode)
+            {
+                _ = Services.JumpListService.InitializeAsync();
+            }
 
             if (!string.IsNullOrEmpty(PendingRecoverPath))
             {

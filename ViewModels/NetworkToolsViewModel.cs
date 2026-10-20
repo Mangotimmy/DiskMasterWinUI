@@ -19,6 +19,7 @@ public partial class NetworkToolsViewModel : ObservableObject
 
     [ObservableProperty] private string _statusMessage = "就緒";
     [ObservableProperty] private bool _isLoading;
+    [ObservableProperty] private bool _isAdmin = AdminHelper.IsRunningAsAdmin();
 
     // ── 1. UPnP Port Forwarding ──
     [ObservableProperty] private bool _isUpnpSupported = true;
@@ -188,6 +189,32 @@ public partial class NetworkToolsViewModel : ObservableObject
     [ObservableProperty] private string _newShareRemark = "DiskMaster LAN Share";
     [ObservableProperty] private string _dedicatedUserName = "ShareUser";
     [ObservableProperty] private string _dedicatedUserPassword = "Password123!";
+    [ObservableProperty] private string _newShareAccount = "";
+    [ObservableProperty] private string _shareAccountDisplay = "";
+    [ObservableProperty] private string _shareGrantAccount = "";
+    [ObservableProperty] private string _shareGrantAccountDisplay = "";
+    [ObservableProperty] private string _selectedShareAccessRight = "Full";
+    [ObservableProperty] private bool _applyNtfsPermission;
+    [ObservableProperty] private NetShareItem? _selectedNetShare;
+    [ObservableProperty] private bool _isNetShareBusy;
+    [ObservableProperty] private string _selectedShareDetailsText = "";
+    [ObservableProperty] private string _shareSearchText = "";
+    [ObservableProperty] private bool _showAdminShares;
+    [ObservableProperty] private ShareDetailsItem? _selectedShareDetails;
+    [ObservableProperty] private bool _isShareDetailsLoading;
+    [ObservableProperty] private string _sharePermissionSummary = "";
+    public ObservableCollection<NetShareItem> VisibleNetShares { get; } = new();
+    public ObservableCollection<ShareAclItem> SelectedShareAcl { get; } = new();
+    public bool HasSelectedShare => SelectedNetShare != null;
+
+    partial void OnShareSearchTextChanged(string value) => ApplyShareFilter();
+    partial void OnShowAdminSharesChanged(bool value) => ApplyShareFilter();
+    partial void OnSelectedNetShareChanged(NetShareItem? value)
+    {
+        OnPropertyChanged(nameof(HasSelectedShare));
+        _ = LoadSelectedShareDetailsAsync();
+    }
+    public List<string> ShareAccessRightOptions { get; } = ["Full", "Change", "Read"];
     [ObservableProperty] private bool _isMsAccountPolicyFixed;
     [ObservableProperty] private string _netShareStatusMessage = "";
 
@@ -256,6 +283,7 @@ public partial class NetworkToolsViewModel : ObservableObject
 
     private bool _isInitialized;
     private bool _isLoadingData;
+    private int _refreshSharesBusy;
 
     public NetworkToolsViewModel()
     {
@@ -295,7 +323,8 @@ public partial class NetworkToolsViewModel : ObservableObject
     [RelayCommand]
     public async Task InitializeAsync(bool forceReload = false)
     {
-        if (!forceReload && (_isInitialized || _isLoadingData)) return;
+        if (_isLoadingData) return;
+        if (!forceReload && _isInitialized) return;
         _isLoadingData = true;
         IsLoading = true;
         var sw = Stopwatch.StartNew();
@@ -950,8 +979,12 @@ public partial class NetworkToolsViewModel : ObservableObject
     // ══════════════════════════════════════════════════════════
 
     [RelayCommand]
+    private void RestartAsAdmin() => AdminHelper.RestartAsAdmin();
+
+    [RelayCommand]
     public async Task RefreshSharesAsync()
     {
+        if (Interlocked.Exchange(ref _refreshSharesBusy, 1) != 0) return;
         try
         {
             var shares = await _netShareService.GetActiveSharesAsync();
@@ -959,6 +992,7 @@ public partial class NetworkToolsViewModel : ObservableObject
             {
                 NetShares.Clear();
                 foreach (var s in shares) NetShares.Add(s);
+                ApplyShareFilter();
             });
             IsMsAccountPolicyFixed = await _netShareService.IsMicrosoftAccountSharingPolicyFixedAsync();
             NetShareStatusMessage = $"已列出 {NetShares.Count} 個共用資源";
@@ -967,28 +1001,118 @@ public partial class NetworkToolsViewModel : ObservableObject
         {
             NetShareStatusMessage = $"讀取共用失敗: {ex.Message}";
         }
+        finally
+        {
+            Volatile.Write(ref _refreshSharesBusy, 0);
+        }
+    }
+
+
+    public void ApplyShareFilter()
+    {
+        string q = ShareSearchText?.Trim() ?? "";
+        VisibleNetShares.Clear();
+        foreach (var share in NetShares)
+        {
+            if (!ShowAdminShares && share.IsAdminShare) continue;
+            if (q.Length > 0 &&
+                !share.ShareName.Contains(q, StringComparison.OrdinalIgnoreCase) &&
+                !share.ResourcePath.Contains(q, StringComparison.OrdinalIgnoreCase) &&
+                !share.AccessSummary.Contains(q, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            VisibleNetShares.Add(share);
+        }
+    }
+
+    public async Task LoadSelectedShareDetailsAsync()
+    {
+        var share = SelectedNetShare;
+        if (share == null)
+        {
+            SelectedShareDetails = null;
+            SelectedShareAcl.Clear();
+            SharePermissionSummary = "";
+            return;
+        }
+
+        try
+        {
+            IsShareDetailsLoading = true;
+            var details = await _netShareService.GetShareDetailsAsync(share.ShareName);
+            if (!ReferenceEquals(SelectedNetShare, share)) return;
+            SelectedShareDetails = details;
+            SelectedShareAcl.Clear();
+            if (details != null)
+            {
+                foreach (var acl in details.AclEntries) SelectedShareAcl.Add(acl);
+                SharePermissionSummary = details.AclEntries.Count == 0
+                    ? "No share permissions found."
+                    : string.Join(" · ", details.AclEntries.Select(a => $"{a.Principal}: {a.AccessRight}"));
+            }
+            else
+            {
+                SharePermissionSummary = "Share details are unavailable.";
+            }
+        }
+        catch (Exception ex)
+        {
+            if (ReferenceEquals(SelectedNetShare, share)) SharePermissionSummary = ex.Message;
+        }
+        finally
+        {
+            IsShareDetailsLoading = false;
+        }
+    }
+
+    public void ApplyShareAccountSelection(LocalAccountItem? account)
+    {
+        NewShareAccount = account?.AccountName ?? "";
+        ShareAccountDisplay = account == null
+            ? ""
+            : $"{account.AccountName} ({account.AccountType}, {account.StateText})";
+    }
+
+    public void ApplyShareGrantAccountSelection(LocalAccountItem? account)
+    {
+        ShareGrantAccount = account?.AccountName ?? "";
+        ShareGrantAccountDisplay = account == null
+            ? ""
+            : $"{account.AccountName} ({account.AccountType}, {account.StateText})";
+    }
+
+    private async Task ShowShareResultAsync(string title, string message, bool success)
+    {
+        try
+        {
+            await DialogHelper.ShowOperationResultAsync(WindowHelper.GetXamlRoot(), title, message, success);
+        }
+        catch { }
     }
 
     [RelayCommand]
     public async Task CreateShareAsync()
     {
-        var (ok, msg, uncIp, uncHost) = await _netShareService.CreateShareAsync(NewShareName, NewSharePath, "FULL", NewShareRemark);
-        NetShareStatusMessage = msg;
-        if (ok)
+        if (IsNetShareBusy) return;
+        try
         {
-            AudioFeedbackService.PlaySuccess();
-            await RefreshSharesAsync();
+            IsNetShareBusy = true;
+            var (ok, msg, _, _) = await _netShareService.CreateShareWithPermissionAsync(
+                NewShareName, NewSharePath, NewShareAccount, SelectedShareAccessRight,
+                ApplyNtfsPermission, NewShareRemark);
+            NetShareStatusMessage = msg;
+            if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+            if (ok) await RefreshSharesAsync();
+            await ShowShareResultAsync(ok ? "共用建立完成 (Share created)" : "共用建立失敗 (Share failed)", msg, ok);
         }
-        else
-        {
-            AudioFeedbackService.PlayError();
-        }
+        finally { IsNetShareBusy = false; }
     }
 
     [RelayCommand]
     public async Task DeleteShareAsync(NetShareItem? item)
     {
-        if (item == null) return;
+        if (item == null || IsNetShareBusy) return;
         var confirmed = await DialogHelper.ConfirmDestructiveOperationAsync(
             WindowHelper.GetXamlRoot(),
             "停止網路共用資料夾 (Stop Network Share)",
@@ -996,9 +1120,110 @@ public partial class NetworkToolsViewModel : ObservableObject
             item.ShareName);
         if (!confirmed) return;
 
-        var (ok, msg) = await _netShareService.DeleteShareAsync(item.ShareName);
-        NetShareStatusMessage = msg;
-        if (ok) await RefreshSharesAsync();
+        try
+        {
+            IsNetShareBusy = true;
+            var (ok, msg) = await _netShareService.DeleteShareAsync(item.ShareName);
+            NetShareStatusMessage = msg;
+            if (ok) await RefreshSharesAsync();
+            await ShowShareResultAsync(ok ? "共用已刪除 (Share deleted)" : "刪除共用失敗 (Delete failed)", msg, ok);
+        }
+        finally { IsNetShareBusy = false; }
+    }
+
+    [RelayCommand]
+    public async Task GrantSharePermissionAsync()
+    {
+        if (IsNetShareBusy) return;
+        if (SelectedNetShare == null)
+        {
+            NetShareStatusMessage = "請先從共用清單選擇一個共用資源。";
+            await ShowShareResultAsync("權限授予 (Grant)", NetShareStatusMessage, false);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(ShareGrantAccount))
+        {
+            NetShareStatusMessage = "請先選擇要授權的帳號。";
+            await ShowShareResultAsync("權限授予 (Grant)", NetShareStatusMessage, false);
+            return;
+        }
+
+        try
+        {
+            IsNetShareBusy = true;
+            var (ok, msg) = await _netShareService.GrantSharePermissionAsync(
+                SelectedNetShare.ShareName, ShareGrantAccount, SelectedShareAccessRight,
+                ApplyNtfsPermission, SelectedNetShare.ResourcePath);
+            NetShareStatusMessage = msg;
+            if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+            await ShowShareResultAsync(ok ? "共用權限授予完成 (Grant complete)" : "共用權限授予失敗 (Grant failed)", msg, ok);
+        }
+        finally { IsNetShareBusy = false; }
+    }
+
+    [RelayCommand]
+    public async Task RevokeSharePermissionAsync()
+    {
+        if (IsNetShareBusy) return;
+        if (SelectedNetShare == null || string.IsNullOrWhiteSpace(ShareGrantAccount))
+        {
+            NetShareStatusMessage = "請先選擇共用資源與帳號。";
+            await ShowShareResultAsync("權限移除 (Revoke)", NetShareStatusMessage, false);
+            return;
+        }
+
+        try
+        {
+            IsNetShareBusy = true;
+            var (ok, msg) = await _netShareService.RevokeSharePermissionAsync(SelectedNetShare.ShareName, ShareGrantAccount);
+            NetShareStatusMessage = msg;
+            if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+            await ShowShareResultAsync(ok ? "共用權限已移除 (Revoked)" : "移除權限失敗 (Revoke failed)", msg, ok);
+        }
+        finally { IsNetShareBusy = false; }
+    }
+
+    [RelayCommand]
+    public async Task ShowShareDetailsAsync()
+    {
+        if (SelectedNetShare == null) return;
+        try
+        {
+            var details = await _netShareService.GetShareDetailsAsync(SelectedNetShare.ShareName);
+            if (details == null)
+            {
+                await ShowShareResultAsync("共用詳細資料 (Share details)", "找不到共用詳細資料。", false);
+                return;
+            }
+            var acl = details.AclEntries.Count > 0
+                ? string.Join(Environment.NewLine, details.AclEntries.Select(a => $"{a.Principal} : {a.AccessRight} ({a.AccessType})"))
+                : "No share ACL entries.";
+            string text = $"Name: {details.ShareName}\nPath: {details.Path}\nDescription: {details.Description}\nConcurrent limit: {details.ConcurrentUserLimit}\nCaching: {details.CachingMode}\nEncrypt data: {details.EncryptData}\nFolder enumeration: {details.FolderEnumerationMode}\nAvailability: {details.AvailabilityType}\nScope: {details.ScopeName}\n\nShare ACL:\n{acl}";
+            SelectedShareDetailsText = text;
+            await ShowShareResultAsync("共用詳細資料 (Share details)", text, true);
+        }
+        catch (Exception ex)
+        {
+            await ShowShareResultAsync("共用詳細資料 (Share details)", ex.Message, false);
+        }
+    }
+
+    [RelayCommand]
+    public async Task ShowShareAclAsync()
+    {
+        if (SelectedNetShare == null) return;
+        try
+        {
+            var acl = await _netShareService.GetShareAclAsync(SelectedNetShare.ShareName);
+            string text = acl.Count == 0
+                ? "No share ACL entries."
+                : string.Join(Environment.NewLine, acl.Select(a => $"{a.Principal} : {a.AccessRight} ({a.AccessType})"));
+            await ShowShareResultAsync("共用權限清單 (Share ACL)", text, true);
+        }
+        catch (Exception ex)
+        {
+            await ShowShareResultAsync("共用權限清單 (Share ACL)", ex.Message, false);
+        }
     }
 
     [RelayCommand]
@@ -1008,6 +1233,7 @@ public partial class NetworkToolsViewModel : ObservableObject
         IsMsAccountPolicyFixed = _netShareService.IsMicrosoftAccountSharingPolicyFixed();
         NetShareStatusMessage = msg;
         if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+        _ = ShowShareResultAsync(ok ? "微軟帳號修復完成" : "微軟帳號修復失敗", msg, ok);
     }
 
     [RelayCommand]
@@ -1015,6 +1241,8 @@ public partial class NetworkToolsViewModel : ObservableObject
     {
         var (ok, msg) = await _netShareService.SetNetworkProfilePrivateAsync();
         NetShareStatusMessage = msg;
+        if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+        await ShowShareResultAsync(ok ? "私人網路設定完成" : "私人網路設定失敗", msg, ok);
     }
 
     [RelayCommand]
@@ -1022,7 +1250,8 @@ public partial class NetworkToolsViewModel : ObservableObject
     {
         var (ok, msg) = await _netShareService.EnableFileSharingFirewallAsync();
         NetShareStatusMessage = msg;
-        if (ok) AudioFeedbackService.PlaySuccess();
+        if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+        await ShowShareResultAsync(ok ? "防火牆共用規則完成" : "防火牆共用規則失敗", msg, ok);
     }
 
     [RelayCommand]
@@ -1031,6 +1260,7 @@ public partial class NetworkToolsViewModel : ObservableObject
         var (ok, msg) = await _netShareService.CreateDedicatedShareUserAsync(DedicatedUserName, DedicatedUserPassword);
         NetShareStatusMessage = msg;
         if (ok) AudioFeedbackService.PlaySuccess(); else AudioFeedbackService.PlayError();
+        await ShowShareResultAsync(ok ? "專用帳號建立完成" : "專用帳號建立失敗", msg, ok);
     }
 
     // ══════════════════════════════════════════════════════════

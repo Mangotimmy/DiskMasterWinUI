@@ -36,7 +36,29 @@ public class DebugLogService
     private const int SizeCheckIntervalChars = 64 * 1024;
     private long _bytesSinceSizeCheck = 0;
 
-    public bool IsEnabled { get; set; }
+    // Asynchronous, bounded file writer. UI threads only enqueue a formatted line;
+    // they never open, append to, or line-count the log file.
+    private const int MaxQueuedFileLines = 20_000;
+    private readonly ConcurrentQueue<string> _fileWriteQueue = new();
+    private readonly SemaphoreSlim _fileSignal = new(0);
+    private readonly object _writerLock = new();
+    private StreamWriter? _fileWriter;
+    private long _writtenLineCount;
+    private int _queuedLineCount;
+    private long _droppedLineCount;
+    private volatile bool _isEnabled;
+
+    public bool IsEnabled
+    {
+        get => _isEnabled;
+        set
+        {
+            _isEnabled = value;
+            if (!value) FlushPendingFileWrites();
+        }
+    }
+
+    public long DroppedFileLineCount => Interlocked.Read(ref _droppedLineCount);
 
     public string LogFilePath => _logFilePath;
     public string LogsDirectory => _logsDirectory;
@@ -53,6 +75,22 @@ public class DebugLogService
             {
                 Directory.CreateDirectory(_logsDirectory);
             }
+        }
+        catch { }
+
+        _ = Task.Run(FileWriterLoopAsync);
+        _ = Task.Run(InitializeLineCountAsync);
+    }
+
+    private async Task InitializeLineCountAsync()
+    {
+        try
+        {
+            if (!File.Exists(_logFilePath)) return;
+            int lines = 0;
+            using var reader = new StreamReader(new FileStream(_logFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite));
+            while (await reader.ReadLineAsync().ConfigureAwait(false) != null) lines++;
+            Interlocked.Exchange(ref _writtenLineCount, lines);
         }
         catch { }
     }
@@ -237,29 +275,117 @@ public class DebugLogService
 
     private void WriteEntry(string level, string category, string message)
     {
+        if (!IsEnabled) return;
+
         try
         {
             var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
-            var line = $"[{timestamp}] [{level}] [{category}] {message}{Environment.NewLine}";
+            string line = $"[{timestamp}] [{level}] [{category}] {message}{Environment.NewLine}";
 
-            lock (_lock)
+            _fileWriteQueue.Enqueue(line);
+            int queued = Interlocked.Increment(ref _queuedLineCount);
+            while (queued > MaxQueuedFileLines && _fileWriteQueue.TryDequeue(out _))
             {
-                File.AppendAllText(_logFilePath, line, Encoding.UTF8);
-
-                // Only stat the file once every N bytes: File.Exists + FileInfo + Length on
-                // every single log line was two extra syscalls per line, all inside the lock.
-                _bytesSinceSizeCheck += line.Length;
-                if (_bytesSinceSizeCheck >= SizeCheckIntervalChars)
-                {
-                    _bytesSinceSizeCheck = 0;
-                    CheckAndRollLogFile();
-                }
+                queued = Interlocked.Decrement(ref _queuedLineCount);
+                Interlocked.Increment(ref _droppedLineCount);
             }
+            _fileSignal.Release();
         }
         catch
         {
             // Do not crash application if logging fails (e.g. disk full or restricted permissions)
         }
+    }
+
+    private async Task FileWriterLoopAsync()
+    {
+        while (true)
+        {
+            try
+            {
+                await _fileSignal.WaitAsync().ConfigureAwait(false);
+
+                var batch = new StringBuilder();
+                int lines = 0;
+                while (lines < 200 && _fileWriteQueue.TryDequeue(out var line))
+                {
+                    Interlocked.Decrement(ref _queuedLineCount);
+                    batch.Append(line);
+                    lines++;
+                }
+
+                if (batch.Length > 0)
+                {
+                    AppendBatch(batch.ToString(), lines);
+                }
+            }
+            catch
+            {
+                // Keep the writer alive; the next signal retries.
+            }
+        }
+    }
+
+    private void AppendBatch(string batch, int lines)
+    {
+        lock (_writerLock)
+        {
+            try
+            {
+                if (_fileWriter == null)
+                {
+                    var stream = new FileStream(_logFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+                    _fileWriter = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = false };
+                }
+
+                _fileWriter.Write(batch);
+                _fileWriter.Flush();
+                Interlocked.Add(ref _writtenLineCount, lines);
+                _bytesSinceSizeCheck += batch.Length;
+
+                if (_bytesSinceSizeCheck >= SizeCheckIntervalChars)
+                {
+                    _bytesSinceSizeCheck = 0;
+                    if (File.Exists(_logFilePath))
+                    {
+                        var fi = new FileInfo(_logFilePath);
+                        if (fi.Length >= MaxLogFileSizeBytes)
+                        {
+                            CloseFileWriter();
+                            CheckAndRollLogFile();
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                CloseFileWriter();
+            }
+        }
+    }
+
+    private void CloseFileWriter()
+    {
+        try { _fileWriter?.Dispose(); } catch { }
+        _fileWriter = null;
+    }
+
+    public void FlushPendingFileWrites()
+    {
+        lock (_writerLock)
+        {
+            try { _fileWriter?.Flush(); } catch { }
+        }
+    }
+
+    public async Task FlushAsync(int timeoutMs = 5000)
+    {
+        var sw = Stopwatch.StartNew();
+        while (Volatile.Read(ref _queuedLineCount) > 0 && sw.ElapsedMilliseconds < timeoutMs)
+        {
+            await Task.Delay(25).ConfigureAwait(false);
+        }
+        FlushPendingFileWrites();
     }
 
     private void CheckAndRollLogFile()
@@ -321,6 +447,7 @@ public class DebugLogService
     {
         try
         {
+            FlushPendingFileWrites();
             if (!File.Exists(_logFilePath))
             {
                 lock (_lock)
@@ -351,6 +478,7 @@ public class DebugLogService
     {
         try
         {
+            FlushPendingFileWrites();
             if (!IsEnabled)
             {
                 IsEnabled = true;
@@ -396,8 +524,11 @@ public class DebugLogService
     {
         try
         {
-            lock (_lock)
+            FlushPendingFileWrites();
+            while (_fileWriteQueue.TryDequeue(out _)) { Interlocked.Decrement(ref _queuedLineCount); }
+            lock (_writerLock)
             {
+                CloseFileWriter();
                 if (Directory.Exists(_logsDirectory))
                 {
                     var logFiles = Directory.GetFiles(_logsDirectory, "diskmaster_debug*.log");
@@ -407,6 +538,8 @@ public class DebugLogService
                     }
                 }
             }
+            Interlocked.Exchange(ref _writtenLineCount, 0);
+            Interlocked.Exchange(ref _droppedLineCount, 0);
             return true;
         }
         catch
@@ -429,17 +562,7 @@ public class DebugLogService
 
             var fi = new FileInfo(_logFilePath);
             long bytes = fi.Length;
-            int lines = 0;
-
-            // Efficient line counting
-            using (var reader = new StreamReader(new FileStream(_logFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)))
-            {
-                while (reader.ReadLine() != null)
-                {
-                    lines++;
-                }
-            }
-
+            int lines = (int)Math.Min(int.MaxValue, Interlocked.Read(ref _writtenLineCount));
             string sizeStr = bytes switch
             {
                 < 1024 => $"{bytes} B",
@@ -453,5 +576,35 @@ public class DebugLogService
         {
             return (0, 0, "讀取中...");
         }
+    }
+
+    /// <summary>Counts the current file on a background thread; never blocks the UI.</summary>
+    public Task<(long SizeBytes, int LineCount, string FormattedText)> GetLogStatsAsync()
+    {
+        return Task.Run(() =>
+        {
+            try
+            {
+                if (!File.Exists(_logFilePath)) return (0L, 0, "無日誌檔案 (0 KB)");
+                long bytes = new FileInfo(_logFilePath).Length;
+                int lines = 0;
+                using (var reader = new StreamReader(new FileStream(_logFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)))
+                {
+                    while (reader.ReadLine() != null) lines++;
+                }
+                Interlocked.Exchange(ref _writtenLineCount, lines);
+                string sizeStr = bytes switch
+                {
+                    < 1024 => $"{bytes} B",
+                    < 1024 * 1024 => $"{bytes / 1024.0:F1} KB",
+                    _ => $"{bytes / (1024.0 * 1024.0):F2} MB"
+                };
+                return (bytes, lines, $"{sizeStr} ({lines:N0} 行)");
+            }
+            catch
+            {
+                return (0L, 0, "讀取中...");
+            }
+        });
     }
 }

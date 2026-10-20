@@ -180,6 +180,64 @@ public sealed partial class NetworkToolsPage : Page
         }
     }
 
+
+    private void ShareList_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
+    {
+        if (args.Item is NetShareItem share)
+        {
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(args.ItemContainer,
+                $"{share.ShareName}, {share.AccessSummary}, {share.CachingMode}");
+        }
+    }
+
+    private async void NewShare_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new DiskMasterWinUI.Controls.ShareEditorDialog
+        {
+            XamlRoot = XamlRoot
+        };
+        await dialog.ShowAsync();
+        if (dialog.Saved)
+        {
+            await ViewModel.RefreshSharesAsync();
+            await DiskMasterWinUI.Helpers.DialogHelper.ShowOperationResultAsync(
+                XamlRoot, "Share created", dialog.ResultMessage, true);
+        }
+    }
+
+    private async void ManageShare_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.SelectedNetShare == null) return;
+        var dialog = new DiskMasterWinUI.Controls.ShareEditorDialog(ViewModel.SelectedNetShare)
+        {
+            XamlRoot = XamlRoot
+        };
+        await dialog.ShowAsync();
+        if (dialog.Saved)
+        {
+            await ViewModel.RefreshSharesAsync();
+            await ViewModel.LoadSelectedShareDetailsAsync();
+            await DiskMasterWinUI.Helpers.DialogHelper.ShowOperationResultAsync(
+                XamlRoot, "Share updated", dialog.ResultMessage, true);
+        }
+    }
+
+    private async void DeleteSelectedShare_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.SelectedNetShare == null) return;
+        await ViewModel.DeleteShareAsync(ViewModel.SelectedNetShare);
+        ViewModel.SelectedNetShare = null;
+    }
+
+    private async void TroubleshootShare_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new DiskMasterWinUI.Controls.ShareTroubleshootingDialog(ViewModel)
+        {
+            XamlRoot = XamlRoot
+        };
+        await dialog.ShowAsync();
+    }
+
     private async void DeleteShare_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button btn && btn.DataContext is NetShareItem item)

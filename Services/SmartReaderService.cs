@@ -170,8 +170,9 @@ public class SmartReaderService
                 return nativeDetails;
             }
 
-            // 3. Fallback: Synthesize rich NVMe telemetry from hardware sensor + system health
-            int effectiveTemp = hwTemp ?? 42;
+            // 3. Fallback: Synthesize rich NVMe telemetry from hardware sensor + system health.
+            //    Clearly marked as estimated — never presented as measured log-page data.
+            int effectiveTemp = hwTemp ?? 0;
             var details = new NvmeHealthDetails
             {
                 DeviceId = diskNumber,
@@ -185,8 +186,9 @@ public class SmartReaderService
                 CriticalWarning = 0,
                 PowerCycles = 1,
                 PowerOnHours = GetFallbackPowerOnHours(),
-                TotalBytesWrittenTB = sizeBytes > 0 ? Math.Round(sizeBytes / Math.Pow(1024, 4) * 1.5, 2) : 0.0,
-                TotalBytesReadTB = sizeBytes > 0 ? Math.Round(sizeBytes / Math.Pow(1024, 4) * 2.1, 2) : 0.0
+                TotalBytesWrittenTB = 0.0,
+                TotalBytesReadTB = 0.0,
+                IsEstimated = true
             };
 
             if (sensors.Count > 0)
@@ -464,11 +466,13 @@ public class SmartReaderService
             return hwTemp.Value;
         }
 
-        // 2. Try NVMe IOCTL log page
+        // 2. Try NVMe IOCTL log page — only accept REAL log-page data, never the
+        //    synthesized sensor fallback (which would fabricate a temperature).
         try
         {
             var nvme = await GetNvmeHealthAsync(diskNumber).WaitAsync(TimeSpan.FromSeconds(3));
-            if (nvme != null && nvme.CompositeTemperatureCelsius > 0 && nvme.CompositeTemperatureCelsius < 130)
+            if (nvme != null && !nvme.IsEstimated &&
+                nvme.CompositeTemperatureCelsius > 0 && nvme.CompositeTemperatureCelsius < 130)
             {
                 return nvme.CompositeTemperatureCelsius;
             }
@@ -537,4 +541,46 @@ public class SmartReaderService
         0xE7 => $"{raw}%",
         _ => $"{raw:N0}"
     };
+
+    /// <summary>
+    /// ATA/SATA summary for HDD and SATA SSD drives: temperature (0xC2/0xBE), wear percent
+    /// (0xE7 SSD Life Left → inverted; 0xB1/B3 wear-leveling), and power-on hours (0x09).
+    /// Returns null values where the drive does not report a given attribute (common for
+    /// USB bridge chips that do not pass S.M.A.R.T. through).
+    /// </summary>
+    public async Task<(int? Temperature, int? WearPercent, ulong? PowerOnHours)> GetAtaSummaryAsync(int diskNumber)
+    {
+        var attrs = await GetAtaSmartAttributesAsync(diskNumber).WaitAsync(TimeSpan.FromSeconds(3));
+
+        int? temp = null;
+        int? wear = null;
+        ulong? powerOnHours = null;
+
+        foreach (var a in attrs)
+        {
+            switch (a.Id)
+            {
+                case 0xC2 or 0xBE when temp == null:
+                {
+                    int t = (int)(a.RawValue & 0xFFFF);
+                    if (t > 0 && t < 130) temp = t;
+                    break;
+                }
+                case 0x09 when powerOnHours == null && a.RawValue > 0:
+                    powerOnHours = a.RawValue;
+                    break;
+                case 0xE7 when wear == null:
+                    // SSD Life Left: 100 = brand new, 0 = exhausted → invert to wear %.
+                    wear = Math.Clamp(100 - (int)Math.Min(a.RawValue, 100ul), 0, 100);
+                    break;
+                case 0xB1 or 0xB3 when wear == null:
+                    // Wear Leveling Count raw is usually already a wear percentage.
+                    int w = (int)Math.Min(a.RawValue, 100ul);
+                    if (w >= 0 && w <= 100) wear = w;
+                    break;
+            }
+        }
+
+        return (temp, wear, powerOnHours);
+    }
 }

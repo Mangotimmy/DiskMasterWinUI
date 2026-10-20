@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="DiskMasterWinUI.Controls.AccountPickerPanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:models="using:DiskMasterWinUI.Models"
+    mc:Ignorable="d">
+
+    <StackPanel Spacing="8">
+        <TextBlock Text="帳號環境 (Account scope)" FontWeight="SemiBold" FontSize="12" />
+        <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+            <RadioButton x:Name="AdminScopeRadio" Content="Administrator"
+                         GroupName="AccountScope" Checked="AdminScopeRadio_Checked"
+                         AutomationProperties.AutomationId="AccountPickerModeAdmin" />
+            <RadioButton x:Name="UserScopeRadio" Content="User"
+                         GroupName="AccountScope" Checked="UserScopeRadio_Checked"
+                         AutomationProperties.AutomationId="AccountPickerModeUser" />
+            <ProgressRing x:Name="LoadingRing" IsActive="False" Width="18" Height="18" />
+        </StackPanel>
+
+        <TextBlock x:Name="HintText"
+                   Text="Select Administrator or User to load accounts."
+                   FontSize="12" TextWrapping="Wrap"
+                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+        <Grid x:Name="SearchRow" ColumnSpacing="8" Visibility="Collapsed">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="SearchBox" Grid.Column="0"
+                     PlaceholderText="Search account, description or SID"
+                     TextChanged="SearchBox_TextChanged"
+                     AutomationProperties.Name="Search accounts"
+                     AutomationProperties.AutomationId="AccountPickerSearch" />
+            <Button x:Name="RefreshButton" Grid.Column="1" Content="Refresh"
+                    Click="RefreshButton_Click"
+                    AutomationProperties.Name="Refresh account list" />
+        </Grid>
+
+        <Border x:Name="SelectedChip" Visibility="Collapsed"
+                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                CornerRadius="6" Padding="10,6">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <FontIcon Glyph="&#xE77B;" FontSize="12" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                <TextBlock x:Name="SelectedText" FontWeight="SemiBold" FontSize="12" />
+            </StackPanel>
+        </Border>
+
+        <Grid x:Name="HeaderRow" Visibility="Collapsed" Padding="10,4"
+              Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4"
+              ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.4*" />
+                <ColumnDefinition Width="80" />
+                <ColumnDefinition Width="70" />
+                <ColumnDefinition Width="60" />
+                <ColumnDefinition Width="1.2*" />
+                <ColumnDefinition Width="150" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="Account" FontWeight="SemiBold" FontSize="11" />
+            <TextBlock Grid.Column="1" Text="Type" FontWeight="SemiBold" FontSize="11" />
+            <TextBlock Grid.Column="2" Text="State" FontWeight="SemiBold" FontSize="11" />
+            <TextBlock Grid.Column="3" Text="Admin" FontWeight="SemiBold" FontSize="11" />
+            <TextBlock Grid.Column="4" Text="Description" FontWeight="SemiBold" FontSize="11" />
+            <TextBlock Grid.Column="5" Text="SID" FontWeight="SemiBold" FontSize="11" />
+        </Grid>
+
+        <ListView x:Name="AccountList" Visibility="Collapsed" SelectionMode="Single"
+                  MaxHeight="280" SelectionChanged="AccountList_SelectionChanged"
+                  ContainerContentChanging="AccountList_ContainerContentChanging"
+                  AutomationProperties.Name="Accounts in selected scope"
+                  AutomationProperties.AutomationId="AccountPickerList">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="models:LocalAccountItem">
+                    <Grid Padding="10,6" ColumnSpacing="8" HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.4*" />
+                            <ColumnDefinition Width="80" />
+                            <ColumnDefinition Width="70" />
+                            <ColumnDefinition Width="60" />
+                            <ColumnDefinition Width="1.2*" />
+                            <ColumnDefinition Width="150" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="{x:Bind AccountName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1" Text="{x:Bind AccountType}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="2" Text="{x:Bind StateText}" FontSize="11" />
+                        <TextBlock Grid.Column="3" Text="{x:Bind AdministratorText}" FontSize="11" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                        <TextBlock Grid.Column="4" Text="{x:Bind Description}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="5" Text="{x:Bind Sid}" FontFamily="Consolas" FontSize="10" TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+    </StackPanel>
+</UserControl>

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentDialog
+    x:Class="DiskMasterWinUI.Controls.ShareTroubleshootingDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="Troubleshoot sharing"
+    CloseButtonText="Close">
+
+    <ScrollViewer MaxHeight="560">
+        <StackPanel Spacing="12" MinWidth="520">
+            <TextBlock Text="If another device cannot connect to this PC, apply the relevant repair. Each repair reports its own result."
+                       TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+            <Button Content="Fix Microsoft account LAN policy" Click="FixPolicy_Click" HorizontalAlignment="Stretch" />
+            <Button Content="Set network profile to Private" Click="PrivateNetwork_Click" HorizontalAlignment="Stretch" />
+            <Button Content="Enable File and Printer Sharing firewall" Click="Firewall_Click" HorizontalAlignment="Stretch" />
+
+            <TextBlock Text="Dedicated sharing account" FontWeight="SemiBold" FontSize="13" Margin="0,8,0,0" />
+            <TextBlock Text="For devices that cannot sign in with a Microsoft account." FontSize="12" TextWrapping="Wrap"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0" Header="Account name" Text="{x:Bind ViewModel.DedicatedUserName, Mode=TwoWay}" />
+                <TextBox Grid.Column="1" Header="Password" Text="{x:Bind ViewModel.DedicatedUserPassword, Mode=TwoWay}" />
+                <Button Grid.Column="2" Content="Create account" Click="CreateUser_Click" VerticalAlignment="Bottom" />
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</ContentDialog>

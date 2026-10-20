@@ -17,6 +17,12 @@ public sealed class ChkdskProgressParser
         @"(\d{1,3}(?:[.,]\d+)?)\s*(?:%|％|percent)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+    // Real per-stage progress reported as "25 percent complete. (123456 of 654321 MB processed)"
+    // or "Stage 4: ... (1234 of 5678 MB processed)".
+    private static readonly Regex ProcessedRatioRegex = new(
+        @"\(?\s*(\d[\d,]*)\s*(?:KB|MB|GB|TB)?\s*of\s*(\d[\d,]*)\s*(?:KB|MB|GB|TB)\s*processed",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
     private static readonly double[] StageBase = { 0, 8, 42, 70, 92, 96 };
     private static readonly double[] StageEnd = { 0, 40, 68, 88, 95, 99 };
 
@@ -76,18 +82,23 @@ public sealed class ChkdskProgressParser
                 out double rawPercent))
         {
             rawPercent = Math.Clamp(rawPercent, 0, 100);
-            double mapped;
-            if (_stage >= 1 && _stage <= 5)
-            {
-                double start = StageBase[_stage];
-                double end = StageEnd[_stage];
-                mapped = start + (rawPercent / 100.0) * (end - start);
-            }
-            else
-            {
-                mapped = rawPercent;
-            }
-            if (candidate == null || candidate.Value < mapped) candidate = mapped;
+            if (candidate == null || candidate.Value < MapToOverall(rawPercent)) candidate = MapToOverall(rawPercent);
+        }
+
+        var ratioMatch = ProcessedRatioRegex.Match(line);
+        if (ratioMatch.Success &&
+            double.TryParse(ratioMatch.Groups[1].Value.Replace(",", ""),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out double processed) &&
+            double.TryParse(ratioMatch.Groups[2].Value.Replace(",", ""),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out double total) &&
+            total > 0)
+        {
+            double ratioPercent = Math.Clamp(processed / total * 100.0, 0, 100);
+            if (candidate == null || candidate.Value < MapToOverall(ratioPercent)) candidate = MapToOverall(ratioPercent);
         }
 
         if (candidate == null) return null;
@@ -96,6 +107,18 @@ public sealed class ChkdskProgressParser
         if (value <= _lastPercent) return null;
         _lastPercent = value;
         return value;
+    }
+
+    /// <summary>Maps a per-stage percentage to the overall 0-100 scale for the status bar.</summary>
+    private double MapToOverall(double rawPercent)
+    {
+        if (_stage >= 1 && _stage <= 5)
+        {
+            double start = StageBase[_stage];
+            double end = StageEnd[_stage];
+            return start + (rawPercent / 100.0) * (end - start);
+        }
+        return rawPercent;
     }
 
     private static bool ContainsAny(string line, params string[] needles)

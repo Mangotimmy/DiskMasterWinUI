@@ -30,10 +30,13 @@ function Initialize-TestAssembly {
 
     $projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $candidatePaths = @(
+        # Platform-specific output first: building with -p:Platform=x64 writes to bin\x64\<cfg>.
+        "$projectRoot\bin\x64\$Configuration\net9.0-windows10.0.26100.0\win-x64\DiskMasterWinUI.dll",
         "$projectRoot\bin\$Configuration\net9.0-windows10.0.26100.0\win-x64\DiskMasterWinUI.dll",
+        "$projectRoot\bin\x64\Debug\net9.0-windows10.0.26100.0\win-x64\DiskMasterWinUI.dll",
         "$projectRoot\bin\Debug\net9.0-windows10.0.26100.0\win-x64\DiskMasterWinUI.dll",
-        "$projectRoot\bin\Release\net9.0-windows10.0.26100.0\win-x64\DiskMasterWinUI.dll",
-        "$projectRoot\bin\x64\$Configuration\net9.0-windows10.0.26100.0\win-x64\DiskMasterWinUI.dll"
+        "$projectRoot\bin\x64\Release\net9.0-windows10.0.26100.0\win-x64\DiskMasterWinUI.dll",
+        "$projectRoot\bin\Release\net9.0-windows10.0.26100.0\win-x64\DiskMasterWinUI.dll"
     )
 
     $dllPath = $candidatePaths | Where-Object { Test-Path $_ } | Select-Object -First 1

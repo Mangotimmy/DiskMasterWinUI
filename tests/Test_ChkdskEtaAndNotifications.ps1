@@ -20,14 +20,20 @@ Assert-True ($stage2 -gt $fileDone) "Stage 2 must advance progress"
 Assert-True ($stage3 -gt $stage2) "Stage 3 must advance progress"
 Assert-True ($cnStage -le $stage3) "Localised stage line must parse without throwing"
 
-Write-Host "Test 2: expected-duration ETA" -ForegroundColor Yellow
+Write-Host "Test 2: progress bar follows real process output, not wall-clock time" -ForegroundColor Yellow
 $trackerType = $asm.GetType("DiskMasterWinUI.Helpers.ProgressAndEtaTracker")
 $tracker = [Activator]::CreateInstance($trackerType)
 $trackerType.GetMethod("Start").Invoke($tracker, @("test", [TimeSpan]::FromSeconds(2))) | Out-Null
 Start-Sleep -Milliseconds 1200
 $snap = $tracker.GetLiveSnapshot()
-Assert-True ($snap.Item1 -gt 0) "Live snapshot must advance from elapsed time"
+Assert-True ($snap.Item1 -eq 0) "Bar must NOT advance from elapsed time alone (tracks process output only)"
 Assert-True ($snap.Item3 -match "remaining|Almost") "Live snapshot must expose a remaining time"
+$trackerType.GetMethod("ProcessLine").Invoke($tracker, @("[================ 45.0% ================]")) | Out-Null
+$snap2 = $tracker.GetLiveSnapshot()
+Assert-True ($snap2.Item1 -ge 45) "Bar must advance when the process reports real progress"
+Start-Sleep -Milliseconds 900
+$snap3 = $tracker.GetLiveSnapshot()
+Assert-True ($snap3.Item1 -eq $snap2.Item1) "Timer ticks must not move the bar past reported progress"
 
 Write-Host "Test 3: raw command output logging" -ForegroundColor Yellow
 $logService = $asm.GetType("DiskMasterWinUI.Services.DebugLogService").GetProperty("Instance").GetValue($null)

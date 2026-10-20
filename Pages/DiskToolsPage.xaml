@@ -439,8 +439,12 @@
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="ChkdskDriveBox" Grid.Column="0" Header="磁碟機" Width="80"
-                                             Text="{x:Bind ViewModel.ChkdskDrive, Mode=TwoWay}" />
+                                    <ComboBox x:Name="ChkdskDriveBox" Grid.Column="0" Header="磁碟機" MinWidth="210"
+                                              HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                                              ItemsSource="{x:Bind ViewModel.ChkdskDriveOptions, Mode=OneWay}"
+                                              DisplayMemberPath="Display"
+                                              SelectedItem="{x:Bind ViewModel.SelectedChkdskDrive, Mode=TwoWay}"
+                                              AutomationProperties.Name="選擇要檢查的磁碟機" />
                                     <Button x:Name="ChkdskScanBtn" Grid.Column="1" Content="🔍 線上掃描" VerticalAlignment="Bottom"
                                              Command="{x:Bind ViewModel.ChkdskScanCommand}" Style="{StaticResource AccentButtonStyle}" />
                                     <Button x:Name="ChkdskSpotFixBtn" Grid.Column="2" Content="🔧 快速修復" VerticalAlignment="Bottom"
@@ -2055,8 +2059,7 @@
                                                             <Grid.ContextFlyout>
                                                                 <MenuFlyout>
                                                                     <MenuFlyoutItem Text="📂 在檔案總管中開啟"
-                                                                                    Command="{Binding ElementName=TabDirectoryAnalyzer, Path=DataContext.OpenFolderForFileCommand}"
-                                                                                    CommandParameter="{x:Bind FilePath}" />
+                                                                                    Click="LargeFileOpenInExplorer_Click" />
                                                                     <MenuFlyoutSeparator />
                                                                     <MenuFlyoutItem Text="👤 將所在資料夾加至使用者 PATH" Click="LargeFileAddToUserPath_Click" />
                                                                     <MenuFlyoutItem Text="🛡️ 將所在資料夾加至系統 PATH" Click="LargeFileAddToSystemPath_Click" />
@@ -2073,8 +2076,7 @@
                                                             </StackPanel>
                                                             <TextBlock Grid.Column="1" Text="{x:Bind DisplaySize}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center" Margin="8,0" />
                                                             <Button Grid.Column="2" Content="📂" ToolTipService.ToolTip="在檔案總管中定位"
-                                                                    Command="{Binding ElementName=TabDirectoryAnalyzer, Path=DataContext.OpenFolderForFileCommand}"
-                                                                    CommandParameter="{x:Bind FilePath}" Padding="6,2" FontSize="11" />
+                                                                    Click="LargeFileOpenInExplorer_Click" Padding="6,2" FontSize="11" />
                                                         </Grid>
                                                     </DataTemplate>
                                                 </ListView.ItemTemplate>

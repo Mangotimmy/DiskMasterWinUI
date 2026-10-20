@@ -174,6 +174,26 @@ public class NtfsPermissionService
             // 2. Query Owner and ACLs via icacls
             try
             {
+                using var ownerCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                ownerCts.CancelAfter(TimeSpan.FromSeconds(3));
+                string ownerPath = cleanPath.EndsWith(":", StringComparison.Ordinal) ? cleanPath + "\\" : cleanPath;
+                string ownerScript = $"(Get-Acl -LiteralPath '{ownerPath.Replace("'", "''")}').Owner";
+                var (ownerOut, _, _) = await ProcessHelper.RunProcessAsync(
+                    "powershell.exe", $"-NoProfile -Command \"{ownerScript}\"", cancellationToken: ownerCts.Token);
+                summary.Owner = ownerOut?.Trim() ?? "";
+                if (string.IsNullOrWhiteSpace(summary.Owner))
+                {
+                    using var pwshCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    pwshCts.CancelAfter(TimeSpan.FromSeconds(3));
+                    var (pwshOwner, _, _) = await ProcessHelper.RunProcessAsync(
+                        "pwsh.exe", $"-NoProfile -Command \"{ownerScript}\"", cancellationToken: pwshCts.Token);
+                    summary.Owner = pwshOwner?.Trim() ?? "";
+                }
+            }
+            catch { }
+
+            try
+            {
                 using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 timeoutCts.CancelAfter(TimeSpan.FromSeconds(3));
                 var (outStr, _, _) = await ProcessHelper.RunProcessAsync("icacls.exe", $"\"{cleanPath}\"", cancellationToken: timeoutCts.Token);

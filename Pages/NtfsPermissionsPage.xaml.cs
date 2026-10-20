@@ -20,6 +20,8 @@ public sealed partial class NtfsPermissionsPage : Page
         DiskMasterWinUI.Helpers.TabReorderHelper.Attach(NtfsTabView);
         ApplyLanguage();
         LocalizationService.Instance.LanguageChanged += ApplyLanguage;
+        BuilderAccountPicker.SelectedAccountChanged += (_, account) => ViewModel.ApplyAccountSelection(account);
+        Loaded += async (_, _) => await ViewModel.RefreshAclStatusAsync();
     }
 
     public void ApplyLanguage()

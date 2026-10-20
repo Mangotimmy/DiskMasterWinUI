@@ -258,16 +258,42 @@ public class HealthMonitorService
                     var disks = await FallbackToWin32DiskDriveAsync();
                     foreach (var d in disks)
                     {
-                        var nvme = await smartReader.GetNvmeHealthAsync(d.DeviceId, d.FriendlyName, d.SizeBytes)
-                            .WaitAsync(TimeSpan.FromSeconds(3));
+                        bool isNvme = d.BusType.Equals("NVMe", StringComparison.OrdinalIgnoreCase)
+                                      || d.FriendlyName.Contains("NVMe", StringComparison.OrdinalIgnoreCase);
+                        int? temp = d.TemperatureCelsius;
+                        int? wear = null;
+                        long powerOnHours = (long)SmartReaderService.GetFallbackPowerOnHours();
+                        long mediaErrors = 0L;
+
+                        if (isNvme)
+                        {
+                            var nvme = await smartReader.GetNvmeHealthAsync(d.DeviceId, d.FriendlyName, d.SizeBytes)
+                                .WaitAsync(TimeSpan.FromSeconds(3));
+                            if (nvme != null && !nvme.IsEstimated)
+                            {
+                                temp = nvme.CompositeTemperatureCelsius > 0 ? nvme.CompositeTemperatureCelsius : temp;
+                                wear = nvme.PercentageUsed;
+                                if (nvme.PowerOnHours > 0) powerOnHours = (long)nvme.PowerOnHours;
+                                mediaErrors = (long)nvme.MediaErrors;
+                            }
+                        }
+                        else
+                        {
+                            // HDD / SATA SSD / USB: ATA SMART is the correct telemetry source.
+                            var (ataTemp, ataWear, ataHours) = await smartReader.GetAtaSummaryAsync(d.DeviceId);
+                            temp = ataTemp ?? d.TemperatureCelsius;
+                            wear = ataWear;
+                            if (ataHours is > 0) powerOnHours = (long)ataHours;
+                        }
+
                         list.Add(new DiskReliabilityInfo
                         {
                             DeviceId = d.DeviceId,
                             FriendlyName = d.FriendlyName,
-                            Temperature = nvme?.CompositeTemperatureCelsius ?? d.TemperatureCelsius,
-                            WearPercent = nvme?.PercentageUsed ?? 0,
-                            PowerOnHours = (nvme != null && nvme.PowerOnHours > 0) ? (long)nvme.PowerOnHours : (long)SmartReaderService.GetFallbackPowerOnHours(),
-                            ReadErrorsTotal = nvme != null ? (long)nvme.MediaErrors : 0L,
+                            Temperature = temp,
+                            WearPercent = wear ?? 0,
+                            PowerOnHours = powerOnHours,
+                            ReadErrorsTotal = mediaErrors,
                             ReadErrorsUncorrected = 0L,
                             WriteErrorsTotal = 0L,
                             WriteErrorsUncorrected = 0L,

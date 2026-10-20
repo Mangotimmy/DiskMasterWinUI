@@ -7,6 +7,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:models="using:DiskMasterWinUI.Models"
     xmlns:services="using:DiskMasterWinUI.Services"
+    xmlns:controls="using:DiskMasterWinUI.Controls"
     xmlns:vm="using:DiskMasterWinUI.ViewModels"
     mc:Ignorable="d"
     Loaded="Page_Loaded">
@@ -770,141 +771,184 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                         <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
-                            <!-- Hero MS Account & Profile Fix Card -->
-                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                                    CornerRadius="8" Padding="16">
-                                <StackPanel Spacing="12">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <FontIcon Glyph="&#xE774;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                                        <TextBlock Text="🛠️ 微軟帳號區域網路共用驗證問題一鍵修復 (MS Account LAN Sharing Fix)" FontWeight="Bold" FontSize="15" />
+                            <!-- NetShare header and actions -->
+                            <Grid RowSpacing="10">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="3">
+                                        <TextBlock Text="🖧 Network shares" FontWeight="Bold" FontSize="20" />
+                                        <TextBlock Text="Create a share, choose who can access it, and manage advanced options in one place."
+                                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                     </StackPanel>
-                                    <TextBlock Text="當本機登入微軟帳號時，區域網路其他電腦連線常遭遇 NTLM 身分驗證失敗或存取拒絕。此精靈自動修正 LocalAccountTokenFilterPolicy 政策、開啟防火牆規則與私人網路設定檔。"
-                                               Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                    <Button Grid.Column="1" Content="+ New share" Click="NewShare_Click"
+                                            Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center" Padding="14,8" />
+                                    <Button Grid.Column="2" Content="Refresh" Command="{x:Bind ViewModel.RefreshSharesCommand}" VerticalAlignment="Center" />
+                                    <Button Grid.Column="3" Content="Troubleshoot sharing" Click="TroubleshootShare_Click" VerticalAlignment="Center" />
+                                </Grid>
+                                <InfoBar Grid.Row="1" x:Name="ShareAdminInfoBar"
+                                         IsOpen="{x:Bind ViewModel.IsAdmin, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}"
+                                         Severity="Warning" Title="Administrator required"
+                                         Message="You can view shares, but creating, editing and deleting shares requires Administrator."
+                                         IsClosable="False">
+                                    <InfoBar.ActionButton>
+                                        <Button Content="Restart as Admin" Command="{x:Bind ViewModel.RestartAsAdminCommand}" />
+                                    </InfoBar.ActionButton>
+                                </InfoBar>
+                            </Grid>
 
-                                    <Grid ColumnSpacing="10" RowSpacing="8">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <Button Grid.Column="0" Command="{x:Bind ViewModel.FixMsAccountPolicyCommand}" Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch">
-                                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                                <FontIcon Glyph="&#xE8D7;" FontSize="13" />
-                                                <TextBlock Text="⚡ 修復微軟帳號權限政策" />
-                                            </StackPanel>
-                                        </Button>
-                                        <Button Grid.Column="1" Command="{x:Bind ViewModel.SetPrivateNetworkCommand}" HorizontalAlignment="Stretch">
-                                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                                <FontIcon Glyph="&#xE8B0;" FontSize="13" />
-                                                <TextBlock Text="🔒 設為私人網路設定檔" />
-                                            </StackPanel>
-                                        </Button>
-                                        <Button Grid.Column="2" Command="{x:Bind ViewModel.EnableSharingFirewallCommand}" HorizontalAlignment="Stretch">
-                                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                                <FontIcon Glyph="&#xE72E;" FontSize="13" />
-                                                <TextBlock Text="🔥 開啟檔案共用防火牆" />
-                                            </StackPanel>
-                                        </Button>
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
+                            <!-- Share table + selected-share details -->
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="390" />
+                                </Grid.ColumnDefinitions>
 
-                            <!-- Create New Share Form -->
-                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                                    CornerRadius="8" Padding="16">
-                                <StackPanel Spacing="12">
-                                    <TextBlock Text="➕ 建立新的網路共用資料夾" FontWeight="Bold" FontSize="14" />
-                                    <Grid ColumnSpacing="10" RowSpacing="10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="2*" />
-                                            <ColumnDefinition Width="3*" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="2*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox Grid.Column="0" Header="共用名稱 (Share Name)" Text="{x:Bind ViewModel.NewShareName, Mode=TwoWay}" />
-                                        <TextBox Grid.Column="1" Header="資料夾實體路徑 (Folder Path)" Text="{x:Bind ViewModel.NewSharePath, Mode=TwoWay}" />
-                                        <Button Grid.Column="2" Content="📁 瀏覽" Command="{x:Bind ViewModel.BrowseShareFolderCommand}"
-                                                VerticalAlignment="Bottom" Padding="12,8"
-                                                ToolTipService.ToolTip="瀏覽要共用的本機資料夾"
-                                                AutomationProperties.Name="瀏覽共用資料夾路徑" />
-                                        <TextBox Grid.Column="3" Header="備註說明 (Remark)" Text="{x:Bind ViewModel.NewShareRemark, Mode=TwoWay}" />
-                                        <Button Grid.Column="4" Content="🚀 一鍵建立共用" Command="{x:Bind ViewModel.CreateShareCommand}"
-                                                Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Bottom" Padding="14,8" />
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
+                                <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                        CornerRadius="8" Padding="12">
+                                    <Grid RowSpacing="8">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+                                        <Grid ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox Grid.Column="0" PlaceholderText="Search shares by name or folder"
+                                                     Text="{x:Bind ViewModel.ShareSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     AutomationProperties.Name="Search shares" />
+                                            <ToggleSwitch Grid.Column="1" OnContent="Admin shares" OffContent="Admin shares"
+                                                          IsOn="{x:Bind ViewModel.ShowAdminShares, Mode=TwoWay}" />
+                                            <ProgressRing Grid.Column="2" IsActive="{x:Bind ViewModel.IsShareDetailsLoading, Mode=OneWay}"
+                                                          Width="18" Height="18" VerticalAlignment="Center" />
+                                        </Grid>
 
-                            <!-- Dedicated Local Sharing User Card -->
-                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                                    CornerRadius="8" Padding="16">
-                                <StackPanel Spacing="12">
-                                    <TextBlock Text="👤 建立區域網路專用連線帳號 (供手機/Mac/電視盒免微軟帳號直接連線)" FontWeight="Bold" FontSize="14" />
-                                    <Grid ColumnSpacing="10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox Grid.Column="0" Header="本機帳號名稱" Text="{x:Bind ViewModel.DedicatedUserName, Mode=TwoWay}" />
-                                        <TextBox Grid.Column="1" Header="帳號密碼" Text="{x:Bind ViewModel.DedicatedUserPassword, Mode=TwoWay}" />
-                                        <Button Grid.Column="2" Content="👤 建立共用專用帳號" Command="{x:Bind ViewModel.CreateDedicatedUserCommand}" VerticalAlignment="Bottom" Padding="14,8" />
-                                    </Grid>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Existing Active Shares List -->
-                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                                    CornerRadius="8" Padding="16">
-                                <StackPanel Spacing="10">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="📋 現有區域網路共用資源清單" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" />
-                                        <Button Grid.Column="1" Content="🔄 重新整理" Command="{x:Bind ViewModel.RefreshSharesCommand}" />
-                                    </Grid>
-
-                                    <ListView ItemsSource="{x:Bind ViewModel.NetShares, Mode=OneWay}" SelectionMode="None"
-                                              HorizontalAlignment="Stretch"
-                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                              ScrollViewer.HorizontalScrollMode="Disabled">
-                                        <ListView.ItemContainerStyle>
-                                            <Style TargetType="ListViewItem">
-                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                            </Style>
-                                        </ListView.ItemContainerStyle>
-                                        <ListView.ItemTemplate>
-                                            <DataTemplate x:DataType="models:NetShareItem">
-                                                <Grid HorizontalAlignment="Stretch" Padding="8,8" ColumnSpacing="12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                        <ListView Grid.Row="1" ItemsSource="{x:Bind ViewModel.VisibleNetShares, Mode=OneWay}"
+                                                  SelectedItem="{x:Bind ViewModel.SelectedNetShare, Mode=TwoWay}"
+                                                  SelectionMode="Single" MaxHeight="520"
+                                                  ContainerContentChanging="ShareList_ContainerContentChanging"
+                                                  HorizontalAlignment="Stretch"
+                                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                  ScrollViewer.HorizontalScrollMode="Disabled"
+                                                  AutomationProperties.Name="Network shares">
+                                            <ListView.Header>
+                                                <Grid Padding="10,4" ColumnSpacing="8" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4">
                                                     <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="150" />
-                                                        <ColumnDefinition Width="2*" />
-                                                        <ColumnDefinition Width="2*" />
-                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="1.5*" />
+                                                        <ColumnDefinition Width="1.8*" />
+                                                        <ColumnDefinition Width="2.2*" />
+                                                        <ColumnDefinition Width="1.6*" />
+                                                        <ColumnDefinition Width="100" />
                                                     </Grid.ColumnDefinitions>
-                                                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
-                                                        <TextBlock Text="{x:Bind ShareName}" FontWeight="SemiBold" FontSize="13" />
-                                                        <TextBlock Text="{x:Bind ResourcePath}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontFamily="Consolas" />
-                                                    </StackPanel>
-                                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                                                        <TextBlock Text="{x:Bind UncIpPath}" FontSize="12" FontWeight="SemiBold" FontFamily="Consolas" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                                                        <TextBlock Text="{x:Bind UncHostPath}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontFamily="Consolas" />
-                                                    </StackPanel>
-                                                    <TextBlock Grid.Column="2" Text="{x:Bind Remark}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
-                                                    <Button Grid.Column="3" Content="🗑️ 刪除共用" Click="DeleteShare_Click" Padding="8,4" FontSize="11" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="0" Text="Share" FontWeight="SemiBold" FontSize="11" />
+                                                    <TextBlock Grid.Column="1" Text="Folder" FontWeight="SemiBold" FontSize="11" />
+                                                    <TextBlock Grid.Column="2" Text="Network path" FontWeight="SemiBold" FontSize="11" />
+                                                    <TextBlock Grid.Column="3" Text="Access" FontWeight="SemiBold" FontSize="11" />
+                                                    <TextBlock Grid.Column="4" Text="Offline" FontWeight="SemiBold" FontSize="11" />
                                                 </Grid>
-                                            </DataTemplate>
-                                        </ListView.ItemTemplate>
-                                    </ListView>
-                                </StackPanel>
-                            </Border>
+                                            </ListView.Header>
+                                            <ListView.ItemContainerStyle>
+                                                <Style TargetType="ListViewItem">
+                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                </Style>
+                                            </ListView.ItemContainerStyle>
+                                            <ListView.ItemTemplate>
+                                                <DataTemplate x:DataType="models:NetShareItem">
+                                                    <Grid Padding="10,7" ColumnSpacing="8" HorizontalAlignment="Stretch"
+                                                          BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="1.5*" />
+                                                            <ColumnDefinition Width="1.8*" />
+                                                            <ColumnDefinition Width="2.2*" />
+                                                            <ColumnDefinition Width="1.6*" />
+                                                            <ColumnDefinition Width="100" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0" Text="{x:Bind ShareName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="1" Text="{x:Bind ResourcePath}" FontFamily="Consolas" FontSize="11" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="2" Text="{x:Bind UncHostPath}" FontFamily="Consolas" FontSize="11" TextTrimming="CharacterEllipsis" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                        <TextBlock Grid.Column="3" Text="{x:Bind AccessSummary}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Grid.Column="4" Text="{x:Bind CachingMode}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ListView.ItemTemplate>
+                                        </ListView>
+                                    </Grid>
+                                </Border>
 
+                                <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                        CornerRadius="8" Padding="14">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="620">
+                                        <StackPanel Spacing="10">
+                                            <TextBlock Text="Share details" FontWeight="Bold" FontSize="14" />
+                                            <StackPanel Visibility="{x:Bind ViewModel.HasSelectedShare, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                <StackPanel Spacing="3">
+                                                    <TextBlock Text="{x:Bind ViewModel.SelectedNetShare.ShareName, Mode=OneWay}" FontWeight="SemiBold" FontSize="17" />
+                                                    <TextBlock Text="{x:Bind ViewModel.SelectedNetShare.ResourcePath, Mode=OneWay}" FontSize="11" FontFamily="Consolas" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                                <TextBlock Text="Network paths" FontWeight="SemiBold" FontSize="12" Margin="0,10,0,0" />
+                                                <TextBlock Text="{x:Bind ViewModel.SelectedNetShare.UncIpPath, Mode=OneWay}" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap" />
+                                                <TextBlock Text="{x:Bind ViewModel.SelectedNetShare.UncHostPath, Mode=OneWay}" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Text="Permissions" FontWeight="SemiBold" FontSize="12" Margin="0,10,0,0" />
+                                                <ListView ItemsSource="{x:Bind ViewModel.SelectedShareAcl, Mode=OneWay}" SelectionMode="None" MaxHeight="150">
+                                                    <ListView.Header>
+                                                        <Grid Padding="6,3" ColumnSpacing="6" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="100" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Grid.Column="0" Text="Account" FontWeight="SemiBold" FontSize="10" />
+                                                            <TextBlock Grid.Column="1" Text="Access" FontWeight="SemiBold" FontSize="10" />
+                                                        </Grid>
+                                                    </ListView.Header>
+                                                    <ListView.ItemTemplate>
+                                                        <DataTemplate x:DataType="models:ShareAclItem">
+                                                            <Grid Padding="6,3" ColumnSpacing="6">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="100" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <TextBlock Grid.Column="0" Text="{x:Bind Principal}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Grid.Column="1" Text="{x:Bind AccessRight}" FontSize="11" />
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ListView.ItemTemplate>
+                                                </ListView>
+                                                <TextBlock Text="Advanced" FontWeight="SemiBold" FontSize="12" Margin="0,10,0,0" />
+                                                <TextBlock Text="{x:Bind ViewModel.SelectedNetShare.CachingMode, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='Offline: {0}'}" FontSize="11" />
+                                                <TextBlock Text="{x:Bind ViewModel.SelectedNetShare.ConcurrentUserLimit, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='Simultaneous users: {0} (0 = unlimited)'}" FontSize="11" />
+                                                <TextBlock Text="{x:Bind ViewModel.SelectedNetShare.EncryptData, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='Encrypt data: {0}'}" FontSize="11" />
+                                                <TextBlock Text="{x:Bind ViewModel.SelectedNetShare.FolderEnumerationMode, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='Enumeration: {0}'}" FontSize="11" />
+                                                <TextBlock Text="{x:Bind ViewModel.SharePermissionSummary, Mode=OneWay}" FontSize="10" TextWrapping="Wrap"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="0,4,0,0" />
+                                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
+                                                    <Button Content="Manage access and options" Click="ManageShare_Click" Style="{StaticResource AccentButtonStyle}" />
+                                                    <Button Content="Delete share" Click="DeleteSelectedShare_Click" />
+                                                </StackPanel>
+                                                <TextBlock Text="{x:Bind ViewModel.NetShareStatusMessage, Mode=OneWay}" FontSize="11" TextWrapping="Wrap"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="0,8,0,0" />
+                                            </StackPanel>
+                                            <TextBlock Text="Select a share to view permissions and advanced options."
+                                                       TextWrapping="Wrap" FontSize="12"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                       Visibility="{x:Bind ViewModel.HasSelectedShare, Mode=OneWay, Converter={StaticResource InvertBoolToVisibilityConverter}}" />
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </Border>
+                            </Grid>
                         </StackPanel>
                     </ScrollViewer>
                 </TabViewItem>
