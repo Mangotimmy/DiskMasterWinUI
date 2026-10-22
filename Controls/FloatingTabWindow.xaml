@@ -59,20 +59,17 @@
             </Grid>
         </Border>
 
-        <!-- Page Content Frame -->
+        <!-- Page Content Frame: stretches to the floating window so the hosted page fills it. -->
         <ScrollViewer x:Name="FloatingScrollViewer" Grid.Row="2"
                       HorizontalScrollBarVisibility="Disabled"
                       HorizontalScrollMode="Disabled"
                       VerticalScrollBarVisibility="Auto"
-                      HorizontalContentAlignment="Left"
-                      VerticalContentAlignment="Top"
+                      HorizontalContentAlignment="Stretch"
+                      VerticalContentAlignment="Stretch"
                       SizeChanged="FloatingScrollViewer_SizeChanged">
-            <Grid x:Name="FloatingContentRoot" RenderTransformOrigin="0,0" HorizontalAlignment="Left" VerticalAlignment="Top"
-                  BringIntoViewRequested="FloatingContentRoot_BringIntoViewRequested">
-                <Grid.RenderTransform>
-                    <ScaleTransform x:Name="FloatingScaleTransform" ScaleX="1.0" ScaleY="1.0" />
-                </Grid.RenderTransform>
-                <Frame x:Name="FloatingContentFrame" SizeChanged="FloatingContentFrame_SizeChanged" HorizontalAlignment="Stretch" />
+            <Grid x:Name="FloatingContentRoot" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                <Frame x:Name="FloatingContentFrame" SizeChanged="FloatingContentFrame_SizeChanged"
+                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
             </Grid>
         </ScrollViewer>
     </Grid>

@@ -10,7 +10,8 @@
     xmlns:controls="using:DiskMasterWinUI.Controls"
     xmlns:vm="using:DiskMasterWinUI.ViewModels"
     mc:Ignorable="d"
-    Loaded="Page_Loaded">
+    Loaded="Page_Loaded"
+    Unloaded="Page_Unloaded">
 
     <Grid Padding="16" RowSpacing="12">
         <Grid.RowDefinitions>
@@ -50,121 +51,84 @@
                           Width="24" Height="24" />
         </Grid>
 
-        <!-- Movable Sub TabView -->
+        <!-- 類別化子分頁：外層 3 大類別，每個類別內容再放一個第二層 TabView（最多兩層，不再加深） -->
         <TabView x:Name="NetTabView" Grid.Row="1"
                  CanReorderTabs="True" CanDragTabs="True"
+                 TabWidthMode="SizeToContent"
                  IsAddTabButtonVisible="False">
             <TabView.TabItems>
 
-                <!-- ════ Tab 1: UPnP 自動通訊埠轉發 ════ -->
-                <TabViewItem x:Name="TabUpnp" Header="🔀 UPnP 自動通訊埠轉發" IsClosable="False">
+                <!-- ════════ 類別 1：🔌 連線與轉發（智慧診斷 / DNS / UPnP）════════ -->
+                <TabViewItem x:Name="TabCategoryConnect" Header="🔌 連線與轉發" IsClosable="False">
+                    <TabView x:Name="ConnectionTabView"
+                             IsAddTabButtonVisible="False" CanDragTabs="False" CanReorderTabs="False"
+                             TabWidthMode="SizeToContent" Margin="0,8,0,0">
+                        <TabView.TabItems>
+
+                <!-- ════ Tab 3: 為什麼網路慢？智慧診斷 ════ -->
+                <TabViewItem x:Name="TabDiagnostic" Header="🩺 智慧連線卡頓診斷" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                         <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
-                            <!-- Status & Quick Presets -->
+                            <!-- Hero Diagnostic Card -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                                    CornerRadius="8" Padding="16">
-                                <StackPanel Spacing="12">
-                                    <Grid ColumnSpacing="12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <FontIcon Grid.Column="0" Glyph="&#xE968;" FontSize="22" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
-                                        <StackPanel Grid.Column="1" Spacing="2">
-                                            <TextBlock x:Name="UpnpTitleText" Text="UPnP NAT-T / IGD 路由器自動通訊埠轉發" FontWeight="SemiBold" FontSize="15" />
-                                            <TextBlock Text="{x:Bind ViewModel.LocalIpAddress, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='本機區域網路 IP: {0}'}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                        </StackPanel>
-                                        <Button Grid.Column="2" Content="🔄 探索路由器" Command="{x:Bind ViewModel.RefreshUpnpCommand}"
-                                                VerticalAlignment="Center" />
-                                    </Grid>
-
-                                    <!-- Quick Game Presets Buttons (Responsive 2x3 Grid) -->
-                                    <TextBlock Text="熱門遊戲與伺服器範本快速載入：" FontWeight="SemiBold" FontSize="13" />
-                                    <Grid ColumnSpacing="10" RowSpacing="8" HorizontalAlignment="Stretch">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                        </Grid.RowDefinitions>
-                                        <Button Grid.Row="0" Grid.Column="0" Content="⛏️ Minecraft (25565)" Click="PresetMinecraft_Click" HorizontalAlignment="Stretch" />
-                                        <Button Grid.Row="0" Grid.Column="1" Content="🎮 Steam CS2 (27015)" Click="PresetSteam_Click" HorizontalAlignment="Stretch" />
-                                        <Button Grid.Row="0" Grid.Column="2" Content="🌳 Terraria (7777)" Click="PresetTerraria_Click" HorizontalAlignment="Stretch" />
-                                        <Button Grid.Row="1" Grid.Column="0" Content="🐺 Palworld (8211)" Click="PresetPalworld_Click" HorizontalAlignment="Stretch" />
-                                        <Button Grid.Row="1" Grid.Column="1" Content="🖥️ Windows 遠端桌面 (3389)" Click="PresetRdp_Click" HorizontalAlignment="Stretch" />
-                                        <Button Grid.Row="1" Grid.Column="2" Content="🎬 Plex 串流 (32400)" Click="PresetPlex_Click" HorizontalAlignment="Stretch" />
-                                    </Grid>
-
-                                    <!-- Manual Add Rule Form -->
-                                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
-                                        <Grid ColumnSpacing="8" RowSpacing="8">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="100" />
-                                                <ColumnDefinition Width="2*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBox Grid.Column="0" Header="外部通訊埠 (WAN Port)" Text="{x:Bind ViewModel.NewExternalPort, Mode=TwoWay}" />
-                                            <TextBox Grid.Column="1" Header="內部通訊埠 (LAN Port)" Text="{x:Bind ViewModel.NewInternalPort, Mode=TwoWay}" />
-                                            <ComboBox Grid.Column="2" Header="協定" SelectedValue="{x:Bind ViewModel.NewProtocol, Mode=TwoWay}" HorizontalAlignment="Stretch">
-                                                <ComboBoxItem Content="TCP" />
-                                                <ComboBoxItem Content="UDP" />
-                                            </ComboBox>
-                                            <TextBox Grid.Column="3" Header="規則備註 (Description)" Text="{x:Bind ViewModel.NewDescription, Mode=TwoWay}" />
-                                            <Button Grid.Column="4" Content="➕ 新增轉發規則" Command="{x:Bind ViewModel.AddPortMappingCommand}"
-                                                    Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Bottom" />
-                                        </Grid>
-                                    </Border>
-                                </StackPanel>
+                                    CornerRadius="8" Padding="18">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Grid.Column="0" Glyph="&#xE95A;" FontSize="40" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="智慧 5 階段連線延遲與瓶頸自動探測" FontWeight="Bold" FontSize="16" />
+                                        <TextBlock Text="{x:Bind ViewModel.DiagnosticSummary, Mode=OneWay}"
+                                                   Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Button Grid.Column="2" Content="🩺 開始智慧診斷" Command="{x:Bind ViewModel.RunSmartDiagnosticsCommand}"
+                                            Style="{StaticResource AccentButtonStyle}" Padding="16,8" VerticalAlignment="Center" />
+                                </Grid>
                             </Border>
 
-                            <!-- Mappings List -->
-                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                                    CornerRadius="8" Padding="16">
-                                <StackPanel Spacing="10">
-                                    <TextBlock Text="路由器現存 UPnP 轉發清單" FontWeight="SemiBold" />
-                                    <ListView ItemsSource="{x:Bind ViewModel.PortMappings, Mode=OneWay}" SelectionMode="None" MaxHeight="300"
-                                              HorizontalAlignment="Stretch"
-                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                              ScrollViewer.HorizontalScrollMode="Disabled">
-                                        <ListView.ItemContainerStyle>
-                                            <Style TargetType="ListViewItem">
-                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                            </Style>
-                                        </ListView.ItemContainerStyle>
-                                        <ListView.ItemTemplate>
-                                            <DataTemplate x:DataType="models:UpnpPortMappingItem">
-                                                <Grid HorizontalAlignment="Stretch" Padding="4,6" ColumnSpacing="12">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto" />
-                                                        <ColumnDefinition Width="*" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                        <ColumnDefinition Width="Auto" />
-                                                    </Grid.ColumnDefinitions>
-                                                    <Border Grid.Column="0" Background="{ThemeResource AccentFillColorTertiaryBrush}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
-                                                        <TextBlock Text="{x:Bind Protocol}" FontWeight="Bold" FontSize="11" />
-                                                    </Border>
-                                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                                                        <TextBlock Text="{x:Bind Description}" FontWeight="SemiBold" />
-                                                        <TextBlock Text="{x:Bind ExternalPort, Converter={StaticResource StringFormatConverter}, ConverterParameter='外部埠: {0}'}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                                    </StackPanel>
-                                                    <TextBlock Grid.Column="2" Text="{x:Bind InternalClient}" VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" />
-                                                    <Button Grid.Column="3" Content="🗑️ 刪除" Click="DeletePortMapping_Click"
-                                                            Padding="8,2" FontSize="11" />
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ListView.ItemTemplate>
-                                    </ListView>
-                                </StackPanel>
-                            </Border>
+                            <!-- Results List -->
+                            <ListView ItemsSource="{x:Bind ViewModel.DiagnosticResults, Mode=OneWay}" SelectionMode="None"
+                                      HorizontalAlignment="Stretch"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                      ScrollViewer.HorizontalScrollMode="Disabled">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="services:DiagnosticStepResult">
+                                        <Border HorizontalAlignment="Stretch" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                                CornerRadius="8" Padding="14" Margin="0,4,0,4">
+                                            <Grid ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <FontIcon Grid.Column="0" Glyph="&#xE73E;" FontSize="20"
+                                                          Foreground="{ThemeResource SystemFillColorSuccessBrush}" VerticalAlignment="Center" />
+
+                                                <StackPanel Grid.Column="1" Spacing="2">
+                                                    <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" FontSize="14" />
+                                                    <TextBlock Text="{x:Bind Details}" Style="{StaticResource CaptionTextBlockStyle}" />
+                                                    <TextBlock Text="{x:Bind Recommendation}" FontSize="12" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                </StackPanel>
+
+                                                <TextBlock Grid.Column="2" Text="{x:Bind LatencyDisplay}"
+                                                           FontWeight="Bold" VerticalAlignment="Center" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
                         </StackPanel>
                     </ScrollViewer>
                 </TabViewItem>
@@ -195,23 +159,25 @@
                                     </Grid>
 
                                     <!-- Network Adapter Selector & Ping Toolbar -->
-                                    <Grid ColumnSpacing="12" Margin="0,4,0,4">
+                                    <Grid ColumnSpacing="12" RowSpacing="8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" MinWidth="260" MaxWidth="500" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="🎯 目標網卡:" VerticalAlignment="Center" FontWeight="SemiBold" />
-                                        <ComboBox Grid.Column="1" ItemsSource="{x:Bind ViewModel.NetworkAdapters, Mode=OneWay}"
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="🎯 目標網卡:" VerticalAlignment="Center" FontWeight="SemiBold" />
+                                        <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{x:Bind ViewModel.NetworkAdapters, Mode=OneWay}"
                                                   SelectedItem="{x:Bind ViewModel.SelectedAdapter, Mode=TwoWay}"
                                                   HorizontalAlignment="Stretch" DisplayMemberPath="DisplayName" />
-                                        <Button Grid.Column="2" Content="🔄 重新整理網卡" Command="{x:Bind ViewModel.RefreshNetworkAdaptersCommand}" />
-                                        <Button Grid.Column="3" Content="⚡ 測試全網 DNS 延遲 (Ping)" Command="{x:Bind ViewModel.TestDnsPingCommand}"
+                                        <Button Grid.Row="0" Grid.Column="2" Content="🔄 重新整理網卡" Command="{x:Bind ViewModel.RefreshNetworkAdaptersCommand}" />
+                                        <Button Grid.Row="1" Grid.Column="0" Content="⚡ 測試全網 DNS 延遲 (Ping)" Command="{x:Bind ViewModel.TestDnsPingCommand}"
                                                 Style="{StaticResource AccentButtonStyle}" />
-                                        <TextBlock Grid.Column="4" Text="{x:Bind ViewModel.DnsPingSummary, Mode=OneWay}"
-                                                   VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" />
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Text="{x:Bind ViewModel.DnsPingSummary, Mode=OneWay}"
+                                                   VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" />
                                     </Grid>
 
                                     <!-- DNS Presets Grid -->
@@ -344,73 +310,135 @@
                     </ScrollViewer>
                 </TabViewItem>
 
-                <!-- ════ Tab 3: 為什麼網路慢？智慧診斷 ════ -->
-                <TabViewItem x:Name="TabDiagnostic" Header="🩺 智慧連線卡頓診斷" IsClosable="False">
+                <!-- ════ Tab 1: UPnP 自動通訊埠轉發 ════ -->
+                <TabViewItem x:Name="TabUpnp" Header="🔀 UPnP 自動通訊埠轉發" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
                         <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
-                            <!-- Hero Diagnostic Card -->
+                            <!-- Status & Quick Presets -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                                    CornerRadius="8" Padding="18">
-                                <Grid ColumnSpacing="16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <FontIcon Grid.Column="0" Glyph="&#xE95A;" FontSize="40" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
-                                    <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
-                                        <TextBlock Text="智慧 5 階段連線延遲與瓶頸自動探測" FontWeight="Bold" FontSize="16" />
-                                        <TextBlock Text="{x:Bind ViewModel.DiagnosticSummary, Mode=OneWay}"
-                                                   Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                                    </StackPanel>
-                                    <Button Grid.Column="2" Content="🩺 開始智慧診斷" Command="{x:Bind ViewModel.RunSmartDiagnosticsCommand}"
-                                            Style="{StaticResource AccentButtonStyle}" Padding="16,8" VerticalAlignment="Center" />
-                                </Grid>
-                            </Border>
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon Grid.Column="0" Glyph="&#xE968;" FontSize="22" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Spacing="2">
+                                            <TextBlock x:Name="UpnpTitleText" Text="UPnP NAT-T / IGD 路由器自動通訊埠轉發" FontWeight="SemiBold" FontSize="15" />
+                                            <TextBlock Text="{x:Bind ViewModel.LocalIpAddress, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='本機區域網路 IP: {0}'}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Content="🔄 探索路由器" Command="{x:Bind ViewModel.RefreshUpnpCommand}"
+                                                VerticalAlignment="Center" />
+                                    </Grid>
 
-                            <!-- Results List -->
-                            <ListView ItemsSource="{x:Bind ViewModel.DiagnosticResults, Mode=OneWay}" SelectionMode="None"
-                                      HorizontalAlignment="Stretch"
-                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                      ScrollViewer.HorizontalScrollMode="Disabled">
-                                <ListView.ItemContainerStyle>
-                                    <Style TargetType="ListViewItem">
-                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                    </Style>
-                                </ListView.ItemContainerStyle>
-                                <ListView.ItemTemplate>
-                                    <DataTemplate x:DataType="services:DiagnosticStepResult">
-                                        <Border HorizontalAlignment="Stretch" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                                                CornerRadius="8" Padding="14" Margin="0,4,0,4">
-                                            <Grid ColumnSpacing="12">
+                                    <!-- Quick Game Presets Buttons (Responsive 2x3 Grid) -->
+                                    <TextBlock Text="熱門遊戲與伺服器範本快速載入：" FontWeight="SemiBold" FontSize="13" />
+                                    <Grid ColumnSpacing="10" RowSpacing="8" HorizontalAlignment="Stretch">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Button Grid.Row="0" Grid.Column="0" Content="⛏️ Minecraft (25565)" Click="PresetMinecraft_Click" HorizontalAlignment="Stretch" />
+                                        <Button Grid.Row="0" Grid.Column="1" Content="🎮 Steam CS2 (27015)" Click="PresetSteam_Click" HorizontalAlignment="Stretch" />
+                                        <Button Grid.Row="0" Grid.Column="2" Content="🌳 Terraria (7777)" Click="PresetTerraria_Click" HorizontalAlignment="Stretch" />
+                                        <Button Grid.Row="1" Grid.Column="0" Content="🐺 Palworld (8211)" Click="PresetPalworld_Click" HorizontalAlignment="Stretch" />
+                                        <Button Grid.Row="1" Grid.Column="1" Content="🖥️ Windows 遠端桌面 (3389)" Click="PresetRdp_Click" HorizontalAlignment="Stretch" />
+                                        <Button Grid.Row="1" Grid.Column="2" Content="🎬 Plex 串流 (32400)" Click="PresetPlex_Click" HorizontalAlignment="Stretch" />
+                                    </Grid>
+
+                                    <!-- Manual Add Rule Form -->
+                                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
+                                        <StackPanel Spacing="8">
+                                            <Grid ColumnSpacing="8">
                                                 <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="110" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox Grid.Column="0" Header="外部通訊埠 (WAN Port)" Text="{x:Bind ViewModel.NewExternalPort, Mode=TwoWay}" />
+                                                <TextBox Grid.Column="1" Header="內部通訊埠 (LAN Port)" Text="{x:Bind ViewModel.NewInternalPort, Mode=TwoWay}" />
+                                                <ComboBox Grid.Column="2" Header="協定" SelectedValue="{x:Bind ViewModel.NewProtocol, Mode=TwoWay}" HorizontalAlignment="Stretch">
+                                                    <ComboBoxItem Content="TCP" />
+                                                    <ComboBoxItem Content="UDP" />
+                                                </ComboBox>
+                                            </Grid>
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="Auto" />
                                                 </Grid.ColumnDefinitions>
-
-                                                <FontIcon Grid.Column="0" Glyph="&#xE73E;" FontSize="20"
-                                                          Foreground="{ThemeResource SystemFillColorSuccessBrush}" VerticalAlignment="Center" />
-
-                                                <StackPanel Grid.Column="1" Spacing="2">
-                                                    <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" FontSize="14" />
-                                                    <TextBlock Text="{x:Bind Details}" Style="{StaticResource CaptionTextBlockStyle}" />
-                                                    <TextBlock Text="{x:Bind Recommendation}" FontSize="12" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                                                </StackPanel>
-
-                                                <TextBlock Grid.Column="2" Text="{x:Bind LatencyDisplay}"
-                                                           FontWeight="Bold" VerticalAlignment="Center" />
+                                                <TextBox Grid.Column="0" Header="規則備註 (Description)" Text="{x:Bind ViewModel.NewDescription, Mode=TwoWay}" />
+                                                <Button Grid.Column="1" Content="➕ 新增轉發規則" Command="{x:Bind ViewModel.AddPortMappingCommand}"
+                                                        Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Bottom" Padding="16,6" />
                                             </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ListView.ItemTemplate>
-                            </ListView>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Mappings List -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="路由器現存 UPnP 轉發清單" FontWeight="SemiBold" />
+                                    <ListView ItemsSource="{x:Bind ViewModel.PortMappings, Mode=OneWay}" SelectionMode="None" MaxHeight="300"
+                                              HorizontalAlignment="Stretch"
+                                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                              ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="models:UpnpPortMappingItem">
+                                                <Grid HorizontalAlignment="Stretch" Padding="4,6" ColumnSpacing="12">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Grid.Column="0" Background="{ThemeResource AccentFillColorTertiaryBrush}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                                                        <TextBlock Text="{x:Bind Protocol}" FontWeight="Bold" FontSize="11" />
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                        <TextBlock Text="{x:Bind Description}" FontWeight="SemiBold" />
+                                                        <TextBlock Text="{x:Bind ExternalPort, Converter={StaticResource StringFormatConverter}, ConverterParameter='外部埠: {0}'}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="2" Text="{x:Bind InternalClient}" VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" />
+                                                    <Button Grid.Column="3" Content="🗑️ 刪除" Click="DeletePortMapping_Click"
+                                                            Padding="8,2" FontSize="11" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </ScrollViewer>
                 </TabViewItem>
+
+                        </TabView.TabItems>
+                    </TabView>
+                </TabViewItem>
+
+                <!-- ════════ 類別 2：📁 檔案與系統（Hosts / 網路共用）════════ -->
+                <TabViewItem x:Name="TabCategoryFiles" Header="📁 檔案與系統" IsClosable="False">
+                    <TabView x:Name="FileSystemTabView"
+                             IsAddTabButtonVisible="False" CanDragTabs="False" CanReorderTabs="False"
+                             TabWidthMode="SizeToContent" Margin="0,8,0,0">
+                        <TabView.TabItems>
 
                 <!-- ════ Tab 4: Windows Hosts 檔案視覺化編輯器 ════ -->
                 <TabViewItem x:Name="TabHosts" Header="📝 Hosts 檔案編輯器" IsClosable="False">
@@ -427,52 +455,45 @@
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                                 CornerRadius="8" Padding="14">
                             <StackPanel Spacing="10">
-                                <Grid ColumnSpacing="8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <StackPanel Spacing="8">
+                                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                         <FontIcon Glyph="&#xE70F;" FontSize="15" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
                                         <TextBlock Text="Windows 本機網域名稱解析 (C:\Windows\System32\drivers\etc\hosts)" FontWeight="SemiBold" VerticalAlignment="Center" />
                                     </StackPanel>
-                                    <!-- Icon-only actions (Notepad/Explorer style): glyph + tooltip + accessible name -->
-                                    <Button Grid.Column="1" Command="{x:Bind ViewModel.RefreshHostsCommand}"
-                                            MinWidth="0" Padding="10,7"
-                                            ToolTipService.ToolTip="重新整理 (從磁碟重新載入 Hosts 檔案)"
-                                            AutomationProperties.Name="重新整理 Hosts 檔案">
-                                        <FontIcon Glyph="&#xE72C;" FontSize="15" AutomationProperties.AccessibilityView="Raw" />
-                                    </Button>
-                                    <Button Grid.Column="2" Command="{x:Bind ViewModel.RunHostsCheckCommand}"
-                                            MinWidth="0" Padding="10,7"
-                                            ToolTipService.ToolTip="智慧體檢 (分析語法、重複與高風險項目)"
-                                            AutomationProperties.Name="Hosts 智慧體檢">
-                                        <FontIcon Glyph="&#xE9D9;" FontSize="15" AutomationProperties.AccessibilityView="Raw" />
-                                    </Button>
-                                    <Button Grid.Column="3" Command="{x:Bind ViewModel.ToggleBackupDrawerCommand}"
-                                            MinWidth="0" Padding="10,7"
-                                            ToolTipService.ToolTip="歷史備份 (多版本快照與還原)"
-                                            AutomationProperties.Name="Hosts 歷史備份">
-                                        <FontIcon Glyph="&#xE81C;" FontSize="15" AutomationProperties.AccessibilityView="Raw" />
-                                    </Button>
-                                    <Button Grid.Column="4" Command="{x:Bind ViewModel.RestoreDefaultHostsCommand}"
-                                            MinWidth="0" Padding="10,7"
-                                            ToolTipService.ToolTip="還原預設 (回復 Windows 官方 Hosts 內容)"
-                                            AutomationProperties.Name="還原預設 Hosts">
-                                        <FontIcon Glyph="&#xE7A7;" FontSize="15" AutomationProperties.AccessibilityView="Raw" />
-                                    </Button>
-                                    <Button Grid.Column="5" Command="{x:Bind ViewModel.SaveRawHostsCommand}"
-                                            Style="{StaticResource AccentButtonStyle}"
-                                            MinWidth="0" Padding="10,7"
-                                            ToolTipService.ToolTip="儲存 Hosts (寫入 C:\Windows\System32\drivers\etc\hosts)"
-                                            AutomationProperties.Name="儲存 Hosts 檔案">
-                                        <FontIcon Glyph="&#xE74E;" FontSize="15" AutomationProperties.AccessibilityView="Raw" />
-                                    </Button>
-                                </Grid>
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Button Command="{x:Bind ViewModel.RefreshHostsCommand}"
+                                                MinWidth="0" Padding="10,7"
+                                                ToolTipService.ToolTip="重新整理 (從磁碟重新載入 Hosts 檔案)"
+                                                AutomationProperties.Name="重新整理 Hosts 檔案">
+                                            <FontIcon Glyph="&#xE72C;" FontSize="15" AutomationProperties.AccessibilityView="Raw" />
+                                        </Button>
+                                        <Button Command="{x:Bind ViewModel.RunHostsCheckCommand}"
+                                                MinWidth="0" Padding="10,7"
+                                                ToolTipService.ToolTip="智慧體檢 (分析語法、重複與高風險項目)"
+                                                AutomationProperties.Name="Hosts 智慧體檢">
+                                            <FontIcon Glyph="&#xE9D9;" FontSize="15" AutomationProperties.AccessibilityView="Raw" />
+                                        </Button>
+                                        <Button Command="{x:Bind ViewModel.ToggleBackupDrawerCommand}"
+                                                MinWidth="0" Padding="10,7"
+                                                ToolTipService.ToolTip="歷史備份 (多版本快照與還原)"
+                                                AutomationProperties.Name="Hosts 歷史備份">
+                                            <FontIcon Glyph="&#xE81C;" FontSize="15" AutomationProperties.AccessibilityView="Raw" />
+                                        </Button>
+                                        <Button Command="{x:Bind ViewModel.RestoreDefaultHostsCommand}"
+                                                MinWidth="0" Padding="10,7"
+                                                ToolTipService.ToolTip="還原預設 (回復 Windows 官方 Hosts 內容)"
+                                                AutomationProperties.Name="還原預設 Hosts">
+                                            <FontIcon Glyph="&#xE7A7;" FontSize="15" AutomationProperties.AccessibilityView="Raw" />
+                                        </Button>
+                                        <Button Command="{x:Bind ViewModel.SaveRawHostsCommand}"
+                                                Style="{StaticResource AccentButtonStyle}"
+                                                MinWidth="0" Padding="10,7"
+                                                ToolTipService.ToolTip="儲存 Hosts (寫入 C:\Windows\System32\drivers\etc\hosts)"
+                                                AutomationProperties.Name="儲存 Hosts 檔案">
+                                            <FontIcon Glyph="&#xE74E;" FontSize="15" AutomationProperties.AccessibilityView="Raw" />
+                                        </Button>
+                                    </StackPanel>
+                                </StackPanel>
 
                                 <!-- Quick Add Form -->
                                 <Grid ColumnSpacing="8">
@@ -952,6 +973,16 @@
                         </StackPanel>
                     </ScrollViewer>
                 </TabViewItem>
+                        </TabView.TabItems>
+                    </TabView>
+                </TabViewItem>
+
+                <!-- ════════ 類別 3：⚙️ 進階（遠端桌面 / CMD 網路工具箱）════════ -->
+                <TabViewItem x:Name="TabCategoryAdvanced" Header="⚙️ 進階" IsClosable="False">
+                    <TabView x:Name="AdvancedTabView"
+                             IsAddTabButtonVisible="False" CanDragTabs="False" CanReorderTabs="False"
+                             TabWidthMode="SizeToContent" Margin="0,8,0,0">
+                        <TabView.TabItems>
 
                 <!-- ════ Tab 6: 遠端桌面服務 (Remote RDP Server & RDP Wrapper) ════ -->
                 <TabViewItem x:Name="TabRdp" Header="🖥️ 遠端桌面 (RDP Server)" IsClosable="False">
@@ -1315,25 +1346,21 @@
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                                     CornerRadius="8" Padding="16">
                                 <StackPanel Spacing="12">
-                                    <Grid ColumnSpacing="10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" Spacing="2">
-                                            <TextBlock Text="⚡ 全域 TCP 視窗自動微調與協定堆疊設定 (netsh int tcp set global autotuninglevel)" FontWeight="Bold" FontSize="14" />
+                                    <StackPanel Spacing="10">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="⚡ 全域 TCP 視窗自動微調與協定堆疊設定 (netsh int tcp set global autotuninglevel)" FontWeight="Bold" FontSize="14" TextWrapping="Wrap" />
                                             <TextBlock Text="{x:Bind ViewModel.TcpStatusMessage, Mode=OneWay}" FontSize="12"
                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                         </StackPanel>
-                                        <Button Grid.Column="1" Content="🔄 讀取目前狀態" Command="{x:Bind ViewModel.RefreshTcpGlobalCommand}"
-                                                Padding="10,6" FontSize="12" AutomationProperties.Name="讀取目前全域 TCP 狀態" />
-                                        <Button Grid.Column="2" Content="🚀 極速大頻寬最佳化" Command="{x:Bind ViewModel.ApplyTcpExtremePresetCommand}"
-                                                Padding="10,6" FontSize="12" ToolTipService.ToolTip="一鍵開啟 AutoTuning + ECN + RSS + RSC + BBR/CUBIC" />
-                                        <Button Grid.Column="3" Content="↩️ 還原官方預設" Command="{x:Bind ViewModel.RestoreTcpDefaultPresetCommand}"
-                                                Padding="10,6" FontSize="12" />
-                                    </Grid>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Button Content="🔄 讀取目前狀態" Command="{x:Bind ViewModel.RefreshTcpGlobalCommand}"
+                                                    Padding="10,6" FontSize="12" AutomationProperties.Name="讀取目前全域 TCP 狀態" />
+                                            <Button Content="🚀 極速大頻寬最佳化" Command="{x:Bind ViewModel.ApplyTcpExtremePresetCommand}"
+                                                    Padding="10,6" FontSize="12" ToolTipService.ToolTip="一鍵開啟 AutoTuning + ECN + RSS + RSC + BBR/CUBIC" />
+                                            <Button Content="↩️ 還原官方預設" Command="{x:Bind ViewModel.RestoreTcpDefaultPresetCommand}"
+                                                    Padding="10,6" FontSize="12" />
+                                        </StackPanel>
+                                    </StackPanel>
 
                                     <!-- Live TCP Parameter Badges -->
                                     <Grid ColumnSpacing="8">
@@ -1409,18 +1436,22 @@
                                     </Grid>
 
                                     <!-- 1-Click Quick Level Presets -->
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <TextBlock Text="快速切換微調等級：" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
-                                        <Button Content="normal (預設推薦)" Tag="normal" Click="TcpLevelPreset_Click" Padding="8,4" FontSize="11"
-                                                ToolTipService.ToolTip="netsh int tcp set global autotuninglevel=normal (標準動態調整接收視窗)" />
-                                        <Button Content="experimental (萬兆/跨國大頻寬)" Tag="experimental" Click="TcpLevelPreset_Click" Padding="8,4" FontSize="11"
-                                                ToolTipService.ToolTip="netsh int tcp set global autotuninglevel=experimental (允許極大接收視窗，適合高延遲高頻寬連線)" />
-                                        <Button Content="restricted (相容舊路由器)" Tag="restricted" Click="TcpLevelPreset_Click" Padding="8,4" FontSize="11"
-                                                ToolTipService.ToolTip="netsh int tcp set global autotuninglevel=restricted (適度限制接收視窗成長幅度)" />
-                                        <Button Content="highlyrestricted (高度保守)" Tag="highlyrestricted" Click="TcpLevelPreset_Click" Padding="8,4" FontSize="11"
-                                                ToolTipService.ToolTip="netsh int tcp set global autotuninglevel=highlyrestricted (非常保守地放大接收視窗)" />
-                                        <Button Content="disabled (停用自動微調)" Tag="disabled" Click="TcpLevelPreset_Click" Padding="8,4" FontSize="11"
-                                                ToolTipService.ToolTip="netsh int tcp set global autotuninglevel=disabled (固定接收視窗，排查特定遊戲或老舊防火牆掉包時使用)" />
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="快速切換微調等級：" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <Button Content="normal (預設推薦)" Tag="normal" Click="TcpLevelPreset_Click" Padding="8,4" FontSize="11"
+                                                    ToolTipService.ToolTip="netsh int tcp set global autotuninglevel=normal (標準動態調整接收視窗)" />
+                                            <Button Content="experimental (萬兆/跨國大頻寬)" Tag="experimental" Click="TcpLevelPreset_Click" Padding="8,4" FontSize="11"
+                                                    ToolTipService.ToolTip="netsh int tcp set global autotuninglevel=experimental (允許極大接收視窗，適合高延遲高頻寬連線)" />
+                                            <Button Content="restricted (相容舊路由器)" Tag="restricted" Click="TcpLevelPreset_Click" Padding="8,4" FontSize="11"
+                                                    ToolTipService.ToolTip="netsh int tcp set global autotuninglevel=restricted (適度限制接收視窗成長幅度)" />
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <Button Content="highlyrestricted (高度保守)" Tag="highlyrestricted" Click="TcpLevelPreset_Click" Padding="8,4" FontSize="11"
+                                                    ToolTipService.ToolTip="netsh int tcp set global autotuninglevel=highlyrestricted (非常保守地放大接收視窗)" />
+                                            <Button Content="disabled (停用自動微調)" Tag="disabled" Click="TcpLevelPreset_Click" Padding="8,4" FontSize="11"
+                                                    ToolTipService.ToolTip="netsh int tcp set global autotuninglevel=disabled (固定接收視窗，排查特定遊戲或老舊防火牆掉包時使用)" />
+                                        </StackPanel>
                                     </StackPanel>
 
                                     <Expander Header="📄 檢視完整 netsh int tcp show global 原始輸出" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
@@ -1648,7 +1679,7 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0" Spacing="2">
-                                            <TextBlock Text="🔐 L2TP/IPsec VPN 無法連線修復 (AssumeUDPEncapsulationContextOnSendRule = 2)" FontWeight="Bold" FontSize="14" />
+                                            <TextBlock Text="🔐 L2TP/IPsec VPN 無法連線修復 (AssumeUDPEncapsulationContextOnSendRule = 2)" FontWeight="Bold" FontSize="14" TextWrapping="Wrap" />
                                             <TextBlock Text="修復 Windows 10/11 連線至 NAT 路由器後方 L2TP/IPsec VPN 伺服器時卡在「正在連線」或報錯 789 / 809 的問題。寫入 HKLM\SYSTEM\CurrentControlSet\Services\PolicyAgent 下 AssumeUDPEncapsulationContextOnSendRule = 2 (REG_DWORD)，重開機後生效。"
                                                        Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                                         </StackPanel>
@@ -1664,6 +1695,9 @@
 
                         </StackPanel>
                     </ScrollViewer>
+                </TabViewItem>
+                        </TabView.TabItems>
+                    </TabView>
                 </TabViewItem>
 
             </TabView.TabItems>

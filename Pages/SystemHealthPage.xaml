@@ -15,7 +15,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" MinHeight="220" />
+            <RowDefinition Height="*" MinHeight="120" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="220" MinHeight="100" x:Name="ConsoleRowDef" />
         </Grid.RowDefinitions>
@@ -29,7 +29,8 @@
             </Grid.ColumnDefinitions>
 
             <TextBlock Grid.Column="0" Text="{x:Bind ViewModel.CurrentStatus, Mode=OneWay}"
-                       VerticalAlignment="Center" Style="{StaticResource SubtitleTextBlockStyle}" />
+                       VerticalAlignment="Center" Style="{StaticResource SubtitleTextBlockStyle}"
+                       TextTrimming="CharacterEllipsis" />
 
             <ProgressRing Grid.Column="1" IsActive="{x:Bind ViewModel.IsRunning, Mode=OneWay}"
                           Width="24" Height="24" Margin="0,0,12,0" />
@@ -174,7 +175,7 @@
         </Grid>
 
         <!-- ═══ System Health Tools, Windows Update & Cleanup ═══ -->
-        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
+        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch">
             <StackPanel Spacing="12">
                 <!-- ═══ Windows Update 修復與更新管理 ═══ -->
                 <Expander x:Name="WindowsUpdateExpander" Header="🔄 Windows Update 修復與更新管理 (Update Repair &amp; Reset)"

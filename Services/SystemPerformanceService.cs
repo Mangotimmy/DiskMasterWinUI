@@ -1089,6 +1089,8 @@ public partial class SystemPerformanceService
 
             // 1. Get process list from .NET Process API
             var procs = Process.GetProcesses();
+            try
+            {
             var dict = new Dictionary<int, Process>();
             foreach (var p in procs)
             {
@@ -1147,6 +1149,17 @@ public partial class SystemPerformanceService
             }
 
             return list.OrderByDescending(x => x.MemoryBytes).ToList();
+            }
+            finally
+            {
+                // Each Process object owns a native handle to the target process. Without this the
+                // enumeration retains one handle per running process until a finalizer pass (measured:
+                // +300 handles per call), which is a native handle leak on a polled UI surface.
+                foreach (var p in procs)
+                {
+                    try { p.Dispose(); } catch { }
+                }
+            }
         }, ct);
     }
 

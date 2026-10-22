@@ -33,6 +33,12 @@ public sealed partial class MainWindow : Window
     public TrayIconService TrayService { get; } = new();
 
     private double _currentZoom = 1.0;
+
+    // Typography bookkeeping: the per-element font walk is expensive on a big page (Network Tools
+    // has thousands of elements), so it only runs when the effective typography actually differs
+    // from the default. This removes the multi-second first-open hitch for default settings.
+    private string _lastAppliedTypographySignature = "";
+    private bool _typographyNeedsReset;
     private bool _isShowingDialog = false;
     private bool _suppressWorkspaceSelectionChanged = false;
     private bool _isApplyingWorkspacePreset = false;
@@ -578,6 +584,47 @@ public sealed partial class MainWindow : Window
     {
     }
 
+    /// <summary>
+    /// Effective text scale: the user's custom font scale multiplied by the interface zoom.
+    /// Zoom is implemented as text scaling on purpose — the old ScaleTransform viewport drew the
+    /// whole page scaled and top-left aligned, which left blank bands and could spin a layout loop;
+    /// scaling the text instead keeps every page laid out at full viewport size (and therefore filled).
+    /// </summary>
+    public double EffectiveFontScaleFactor()
+    {
+        var s = SettingsService.Instance.Current;
+        double fontScale = (s.CustomFontScale > 0 ? s.CustomFontScale : 100.0) / 100.0;
+        double zoomScale = Math.Clamp(_currentZoom, 0.8, 1.5);
+        // Keep text legible: below 100% zoom only go to 90% (85/90% auto-detect no longer shrinks text
+        // into unreadability), above 100% allow the full zoom.
+        double zoomForText = zoomScale < 1.0 ? Math.Max(0.9, zoomScale) : zoomScale;
+        return Math.Clamp(fontScale * zoomForText, 0.6, 3.0);
+    }
+
+    /// <summary>Applies the current font family and effective (font scale x zoom) size to one page.</summary>
+    private void ApplyFontToPage(Page? page)
+    {
+        if (page == null) return;
+        var fontName = SettingsService.Instance.Current.CustomFontFamily;
+        if (string.IsNullOrWhiteSpace(fontName)) fontName = "Segoe UI Variable";
+        double factor = EffectiveFontScaleFactor();
+
+        // Default typography (Segoe UI Variable at 100%) is exactly what the XAML already declares,
+        // so walking the whole tree would only burn UI-thread time for no visual change. The walk is
+        // skipped unless a non-default typography was applied at some point (then it must run to
+        // reset the sizes back to their originals).
+        if (!_typographyNeedsReset && factor > 0.999 && factor < 1.001 && IsDefaultFont(fontName))
+        {
+            return;
+        }
+
+        FontScaleHelper.ApplyFontAndScale(page, new FontFamily(fontName), factor);
+    }
+
+    private static bool IsDefaultFont(string? fontName) =>
+        string.IsNullOrWhiteSpace(fontName) ||
+        fontName.Equals("Segoe UI Variable", StringComparison.OrdinalIgnoreCase);
+
     public void ApplyCustomFont()
     {
         var fontName = SettingsService.Instance.Current.CustomFontFamily;
@@ -586,8 +633,17 @@ public sealed partial class MainWindow : Window
             fontName = "Segoe UI Variable";
         }
 
-        var scalePercent = SettingsService.Instance.Current.CustomFontScale > 0 ? SettingsService.Instance.Current.CustomFontScale : 100.0;
-        double scaleFactor = scalePercent / 100.0;
+        double scaleFactor = EffectiveFontScaleFactor();
+        bool isDefaultTypography = scaleFactor > 0.999 && scaleFactor < 1.001 && IsDefaultFont(fontName);
+
+        // Skip the whole-application walk when the requested typography is the default one and no
+        // non-default typography is currently applied. This is the difference between a multi-second
+        // hitch and no work at all on every settings save.
+        string signature = fontName + "|" + scaleFactor.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
+        if (string.Equals(signature, _lastAppliedTypographySignature, StringComparison.Ordinal)) return;
+        _lastAppliedTypographySignature = signature;
+        if (isDefaultTypography && !_typographyNeedsReset) return;
+        _typographyNeedsReset = !isDefaultTypography;
 
         try
         {
@@ -1020,11 +1076,11 @@ public sealed partial class MainWindow : Window
                 _ => new Page()
             };
 
-            var fontName = SettingsService.Instance.Current.CustomFontFamily;
-            if (string.IsNullOrWhiteSpace(fontName)) fontName = "Segoe UI Variable";
-            var scalePercent = SettingsService.Instance.Current.CustomFontScale > 0 ? SettingsService.Instance.Current.CustomFontScale : 100.0;
-            double scaleFactor = scalePercent / 100.0;
-            FontScaleHelper.ApplyFontAndScale(page, new FontFamily(fontName), scaleFactor);
+            // Font/scale is applied once when the page is created (and again only when the user changes
+            // the typography or zoom). It used to be re-applied on every tab switch, which walked the
+            // whole visual tree of every page on every navigation and was a direct contributor to the
+            // UI-thread freezes when switching away from the Network Tools page.
+            ApplyFontToPage(page);
 
             return page;
         }
@@ -2526,7 +2582,7 @@ public sealed partial class MainWindow : Window
         };
         TabSettings.Header = loc["Settings"];
 
-        LanguageToggleBtn.Content = loc.CurrentLanguage switch
+        LanguageToggleBtn.Text = loc.CurrentLanguage switch
         {
             "zh-CN" => "🌐 简体中文",
             "en-US" => "🌐 English",
@@ -2574,6 +2630,13 @@ public sealed partial class MainWindow : Window
     private string? _currentNavigatedTag;
     private bool _isNavigating;
 
+    // ── Coalesced tab switching ──
+    // Rapid clicking through the tab strip used to run a full detach/attach/layout pass per click.
+    // Bursts are now folded into a single navigation on the next dispatcher turn: only the last
+    // requested tab is honoured, which is what the user sees anyway.
+    private string? _pendingNavigationTag;
+    private bool _navigationQueued;
+
     public void NavigateToTag(string? tag)
     {
         if (string.IsNullOrEmpty(tag)) return;
@@ -2614,11 +2677,6 @@ public sealed partial class MainWindow : Window
             DetachPageFromAllHosts(page);
             ContentFrame.Content = page;
 
-            var fontName = SettingsService.Instance.Current.CustomFontFamily;
-            if (string.IsNullOrWhiteSpace(fontName)) fontName = "Segoe UI Variable";
-            var scalePercent = SettingsService.Instance.Current.CustomFontScale > 0 ? SettingsService.Instance.Current.CustomFontScale : 100.0;
-            FontScaleHelper.ApplyFontAndScale(page, new FontFamily(fontName), scalePercent / 100.0);
-
             UpdateViewportLayout();
 
             sw.Stop();
@@ -2649,12 +2707,49 @@ public sealed partial class MainWindow : Window
         {
             if (MainTabs.SelectedItem is TabViewItem item)
             {
-                NavigateToTag(item.Tag?.ToString());
+                RequestNavigation(item.Tag?.ToString());
             }
         }
         catch (Exception ex)
         {
             GlobalExceptionHandler.ReportException(ex, "MainTabs_SelectionChanged");
+        }
+    }
+
+    /// <summary>
+    /// Queues a navigation and folds a burst of rapid tab switches into one dispatcher turn.
+    /// This is the user-facing hardening for "click through the tabs quickly and the app freezes":
+    /// the tab strip may raise SelectionChanged many times in a row, but the expensive detach/re-attach
+    /// plus layout only ever runs once for the tab the user actually settled on.
+    /// </summary>
+    private void RequestNavigation(string? tag)
+    {
+        if (string.IsNullOrEmpty(tag)) return;
+        _pendingNavigationTag = tag;
+        if (_navigationQueued) return;
+        _navigationQueued = true;
+
+        if (!DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal, () =>
+        {
+            _navigationQueued = false;
+            var target = _pendingNavigationTag;
+            _pendingNavigationTag = null;
+            if (string.IsNullOrEmpty(target)) return;
+            try
+            {
+                NavigateToTag(target);
+            }
+            catch (Exception ex)
+            {
+                GlobalExceptionHandler.ReportException(ex, $"RequestNavigation({target})");
+            }
+        }))
+        {
+            // Queue shutting down: fall back to an immediate navigation so no click is lost.
+            _navigationQueued = false;
+            var target = _pendingNavigationTag;
+            _pendingNavigationTag = null;
+            if (!string.IsNullOrEmpty(target)) NavigateToTag(target);
         }
     }
 
@@ -2676,6 +2771,13 @@ public sealed partial class MainWindow : Window
 
     private bool _isUpdatingLayout = false;
 
+    /// <summary>
+    /// Keeps the central viewport filled. The hosted page stretches to the viewport width and to at
+    /// least one full viewport height, so no page can collapse to its content height and leave a blank
+    /// band at the bottom (the old ScaleTransform zoom did exactly that). Taller content still scrolls
+    /// through the outer ScrollViewer. This is the only remaining piece of the former zoom layout:
+    /// it sets a minimum height and clears any leftover fixed width/margin from earlier builds.
+    /// </summary>
     public void UpdateViewportLayout()
     {
         if (_isUpdatingLayout) return;
@@ -2683,79 +2785,50 @@ public sealed partial class MainWindow : Window
         try
         {
             if (ContentScrollViewer == null || ContentRoot == null) return;
-            var viewportW = ContentScrollViewer.ActualWidth;
-            var viewportH = ContentScrollViewer.ActualHeight;
-            if (viewportW <= 0) return;
 
-            var contentH = ContentFrame?.ActualHeight ?? ContentRoot.ActualHeight;
-            var (layoutW, offsetX, bottomMargin, factor) = DisplayHelper.CalculateScaledViewportLayout(
-                viewportW, viewportH, contentH, _currentZoom);
+            double viewportH = ContentScrollViewer.ViewportHeight;
+            if (double.IsNaN(viewportH) || viewportH <= 0) viewportH = ContentScrollViewer.ActualHeight;
+            if (viewportH <= 0) return;
 
-            if (Math.Abs(ContentRoot.Width - layoutW) > 0.1)
+            // Fill the viewport: short pages stretch to the full height instead of stopping early.
+            if (Math.Abs(ContentRoot.MinHeight - viewportH) > 0.5)
             {
-                ContentRoot.Width = layoutW;
+                ContentRoot.MinHeight = viewportH;
             }
-            ContentRoot.MaxWidth = layoutW;
+
+            // Neutralise the legacy zoom layout (fixed width / max width / margins / explicit height)
+            // that used to be written here by CalculateScaledViewportLayout.
+            if (!double.IsNaN(ContentRoot.Width)) ContentRoot.ClearValue(FrameworkElement.WidthProperty);
+            if (!double.IsNaN(ContentRoot.MaxWidth)) ContentRoot.ClearValue(FrameworkElement.MaxWidthProperty);
+            if (ContentRoot.Margin != new Thickness(0)) ContentRoot.Margin = new Thickness(0);
+
             if (ContentFrame != null)
             {
-                ContentFrame.Width = layoutW;
-                ContentFrame.MaxWidth = layoutW;
-            }
-            if (Math.Abs(RootScaleTransform.ScaleX - factor) > 0.001)
-            {
-                RootScaleTransform.ScaleX = factor;
-                RootScaleTransform.ScaleY = factor;
+                if (!double.IsNaN(ContentFrame.Width)) ContentFrame.ClearValue(FrameworkElement.WidthProperty);
+                if (!double.IsNaN(ContentFrame.MaxWidth)) ContentFrame.ClearValue(FrameworkElement.MaxWidthProperty);
             }
 
-            if (_currentNavigatedTag == "EasyMode" && viewportH > 0)
+            if (_currentNavigatedTag == "EasyMode")
             {
-                if (ContentScrollViewer.VerticalScrollBarVisibility != ScrollBarVisibility.Disabled)
-                    ContentScrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
-                var layoutH = Math.Max(520, (viewportH - 4) / factor);
-                if (Math.Abs(ContentRoot.Height - layoutH) > 0.1)
-                    ContentRoot.Height = layoutH;
-                var newMargin = new Thickness(offsetX, 0, 0, 0);
-                if (ContentRoot.Margin != newMargin)
-                    ContentRoot.Margin = newMargin;
+                // Easy Mode is a fixed dashboard: let it fill the viewport exactly (and follow the
+                // window while it is resized).
+                if (Math.Abs(ContentRoot.Height - viewportH) > 0.5) ContentRoot.Height = viewportH;
             }
-            else
+            else if (!double.IsNaN(ContentRoot.Height) && !double.IsPositiveInfinity(ContentRoot.Height))
             {
-                if (ContentScrollViewer.VerticalScrollBarVisibility != ScrollBarVisibility.Auto)
-                    ContentScrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
                 ContentRoot.ClearValue(FrameworkElement.HeightProperty);
-                var newMargin = new Thickness(offsetX, 0, 0, bottomMargin);
-                if (ContentRoot.Margin != newMargin)
-                    ContentRoot.Margin = newMargin;
             }
 
+            if (ContentScrollViewer.VerticalScrollBarVisibility != ScrollBarVisibility.Auto)
+                ContentScrollViewer.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
             if (ContentScrollViewer.HorizontalOffset != 0)
-            {
                 ContentScrollViewer.ChangeView(0, null, null, disableAnimation: true);
-            }
 
             CompanionControl?.AutoDetectAndSnapToEdge(IsRightDockOpen, announce: false);
         }
         finally
         {
             _isUpdatingLayout = false;
-        }
-    }
-
-    private void ContentScrollViewer_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
-    {
-        if (ContentScrollViewer != null && ContentScrollViewer.HorizontalOffset != 0)
-        {
-            ContentScrollViewer.ChangeView(0, null, null, disableAnimation: true);
-        }
-    }
-
-    private void ContentRoot_BringIntoViewRequested(UIElement sender, BringIntoViewRequestedEventArgs args)
-    {
-        // Keep vertical BringIntoView working while clamping horizontal X to 0 so <100% scaled viewports never scroll horizontally
-        var r = args.TargetRect;
-        if (!double.IsNaN(r.X) && r.X != 0)
-        {
-            args.TargetRect = new Windows.Foundation.Rect(0, r.Y, Math.Min(1.0, Math.Max(0.0, r.Width)), r.Height);
         }
     }
 
@@ -2771,13 +2844,18 @@ public sealed partial class MainWindow : Window
 
     private void SetZoom(double factor)
     {
-        _currentZoom = factor;
+        _currentZoom = Math.Clamp(factor, 0.8, 1.5);
+
+        // Zoom is applied as text scaling so the page is re-laid-out at the full viewport size and
+        // therefore always fills the window (a ScaleTransform would shrink the drawn page and leave
+        // blank bands). All pages are re-applied here in one pass.
+        ApplyCustomFont();
         UpdateViewportLayout();
 
         var s = SettingsService.Instance.Current;
-        if (s.ScalePercent != (int)(factor * 100))
+        if (s.ScalePercent != (int)Math.Round(_currentZoom * 100))
         {
-            s.ScalePercent = (int)(factor * 100);
+            s.ScalePercent = (int)Math.Round(_currentZoom * 100);
             SettingsService.Instance.Save();
         }
     }

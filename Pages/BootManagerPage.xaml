@@ -18,49 +18,52 @@
         </Grid.RowDefinitions>
 
         <!-- ═══ Top Control Bar ═══ -->
-        <Grid Grid.Row="0" ColumnSpacing="8">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+        <StackPanel Grid.Row="0" Spacing="8">
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Command="{x:Bind ViewModel.RefreshEntriesCommand}"
+                        Style="{StaticResource AccentButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE72C;" FontSize="16" />
+                        <TextBlock x:Name="RefreshBcdBtnText" Text="Refresh BCD Entries" />
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="1" Command="{x:Bind ViewModel.ScanWindowsCommand}" HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE721;" FontSize="16" />
+                        <TextBlock x:Name="DeepScanBtnText" Text="🔍 全盤探測並掛載開機 (Deep Scan)" />
+                    </StackPanel>
+                </Button>
+            </Grid>
 
-            <Button Grid.Column="0" Command="{x:Bind ViewModel.RefreshEntriesCommand}"
-                    Style="{StaticResource AccentButtonStyle}">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE72C;" FontSize="16" />
-                    <TextBlock x:Name="RefreshBcdBtnText" Text="Refresh BCD Entries" />
-                </StackPanel>
-            </Button>
-
-            <Button Grid.Column="1" Command="{x:Bind ViewModel.ScanWindowsCommand}">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon Glyph="&#xE721;" FontSize="16" />
-                    <TextBlock x:Name="DeepScanBtnText" Text="🔍 全盤探測並掛載開機 (Deep Scan)" />
-                </StackPanel>
-            </Button>
-
-            <Button x:Name="MountEspBtn" Grid.Column="2" Content="💿 掛載 ESP" Command="{x:Bind ViewModel.MountEspCommand}"
-                    ToolTipService.ToolTip="掛載 ESP 系統開機分割區至 S: (mountvol /s)" />
-            <Button x:Name="UnmountEspBtn" Grid.Column="3" Content="⏏️ 卸載 ESP" Command="{x:Bind ViewModel.UnmountEspCommand}"
-                    ToolTipService.ToolTip="卸載 ESP 開機分割區 (mountvol /d)" />
-            <Button x:Name="BcdExportBtn" Grid.Column="4" Content="💾 備份 BCD" Command="{x:Bind ViewModel.BcdExportCommand}"
-                    ToolTipService.ToolTip="備份當前 BCD 設定至檔案" />
-            <Button x:Name="BcdImportBtn" Grid.Column="5" Content="📥 還原 BCD" Command="{x:Bind ViewModel.BcdImportCommand}"
-                    ToolTipService.ToolTip="從備份檔案還原 BCD 設定" />
-
-            <TextBlock Grid.Column="6" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
-                       VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}"
-                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-
-            <ProgressRing Grid.Column="7" IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
-                          Width="24" Height="24" />
-        </Grid>
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Button x:Name="MountEspBtn" Grid.Column="0" Content="💿 掛載 ESP" Command="{x:Bind ViewModel.MountEspCommand}"
+                        ToolTipService.ToolTip="掛載 ESP 系統開機分割區至 S: (mountvol /s)" />
+                <Button x:Name="UnmountEspBtn" Grid.Column="1" Content="⏏️ 卸載 ESP" Command="{x:Bind ViewModel.UnmountEspCommand}"
+                        ToolTipService.ToolTip="卸載 ESP 開機分割區 (mountvol /d)" />
+                <Button x:Name="BcdExportBtn" Grid.Column="2" Content="💾 備份 BCD" Command="{x:Bind ViewModel.BcdExportCommand}"
+                        ToolTipService.ToolTip="備份當前 BCD 設定至檔案" />
+                <Button x:Name="BcdImportBtn" Grid.Column="3" Content="📥 還原 BCD" Command="{x:Bind ViewModel.BcdImportCommand}"
+                        ToolTipService.ToolTip="從備份檔案還原 BCD 設定" />
+                <TextBlock Grid.Column="4" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                           VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           TextTrimming="CharacterEllipsis" />
+                <ProgressRing Grid.Column="5" IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                              Width="24" Height="24" />
+            </Grid>
+        </StackPanel>
 
         <!-- ═══ Movable TabView ═══ -->
         <TabView x:Name="BootTabView" Grid.Row="1"
@@ -72,7 +75,7 @@
             <TabViewItem x:Name="TabBootEntries" Header="開機項目管理 (Boot Entries)" IsClosable="False">
                 <Grid Margin="0,10,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition x:Name="ColBootList" Width="380" MinWidth="260" MaxWidth="600" />
+                        <ColumnDefinition x:Name="ColBootList" Width="0.8*" MinWidth="280" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" MinWidth="340" />
                     </Grid.ColumnDefinitions>
@@ -175,7 +178,7 @@
                     <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                             CornerRadius="8" Padding="16">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch">
                             <StackPanel Spacing="14">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <FontIcon Glyph="&#xE70F;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
@@ -186,13 +189,25 @@
                                 <TextBox x:Name="DescBox" Header="Description (Display Name in Boot Menu)"
                                          Text="{x:Bind ViewModel.EditDescriptionText, Mode=TwoWay}" />
 
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Button x:Name="SaveDescBtn" Content="💾 Save Description" Command="{x:Bind ViewModel.SaveDescriptionCommand}"
+                                <Grid ColumnSpacing="8" RowSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Button x:Name="SaveDescBtn" Grid.Row="0" Grid.Column="0" Content="💾 Save Description" Command="{x:Bind ViewModel.SaveDescriptionCommand}"
+                                            HorizontalAlignment="Stretch"
                                             Style="{StaticResource AccentButtonStyle}" />
-                                    <Button x:Name="SetDefaultBtn" Content="⭐ Set as Default OS" Command="{x:Bind ViewModel.SetDefaultEntryCommand}" />
-                                    <Button x:Name="CloneEntryBtn" Content="📋 Clone Entry" Command="{x:Bind ViewModel.CloneEntryCommand}" />
-                                    <Button x:Name="DeleteEntryBtn" Content="🗑️ Delete Entry" Command="{x:Bind ViewModel.DeleteEntryCommand}" />
-                                </StackPanel>
+                                    <Button x:Name="SetDefaultBtn" Grid.Row="0" Grid.Column="1" Content="⭐ Set as Default OS" Command="{x:Bind ViewModel.SetDefaultEntryCommand}"
+                                            HorizontalAlignment="Stretch" />
+                                    <Button x:Name="CloneEntryBtn" Grid.Row="1" Grid.Column="0" Content="📋 Clone Entry" Command="{x:Bind ViewModel.CloneEntryCommand}"
+                                            HorizontalAlignment="Stretch" />
+                                    <Button x:Name="DeleteEntryBtn" Grid.Row="1" Grid.Column="1" Content="🗑️ Delete Entry" Command="{x:Bind ViewModel.DeleteEntryCommand}"
+                                            HorizontalAlignment="Stretch" />
+                                </Grid>
 
                                 <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="0,4" />
 
@@ -223,7 +238,7 @@
                     <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                             CornerRadius="8" Padding="16">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch">
                             <StackPanel Spacing="12">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <FontIcon Glyph="&#xEC06;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
@@ -343,7 +358,7 @@
 
             <!-- ── Tab 4: MSConfig 安全開機與旗標 (Safe Boot & Advanced Boot Flags) ── -->
             <TabViewItem x:Name="TabSafeBoot" Header="🛡️ 安全開機 (Safe Boot)" IsClosable="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch" Margin="0,10,0,0">
                     <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
                         <!-- Hero Card -->
                         <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -439,7 +454,7 @@
 
             <!-- ── Tab 5: TPM 2.0 & Win11 Security LabConfig Bypass ── -->
             <TabViewItem x:Name="TabTpm" Header="🛡️ TPM 2.0 與系統安全" IsClosable="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch" Margin="0,10,0,0">
                     <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
                         <!-- TPM Hardware Status Card -->
                         <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -543,7 +558,7 @@
 
             <!-- ── Tab 6: Windows 修復環境 (WinRE) ── -->
             <TabViewItem x:Name="TabWinRe" Header="🩹 Windows 修復環境 (WinRE)" IsClosable="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch" Margin="0,10,0,0">
                     <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
                         
                         <!-- WinRE Status Card -->

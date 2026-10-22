@@ -49,7 +49,7 @@
 
                 <!-- ── Tab 0: Disk Health & Integrity ── -->
                 <TabViewItem x:Name="TabHealth" Header="🩺 磁碟健康 (Disk Health)" IsClosable="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch" Margin="0,10,0,0">
                     <StackPanel x:Name="HealthCardsStack" Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                         <!-- S.M.A.R.T. Health Overview -->
@@ -428,36 +428,36 @@
                                     <TextBlock x:Name="ChkdskTitle" Text="chkdsk 檔案系統完整性檢查" FontWeight="SemiBold" FontSize="15" />
                                 </StackPanel>
 
-                                <Grid ColumnSpacing="8">
+                                <Grid ColumnSpacing="8" RowSpacing="8">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <ComboBox x:Name="ChkdskDriveBox" Grid.Column="0" Header="磁碟機" MinWidth="210"
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <ComboBox x:Name="ChkdskDriveBox" Grid.Row="0" Grid.Column="0" Header="磁碟機" MinWidth="210"
                                               HorizontalAlignment="Left" VerticalAlignment="Bottom"
                                               ItemsSource="{x:Bind ViewModel.ChkdskDriveOptions, Mode=OneWay}"
                                               DisplayMemberPath="Display"
                                               SelectedItem="{x:Bind ViewModel.SelectedChkdskDrive, Mode=TwoWay}"
                                               AutomationProperties.Name="選擇要檢查的磁碟機" />
-                                    <Button x:Name="ChkdskScanBtn" Grid.Column="1" Content="🔍 線上掃描" VerticalAlignment="Bottom"
+                                    <Button x:Name="ChkdskScanBtn" Grid.Row="0" Grid.Column="1" Content="🔍 線上掃描" VerticalAlignment="Bottom"
                                              Command="{x:Bind ViewModel.ChkdskScanCommand}" Style="{StaticResource AccentButtonStyle}" />
-                                    <Button x:Name="ChkdskSpotFixBtn" Grid.Column="2" Content="🔧 快速修復" VerticalAlignment="Bottom"
+                                    <Button x:Name="ChkdskSpotFixBtn" Grid.Row="0" Grid.Column="2" Content="🔧 快速修復" VerticalAlignment="Bottom"
                                              Command="{x:Bind ViewModel.ChkdskSpotFixCommand}" />
-                                    <Button x:Name="ChkdskFixBtn" Grid.Column="3" Content="🛠️ 完整修復" VerticalAlignment="Bottom"
+                                    <Button x:Name="ChkdskFixBtn" Grid.Row="0" Grid.Column="3" Content="🛠️ 完整修復" VerticalAlignment="Bottom"
                                              Command="{x:Bind ViewModel.ChkdskFixCommand}" />
-                                    <Button x:Name="ChkdskFullBtn" Grid.Column="4" Content="🩹 壞軌修復" VerticalAlignment="Bottom"
+                                    <Button x:Name="ChkdskFullBtn" Grid.Row="1" Grid.Column="0" Content="🩹 壞軌修復" VerticalAlignment="Bottom"
                                              Command="{x:Bind ViewModel.ChkdskFullRepairCommand}" />
-                                    <Button x:Name="ChkdskDirtyBtn" Grid.Column="5" Content="❓ Dirty Bit" VerticalAlignment="Bottom"
+                                    <Button x:Name="ChkdskDirtyBtn" Grid.Row="1" Grid.Column="1" Content="❓ Dirty Bit" VerticalAlignment="Bottom"
                                              Command="{x:Bind ViewModel.ChkdskQueryDirtyCommand}" />
-                                    <Button x:Name="ChkdskBootBtn" Grid.Column="6" Content="📅 排程開機檢查" VerticalAlignment="Bottom"
+                                    <Button x:Name="ChkdskBootBtn" Grid.Row="1" Grid.Column="2" Content="📅 排程開機檢查" VerticalAlignment="Bottom"
                                              Command="{x:Bind ViewModel.ChkdskScheduleBootCommand}" />
-                                    <Button x:Name="ChkdskCancelBtn" Grid.Column="7" Content="⏹️ 停止" VerticalAlignment="Bottom"
+                                    <Button x:Name="ChkdskCancelBtn" Grid.Row="1" Grid.Column="3" Content="⏹️ 停止" VerticalAlignment="Bottom"
                                              Command="{x:Bind ViewModel.CancelChkdskCommand}"
                                              IsEnabled="{x:Bind ViewModel.IsChkdskRunning, Mode=OneWay}" />
                                 </Grid>
@@ -469,7 +469,7 @@
 
             <!-- ── Tab 1: Windows License Keys & Serials ── -->
             <TabViewItem x:Name="TabKeys" Header="金鑰與硬體序號 (Keys &amp; Serials)" IsClosable="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch" Margin="0,10,0,0">
                     <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                         <!-- OEM BIOS Key Card -->
@@ -593,7 +593,7 @@
 
             <!-- ── Tab 2: Environment Table Setting & Doctor (環境變數表格、PATH 健檢與系統工具) ── -->
             <TabViewItem x:Name="TabEnv" Header="🛠️ 環境變數表與套件健檢 (Environment Table &amp; Doctor)" IsClosable="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch" Margin="0,10,0,0">
                     <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,24">
 
                         <!-- Top Filter, Search & Backup Toolbar Card -->
@@ -1057,9 +1057,9 @@
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="130" />
-                                            <ColumnDefinition Width="210" />
+                                            <ColumnDefinition Width="180" />
                                             <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="165" />
+                                            <ColumnDefinition Width="220" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="環境狀態" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                         <TextBlock Grid.Column="1" Text="工具名稱 / 執行檔" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -1085,9 +1085,9 @@
                                                   BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="130" />
-                                                    <ColumnDefinition Width="210" />
+                                                    <ColumnDefinition Width="180" />
                                                     <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="165" />
+                                                    <ColumnDefinition Width="220" />
                                                 </Grid.ColumnDefinitions>
 
                                                 <!-- Status Icon + Text Badge (Never color/icon alone) -->
@@ -1208,7 +1208,7 @@
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0" Spacing="2">
                                             <TextBlock x:Name="SsdTrimSupportLabel" Text="SSD TRIM 支援" FontWeight="SemiBold" />
-                                            <TextBlock x:Name="SsdTrimSupportDesc" Text="保持快閃記憶體寫入壽命與垃圾回收效能" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock x:Name="SsdTrimSupportDesc" Text="保持快閃記憶體寫入壽命與垃圾回收效能" TextWrapping="Wrap" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                         </StackPanel>
                                         <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsTrimEnabled, Mode=OneWay}"
                                                       Toggled="Trim_Toggled" />
@@ -1225,11 +1225,11 @@
                                         <FontIcon Glyph="&#xE74D;" FontSize="16" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
                                         <TextBlock x:Name="SafeEraseCardTitle" Text="安全抹除與陰影複本" FontWeight="SemiBold" />
                                     </StackPanel>
-                                    <TextBlock x:Name="CipherDescText" Text="cipher.exe: 3 遍完整覆寫可用空間，防已刪檔案還原"
+                                    <TextBlock x:Name="CipherDescText" Text="cipher.exe: 3 遍完整覆寫可用空間，防已刪檔案還原" TextWrapping="Wrap"
                                                Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     <Button x:Name="RunCipherBtn" Content="🛡️ 安全抹除已刪檔案 (cipher /w)" Command="{x:Bind ViewModel.SecureWipeFreeSpaceCommand}"
                                             HorizontalAlignment="Stretch" Style="{StaticResource AccentButtonStyle}" />
-                                    <TextBlock x:Name="VssTitleText" Text="vssadmin: 磁碟區陰影複本 (Volume Shadow Copies)"
+                                    <TextBlock x:Name="VssTitleText" Text="vssadmin: 磁碟區陰影複本 (Volume Shadow Copies)" TextWrapping="Wrap"
                                                Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="0,4,0,0" />
                                     <Grid ColumnSpacing="6">
                                         <Grid.ColumnDefinitions>
@@ -1271,7 +1271,7 @@
                                         </ListView.ItemTemplate>
                                     </ListView>
 
-                                    <TextBlock x:Name="RestorePointsTitleText" Text="System Restore: 系統還原點 (Restore Points)"
+                                    <TextBlock x:Name="RestorePointsTitleText" Text="System Restore: 系統還原點 (Restore Points)" TextWrapping="Wrap"
                                                Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="0,4,0,0" />
                                     <Grid ColumnSpacing="6">
                                         <Grid.ColumnDefinitions>
@@ -1320,7 +1320,7 @@
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0" Spacing="2">
                                             <TextBlock x:Name="BitLockerProtectLabel" Text="BitLocker 保護狀態" FontWeight="SemiBold" />
-                                            <TextBlock x:Name="BitLockerProtectDesc" Text="暫停保護或恢復硬體層級加密" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            <TextBlock x:Name="BitLockerProtectDesc" Text="暫停保護或恢復硬體層級加密" TextWrapping="Wrap" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                         </StackPanel>
                                         <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsBitLockerActive, Mode=OneWay}"
                                                       Toggled="BitLockerProtect_Toggled" />
@@ -1502,7 +1502,7 @@
 
             <!-- ── Tab 4: VHD / VHDX 虛擬硬碟與暫存清理管理箱 ── -->
             <TabViewItem x:Name="TabVhdx" Header="💽 VHD/VHDX 虛擬磁碟與快取清理" IsClosable="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch" Margin="0,10,0,0">
                     <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                         <!-- Card 1: VHD/VHDX Virtual Disk Manager -->
@@ -1673,7 +1673,7 @@
 
             <!-- ── Tab 5: 磁碟複製與格式化 (Raw Block Clone / VHDX Image / ReFS Format) ── -->
             <TabViewItem x:Name="TabCloneFormat" Header="🧬 複製與格式化 (Clone &amp; Format)" IsClosable="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch" Margin="0,10,0,0">
                     <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                         <!-- Card 1: Raw block level clone + VHDX image mode -->
@@ -1903,7 +1903,7 @@
 
             <!-- ── Tab 7: 磁碟目錄空間與功能指南 (Storage Directory Encyclopedia) ── -->
             <TabViewItem x:Name="TabDirectoryAnalyzer" Header="📁 目錄空間指南 (Storage Directory Guide)" IsClosable="False">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch" Margin="0,10,0,0">
                     <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
                         <!-- Hero Header Card -->

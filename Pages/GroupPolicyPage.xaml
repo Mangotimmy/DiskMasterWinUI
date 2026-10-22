@@ -10,23 +10,22 @@
     Loaded="Page_Loaded">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch">
-        <StackPanel Spacing="16" HorizontalAlignment="Center" MaxWidth="1200" Margin="16,16,16,24">
+        <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="16,16,16,24">
 
             <!-- Hero Status & Home Edition Enabler Card -->
             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                     CornerRadius="8" Padding="16">
                 <StackPanel Spacing="14">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Spacing="4">
+                    <Grid RowSpacing="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0" Spacing="4">
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon Glyph="&#xE713;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                                <TextBlock Text="Windows 本機群組原則編輯器 (Group Policy - gpedit.msc)" FontWeight="Bold" FontSize="16" />
+                                <FontIcon Glyph="&#xE713;" FontSize="20" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                <TextBlock Text="Windows 本機群組原則編輯器 (Group Policy - gpedit.msc)" FontWeight="Bold" FontSize="16" TextWrapping="Wrap" VerticalAlignment="Center" />
                             </StackPanel>
                             <TextBlock Text="{x:Bind ViewModel.EditionName, Mode=OneWay, Converter={StaticResource StringFormatConverter}, ConverterParameter='目前系統版本: {0}'}"
                                        Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -34,19 +33,23 @@
                                        FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
                         </StackPanel>
 
-                        <Button Grid.Column="1" Command="{x:Bind ViewModel.RunGpupdateCommand}" Margin="0,0,8,0" VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <FontIcon Glyph="&#xE72C;" FontSize="13" />
-                                <TextBlock Text="🔄 強制更新 (gpupdate /force)" />
-                            </StackPanel>
-                        </Button>
+                        <!-- Action buttons live on their own row and align right, so a narrow window
+                             wraps them below the title instead of pushing them out of the card. -->
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                            <Button Command="{x:Bind ViewModel.RunGpupdateCommand}" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE72C;" FontSize="13" />
+                                    <TextBlock Text="🔄 強制更新 (gpupdate /force)" />
+                                </StackPanel>
+                            </Button>
 
-                        <Button Grid.Column="2" Command="{x:Bind ViewModel.OpenGpeditCommand}" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <FontIcon Glyph="&#xE8A7;" FontSize="13" />
-                                <TextBlock Text="📂 開啟群組原則 (gpedit.msc)" />
-                            </StackPanel>
-                        </Button>
+                            <Button Command="{x:Bind ViewModel.OpenGpeditCommand}" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE8A7;" FontSize="13" />
+                                    <TextBlock Text="📂 開啟群組原則 (gpedit.msc)" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                     </Grid>
 
                     <!-- Windows Home Edition 1-Click Unlocker Banner -->
@@ -108,8 +111,8 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" Spacing="2">
-                                    <TextBlock Text="🛑 徹底禁止 Windows Update 強制自動重新開機" FontWeight="SemiBold" FontSize="12" />
-                                    <TextBlock Text="防止更新完成後無預警重啟中斷遊戲與工作 (NoAutoRebootWithLoggedOnUsers)" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="🛑 徹底禁止 Windows Update 強制自動重新開機" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap" />
+                                    <TextBlock Text="防止更新完成後無預警重啟中斷遊戲與工作 (NoAutoRebootWithLoggedOnUsers)" FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 </StackPanel>
                                 <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsDisableAutoReboot, Mode=OneWay}"
                                               Toggled="DisableAutoReboot_Toggled" VerticalAlignment="Center" />
@@ -124,8 +127,8 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" Spacing="2">
-                                    <TextBlock Text="🛑 停用 Windows 遙測與診斷資料回傳" FontWeight="SemiBold" FontSize="12" />
-                                    <TextBlock Text="將 AllowTelemetry 政策鎖定為最低層級，停止背景自動上傳活動紀錄" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="🛑 停用 Windows 遙測與診斷資料回傳" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap" />
+                                    <TextBlock Text="將 AllowTelemetry 政策鎖定為最低層級，停止背景自動上傳活動紀錄" FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 </StackPanel>
                                 <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsDisableTelemetry, Mode=OneWay}"
                                               Toggled="DisableTelemetry_Toggled" VerticalAlignment="Center" />
@@ -140,8 +143,8 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" Spacing="2">
-                                    <TextBlock Text="🛑 關閉開始功能表 Bing 搜尋建議與 Web 搜尋" FontWeight="SemiBold" FontSize="12" />
-                                    <TextBlock Text="搜尋時僅檢視本機應用程式與檔案，避免輸入延遲 (DisableSearchBoxSuggestions)" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="🛑 關閉開始功能表 Bing 搜尋建議與 Web 搜尋" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap" />
+                                    <TextBlock Text="搜尋時僅檢視本機應用程式與檔案，避免輸入延遲 (DisableSearchBoxSuggestions)" FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 </StackPanel>
                                 <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsDisableSearchBoxSuggestions, Mode=OneWay}"
                                               Toggled="DisableSearchBox_Toggled" VerticalAlignment="Center" />
@@ -156,8 +159,8 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" Spacing="2">
-                                    <TextBlock Text="🛑 停用微軟消費者體驗 (廣告與推薦安裝)" FontWeight="SemiBold" FontSize="12" />
-                                    <TextBlock Text="禁止 Windows 自動下載促銷應用與開始功能表推播 (DisableWindowsConsumerFeatures)" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="🛑 停用微軟消費者體驗 (廣告與推薦安裝)" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap" />
+                                    <TextBlock Text="禁止 Windows 自動下載促銷應用與開始功能表推播 (DisableWindowsConsumerFeatures)" FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 </StackPanel>
                                 <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsDisableConsumerFeatures, Mode=OneWay}"
                                               Toggled="DisableConsumerFeatures_Toggled" VerticalAlignment="Center" />
@@ -172,8 +175,8 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" Spacing="2">
-                                    <TextBlock Text="🛑 停用傳遞最佳化 P2P 背景頻寬上傳" FontWeight="SemiBold" FontSize="12" />
-                                    <TextBlock Text="將 DODownloadMode 設為 0，防止 Windows 擅自使用本機上傳頻寬協助他人更新" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="🛑 停用傳遞最佳化 P2P 背景頻寬上傳" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap" />
+                                    <TextBlock Text="將 DODownloadMode 設為 0，防止 Windows 擅自使用本機上傳頻寬協助他人更新" FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 </StackPanel>
                                 <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsDisableDeliveryOptimization, Mode=OneWay}"
                                               Toggled="DisableDeliveryOptimization_Toggled" VerticalAlignment="Center" />
@@ -188,8 +191,8 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" Spacing="2">
-                                    <TextBlock Text="⚡ 關閉 UAC 暗屏桌面彈窗 (維持視窗提示)" FontWeight="SemiBold" FontSize="12" />
-                                    <TextBlock Text="提昇 UAC 彈出時的反應速度，不再短暫黑屏凍結 (PromptOnSecureDesktop = 0)" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="⚡ 關閉 UAC 暗屏桌面彈窗 (維持視窗提示)" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap" />
+                                    <TextBlock Text="提昇 UAC 彈出時的反應速度，不再短暫黑屏凍結 (PromptOnSecureDesktop = 0)" FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 </StackPanel>
                                 <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsDisableUacSecureDesktop, Mode=OneWay}"
                                               Toggled="DisableUacSecureDesktop_Toggled" VerticalAlignment="Center" />
@@ -204,8 +207,8 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" Spacing="2">
-                                    <TextBlock Text="🛡️ 停用 Defender 雲端自動上傳樣本" FontWeight="SemiBold" FontSize="12" />
-                                    <TextBlock Text="防止未知的敏感檔案或私人程式自動上傳至微軟伺服器 (SubmitSamplesConsent = 2)" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="🛡️ 停用 Defender 雲端自動上傳樣本" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap" />
+                                    <TextBlock Text="防止未知的敏感檔案或私人程式自動上傳至微軟伺服器 (SubmitSamplesConsent = 2)" FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 </StackPanel>
                                 <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsDisableDefenderSampleSubmission, Mode=OneWay}"
                                               Toggled="DisableDefenderSample_Toggled" VerticalAlignment="Center" />
@@ -220,8 +223,8 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0" Spacing="2">
-                                    <TextBlock Text="🎮 強制開啟硬體加速 GPU 排程 (HAGS)" FontWeight="SemiBold" FontSize="12" />
-                                    <TextBlock Text="釋放顯卡調度延遲，支援 DLSS 3 影格生成技術 (HwSchMode = 2，需重新開機)" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="🎮 強制開啟硬體加速 GPU 排程 (HAGS)" FontWeight="SemiBold" FontSize="12" TextWrapping="Wrap" />
+                                    <TextBlock Text="釋放顯卡調度延遲，支援 DLSS 3 影格生成技術 (HwSchMode = 2，需重新開機)" FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 </StackPanel>
                                 <ToggleSwitch Grid.Column="1" IsOn="{x:Bind ViewModel.IsForceHags, Mode=OneWay}"
                                               Toggled="ForceHags_Toggled" VerticalAlignment="Center" />

@@ -45,10 +45,11 @@
                     <SolidColorBrush x:Name="DynamicExpanderContentBrush" x:Key="ExpanderContentBackground" Color="#661A1A1A" />
                 </Grid.Resources>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />   <!-- 0: notification banners -->
+                    <RowDefinition Height="Auto" />   <!-- 1: command toolbar (own row: can never be squeezed by the tab strip) -->
+                    <RowDefinition Height="Auto" />   <!-- 2: tab strip -->
+                    <RowDefinition Height="*" />      <!-- 3: page viewport + docks -->
+                    <RowDefinition Height="Auto" />   <!-- 4: status bar -->
                 </Grid.RowDefinitions>
 
                 <!-- Top Notification Banners -->
@@ -75,8 +76,82 @@
                     </InfoBar>
                 </StackPanel>
 
+                <!-- ═══ Command toolbar: its own full-width row ═══
+                     These actions used to live in TabView.TabStripFooter, which is laid out to the right
+                     of the tab strip: with many tabs open the strip consumed all the width and the footer
+                     was clipped at the window edge ("框架出界"). A dedicated row can never be squeezed and
+                     keeps every action reachable. -->
+                <Grid x:Name="CommandToolbar" Grid.Row="1" Padding="4,2,12,2"
+                      BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" x:Name="CommandToolbarHint"
+                               Text="分頁列可拖曳排序；右鍵分頁可浮動、停靠、隱藏"
+                               VerticalAlignment="Center" FontSize="11"
+                               Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                               TextTrimming="CharacterEllipsis" Margin="8,0,12,0" />
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <!-- Admin Status & 1-Click Elevation Button -->
+                        <Button x:Name="AdminStatusBtn" Click="AdminStatusBtn_Click"
+                                Padding="8,3" FontSize="11">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <TextBlock x:Name="AdminStatusIcon" Text="🛡️" FontSize="11" />
+                                <TextBlock x:Name="AdminStatusText" Text="系統管理員模式" FontSize="11" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Dual Mode Switcher: Easy vs Advance -->
+                        <Button x:Name="ModeSwitcherBtn" Click="ModeSwitcher_Click"
+                                Padding="8,3" FontSize="11" ToolTipService.ToolTip="切換 簡易模式 (Easy) 與 專業進階模式 (Advance)">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <FontIcon x:Name="ModeSwitcherIcon" Glyph="&#xE790;" FontSize="12" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                <TextBlock x:Name="ModeSwitcherText" Text="🟢 簡易模式" FontSize="11" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Adobe Workspace Preset Dropdown -->
+                        <ComboBox x:Name="WorkspaceCombo" SelectionChanged="WorkspaceCombo_SelectionChanged"
+                                  Padding="6,2" FontSize="11" Width="112" ToolTipService.ToolTip="工作區排版預設" />
+
+                        <!-- Float Active Tab Button -->
+                        <Button x:Name="FloatTabBtn" Content="🪟 浮動" Click="FloatCurrentTab_Click"
+                                Padding="6,2" FontSize="11" ToolTipService.ToolTip="撕離為獨立視窗 [Ctrl+Shift+F]" />
+
+                        <!-- Floating Windows Manager (Shows count, click to Dock All) -->
+                        <Button x:Name="FloatingManagerBtn" Click="DockAll_Click" Visibility="Collapsed"
+                                Style="{StaticResource AccentButtonStyle}" Padding="6,2" FontSize="11"
+                                ToolTipService.ToolTip="點擊將所有浮動視窗一鍵嵌回主視窗 [Ctrl+Shift+D]">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <FontIcon Glyph="&#xE8B0;" FontSize="11" />
+                                <TextBlock x:Name="FloatingCountText" Text="1 浮動視窗" FontSize="11" />
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Overflow menu for the secondary actions -->
+                        <Button x:Name="MoreActionsBtn" Padding="8,3" FontSize="11"
+                                ToolTipService.ToolTip="更多動作：即時日誌、2D 助手、介面語言">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <FontIcon Glyph="&#xE712;" FontSize="11" />
+                                <TextBlock Text="更多" FontSize="11" />
+                            </StackPanel>
+                            <Button.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                    <MenuFlyoutItem x:Name="ActionLogBtn" Text="📝 即時日誌  [Ctrl+Shift+L]" Click="ActionLogBtn_Click" />
+                                    <MenuFlyoutItem x:Name="CompanionToggleBtn" Text="🎭 顯示 / 隱藏 2D 助手" Click="CompanionToggle_Click" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem x:Name="LanguageToggleBtn" Text="🌐 繁體中文" Click="LanguageToggle_Click" />
+                                </MenuFlyout>
+                            </Button.Flyout>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
                 <!-- ═══ Movable Top TabView (All tabs can drag & reorder & right-click) ═══ -->
-                <TabView x:Name="MainTabs" Grid.Row="1"
+                <TabView x:Name="MainTabs" Grid.Row="2"
                          TabWidthMode="SizeToContent"
                          CanDragTabs="True"
                          CanReorderTabs="True"
@@ -465,63 +540,11 @@
                         </TabViewItem>
                     </TabView.TabItems>
 
-                    <TabView.TabStripFooter>
-                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,12,0" VerticalAlignment="Center">
-                            <!-- Admin Status & 1-Click Elevation Button -->
-                            <Button x:Name="AdminStatusBtn" Click="AdminStatusBtn_Click"
-                                    Padding="8,3" FontSize="11">
-                                <StackPanel Orientation="Horizontal" Spacing="5">
-                                    <TextBlock x:Name="AdminStatusIcon" Text="🛡️" FontSize="11" />
-                                    <TextBlock x:Name="AdminStatusText" Text="系統管理員模式" FontSize="11" FontWeight="SemiBold" />
-                                </StackPanel>
-                            </Button>
 
-                            <!-- Dual Mode Switcher: Easy vs Advance -->
-                            <Button x:Name="ModeSwitcherBtn" Click="ModeSwitcher_Click"
-                                    Padding="8,3" FontSize="11" ToolTipService.ToolTip="切換 簡易模式 (Easy) 與 專業進階模式 (Advance)">
-                                <StackPanel Orientation="Horizontal" Spacing="5">
-                                    <FontIcon x:Name="ModeSwitcherIcon" Glyph="&#xE790;" FontSize="12" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                                    <TextBlock x:Name="ModeSwitcherText" Text="🟢 簡易模式" FontSize="11" FontWeight="SemiBold" />
-                                </StackPanel>
-                            </Button>
-
-                            <!-- Adobe Workspace Preset Dropdown -->
-                            <ComboBox x:Name="WorkspaceCombo" SelectionChanged="WorkspaceCombo_SelectionChanged"
-                                      Padding="6,2" FontSize="11" Width="130" ToolTipService.ToolTip="工作區排版預設" />
-
-                            <!-- Float Active Tab Button -->
-                            <Button x:Name="FloatTabBtn" Content="🪟 浮動" Click="FloatCurrentTab_Click"
-                                    Padding="6,2" FontSize="11" ToolTipService.ToolTip="撕離為獨立視窗 [Ctrl+Shift+F]" />
-
-                            <!-- Floating Windows Manager (Shows count, click to Dock All) -->
-                            <Button x:Name="FloatingManagerBtn" Click="DockAll_Click" Visibility="Collapsed"
-                                    Style="{StaticResource AccentButtonStyle}" Padding="6,2" FontSize="11"
-                                    ToolTipService.ToolTip="點擊將所有浮動視窗一鍵嵌回主視窗 [Ctrl+Shift+D]">
-                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <FontIcon Glyph="&#xE8B0;" FontSize="11" />
-                                    <TextBlock x:Name="FloatingCountText" Text="1 浮動視窗" FontSize="11" />
-                                </StackPanel>
-                            </Button>
-
-
-                            <Button x:Name="ActionLogBtn" Click="ActionLogBtn_Click"
-                                    Padding="6,2" FontSize="11" ToolTipService.ToolTip="即時操作與請求動態檢視器 [Ctrl+Shift+L]">
-                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <TextBlock Text="📝" FontSize="11" />
-                                    <TextBlock Text="即時日誌" FontSize="11" />
-                                </StackPanel>
-                            </Button>
-
-                            <Button x:Name="CompanionToggleBtn" Content="🎭 2D 助手" Click="CompanionToggle_Click"
-                                    Padding="6,2" FontSize="11" ToolTipService.ToolTip="顯示 / 隱藏 2D 守護助手" />
-
-                            <Button x:Name="LanguageToggleBtn" Content="🌐 繁體中文" Click="LanguageToggle_Click" Padding="8,4" FontSize="12" />
-                        </StackPanel>
-                    </TabView.TabStripFooter>
                 </TabView>
 
                 <!-- Multi-Directional Docking Container Grid (Main Viewport, Right Dock, Bottom Dock) -->
-                <Grid Grid.Row="2" x:Name="DockContainerGrid"
+                <Grid Grid.Row="3" x:Name="DockContainerGrid"
                       AllowDrop="True"
                       DragOver="DockContainerGrid_DragOver"
                       Drop="DockContainerGrid_Drop">
@@ -539,21 +562,23 @@
                             <ColumnDefinition x:Name="RightDockColDef" Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <!-- Central Main Viewport -->
+                        <!-- Central Main Viewport —
+                             The hosted page always stretches to the full viewport width and to at least
+                             one full viewport height (ContentRoot.MinHeight is maintained by
+                             UpdateViewportLayout), so every page fills the window instead of shrinking
+                             to its natural content size. Taller content still scrolls here. The former
+                             ScaleTransform "zoom" layout was removed: it drew the whole page scaled and
+                             top-left aligned, which left blank bands and could spin the layout loop. -->
                         <ScrollViewer x:Name="ContentScrollViewer" Grid.Column="0"
                                       HorizontalScrollBarVisibility="Disabled"
                                       HorizontalScrollMode="Disabled"
                                       VerticalScrollBarVisibility="Auto"
-                                      HorizontalContentAlignment="Left"
-                                      VerticalContentAlignment="Top"
-                                      ViewChanged="ContentScrollViewer_ViewChanged"
+                                      HorizontalContentAlignment="Stretch"
+                                      VerticalContentAlignment="Stretch"
                                       SizeChanged="ContentScrollViewer_SizeChanged">
-                            <Grid x:Name="ContentRoot" RenderTransformOrigin="0,0" HorizontalAlignment="Left" VerticalAlignment="Top"
-                                  BringIntoViewRequested="ContentRoot_BringIntoViewRequested">
-                                <Grid.RenderTransform>
-                                    <ScaleTransform x:Name="RootScaleTransform" ScaleX="1.0" ScaleY="1.0" />
-                                </Grid.RenderTransform>
-                                <Frame x:Name="ContentFrame" SizeChanged="ContentFrame_SizeChanged" HorizontalAlignment="Stretch" />
+                            <Grid x:Name="ContentRoot" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                                <Frame x:Name="ContentFrame" SizeChanged="ContentFrame_SizeChanged"
+                                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
                             </Grid>
                         </ScrollViewer>
 
@@ -670,7 +695,7 @@
                 </Grid>
 
                 <!-- Unified Bottom Status Bar with % and ETA -->
-                <controls:StatusBarControl Grid.Row="3" />
+                <controls:StatusBarControl Grid.Row="4" />
             </Grid>
 
             <!-- CrystalDiskInfo-Style Live2D Floating Companion Avatar Overlay -->

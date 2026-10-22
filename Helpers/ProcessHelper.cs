@@ -32,11 +32,23 @@ public static class ProcessHelper
         return Console.OutputEncoding ?? Encoding.Default;
     }
 
-    public static async Task<(string Output, string Error, int ExitCode)> RunProcessAsync(
+    public static Task<(string Output, string Error, int ExitCode)> RunProcessAsync(
         string fileName,
         string arguments,
         string? workingDirectory = null,
         CancellationToken cancellationToken = default)
+    {
+        // Process.Start (plus redirected pipe creation) can block for seconds under AV/EDR load
+        // (measured: a pwsh spawn aligned with a 2.25 s UI freeze). Callers commonly await this from
+        // the UI thread, so the synchronous startup must never run on that thread.
+        return Task.Run(() => RunProcessCoreAsync(fileName, arguments, workingDirectory, cancellationToken));
+    }
+
+    private static async Task<(string Output, string Error, int ExitCode)> RunProcessCoreAsync(
+        string fileName,
+        string arguments,
+        string? workingDirectory,
+        CancellationToken cancellationToken)
     {
         var sw = Stopwatch.StartNew();
         DebugLogService.Instance.LogRequest("ProcessHelper", $"啟動呼叫: {fileName}", arguments);

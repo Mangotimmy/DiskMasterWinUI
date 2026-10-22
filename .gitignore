@@ -62,3 +62,6 @@ Generated\ Files/
 
 # Locally installed .NET SDK (only when the machine has no machine-wide SDK)
 dotnet-sdk/
+
+# UI soak gate local evidence (JSON reports, hang dumps)
+tests/leak/artifacts/

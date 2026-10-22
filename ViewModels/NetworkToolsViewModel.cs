@@ -285,6 +285,82 @@ public partial class NetworkToolsViewModel : ObservableObject
     private bool _isLoadingData;
     private int _refreshSharesBusy;
 
+    // Single-flight bookkeeping. Without these, deactivation cleared _isLoadingData while the
+    // abandoned load was still running, so a fast re-activation started a second full load on top
+    // of the first (measured: up to 4 concurrent loads in the shipped v1.6.3 log).
+    private int _loadGeneration;
+    private bool _reloadRequested;
+
+    // ── Page-lifecycle awareness ──
+    // The page reports when it is attached/detached. Work started while the page was visible is
+    // cancelled when the user switches away, so a slow background refresh can never keep marshalling
+    // UI updates into a page that is being detached (that churn fed the tab-switch freezes).
+    // Defaults to true so the page keeps working exactly as before if the lifecycle hooks are not
+    // wired; the page only has to report deactivation to gain the abandoned-work cancellation.
+    private volatile bool _isPageActive = true;
+    private CancellationTokenSource? _lifecycleCts;
+
+    /// <summary>True once the first successful load has completed.</summary>
+    public bool IsDataInitialized => _isInitialized;
+
+    /// <summary>True while the owning page is attached to the visual tree.</summary>
+    public bool IsPageActive => _isPageActive;
+
+    /// <summary>Called by the page when it is loaded/attached.</summary>
+    public void OnPageActivated()
+    {
+        _isPageActive = true;
+        if (_isLoadingData)
+        {
+            // A load is still running: remember that the data must be refreshed once it ends
+            // instead of stacking another concurrent load on top of it.
+            _reloadRequested = true;
+            return;
+        }
+        if (!_isInitialized)
+        {
+            _ = InitializeAsync();
+        }
+    }
+
+    /// <summary>Called by the page when it is unloaded/detached. Cancels abandoned background work.</summary>
+    public void OnPageDeactivated()
+    {
+        _isPageActive = false;
+        CancelPendingWork();
+    }
+
+    /// <summary>
+    /// Cancels in-flight lifecycle work. The refresh will run again the next time the page becomes
+    /// active, so no data is lost — only work whose UI updates target a page that is going away.
+    /// </summary>
+    public void CancelPendingWork()
+    {
+        try
+        {
+            var cts = Interlocked.Exchange(ref _lifecycleCts, null);
+            cts?.Cancel();
+            cts?.Dispose();
+        }
+        catch { }
+
+        Volatile.Write(ref _refreshSharesBusy, 0);
+        // Do not clear _isLoadingData here: the abandoned load owns that flag and clears it in its
+        // own finally block. Clearing it early is what allowed overlapping loads.
+        IsLoading = false;
+    }
+
+    /// <summary>
+    /// Marshals a UI update only while the owning page is still attached. Data stays in the ViewModel
+    /// either way; this only stops background refreshes from touching the controls of a page that is
+    /// being detached, which is what used to pile UI work on the thread during rapid tab switching.
+    /// </summary>
+    private void RunOnUIThreadIfActive(Action action)
+    {
+        if (action == null || !_isPageActive) return;
+        DispatcherHelper.RunOnUIThread(action);
+    }
+
     public NetworkToolsViewModel()
     {
         // 0ms instant initialization: load in-memory presets without blocking network or WMI
@@ -323,10 +399,22 @@ public partial class NetworkToolsViewModel : ObservableObject
     [RelayCommand]
     public async Task InitializeAsync(bool forceReload = false)
     {
-        if (_isLoadingData) return;
+        // Coalescing: a burst of re-activations (rapid tab switching) starts exactly one load.
+        if (_isLoadingData)
+        {
+            _reloadRequested = true;
+            return;
+        }
         if (!forceReload && _isInitialized) return;
+        _reloadRequested = false;
         _isLoadingData = true;
         IsLoading = true;
+        int generation = Interlocked.Increment(ref _loadGeneration);
+
+        var cts = new CancellationTokenSource();
+        Interlocked.Exchange(ref _lifecycleCts, cts);
+        var token = cts.Token;
+
         var sw = Stopwatch.StartNew();
         DebugLogService.Instance.Debug("Starting non-blocking NetworkTools background initialization...", "NetworkTools");
 
@@ -340,7 +428,7 @@ public partial class NetworkToolsViewModel : ObservableObject
                 var isMsPolicy = await _netShareService.IsMicrosoftAccountSharingPolicyFixedAsync();
                 var rdp = await _rdpService.GetStatusAsync();
 
-                DispatcherHelper.RunOnUIThread(() =>
+                RunOnUIThreadIfActive(() =>
                 {
                     LocalIpAddress = ip;
                     IsMsAccountPolicyFixed = isMsPolicy;
@@ -363,8 +451,19 @@ public partial class NetworkToolsViewModel : ObservableObject
             RefreshL2tpVpnNatTStatus();
 
             await Task.WhenAll(nicTask, upnpTask, hostsTask, sharesTask, rdpTask, tcpTask);
+            if (token.IsCancellationRequested || !_isPageActive)
+            {
+                // The user switched away: keep the partial data but let the next activation retry,
+                // and never report a "completed" state for an abandoned load.
+                DebugLogService.Instance.Debug("NetworkTools initialization abandoned (page detached)", "NetworkTools");
+                return;
+            }
             _isInitialized = true;
             StatusMessage = LocalizationService.T("網路工具資料已同步完成", "网络工具数据已同步完成", "Network tools data synchronized", "ネットワークツールの同期完了");
+        }
+        catch (OperationCanceledException)
+        {
+            DebugLogService.Instance.Debug("NetworkTools initialization cancelled", "NetworkTools");
         }
         catch (Exception ex)
         {
@@ -372,10 +471,22 @@ public partial class NetworkToolsViewModel : ObservableObject
         }
         finally
         {
-            _isLoadingData = false;
-            IsLoading = false;
+            // Only the newest load may clear the shared flags; a stale load finishing late must not
+            // clobber the state of the load that replaced it.
+            if (generation == Volatile.Read(ref _loadGeneration))
+            {
+                _isLoadingData = false;
+                IsLoading = false;
+            }
             sw.Stop();
             DebugLogService.Instance.Info($"NetworkTools background initialization completed in {sw.ElapsedMilliseconds}ms", "NetworkTools");
+
+            if (_reloadRequested && _isPageActive && !_isInitialized &&
+                generation == Volatile.Read(ref _loadGeneration))
+            {
+                _reloadRequested = false;
+                _ = InitializeAsync(forceReload: true);
+            }
         }
     }
 
@@ -400,13 +511,13 @@ public partial class NetworkToolsViewModel : ObservableObject
 
             if (!IsUpnpSupported)
             {
-                DispatcherHelper.RunOnUIThread(() => PortMappings.Clear());
+                RunOnUIThreadIfActive(() => PortMappings.Clear());
                 StatusMessage = "路由器未啟用 UPnP 或無回應。";
                 return;
             }
 
             var (success, list, err) = await _upnpService.GetPortMappingsAsync();
-            DispatcherHelper.RunOnUIThread(() =>
+            RunOnUIThreadIfActive(() =>
             {
                 PortMappings.Clear();
                 foreach (var item in list) PortMappings.Add(item);
@@ -732,7 +843,7 @@ public partial class NetworkToolsViewModel : ObservableObject
 
             var entries = await _hostsService.ReadHostsAsync();
             var backups = await _hostsService.GetBackupHistoryAsync();
-            DispatcherHelper.RunOnUIThread(() =>
+            RunOnUIThreadIfActive(() =>
             {
                 HostsEntries.Clear();
                 foreach (var e in entries) HostsEntries.Add(e);
@@ -988,7 +1099,7 @@ public partial class NetworkToolsViewModel : ObservableObject
         try
         {
             var shares = await _netShareService.GetActiveSharesAsync();
-            DispatcherHelper.RunOnUIThread(() =>
+            RunOnUIThreadIfActive(() =>
             {
                 NetShares.Clear();
                 foreach (var s in shares) NetShares.Add(s);
@@ -1274,7 +1385,7 @@ public partial class NetworkToolsViewModel : ObservableObject
         {
             RdpStatus = await _rdpService.GetStatusAsync();
             var sessions = await _rdpService.GetActiveSessionsAsync();
-            DispatcherHelper.RunOnUIThread(() =>
+            RunOnUIThreadIfActive(() =>
             {
                 CustomRdpPort = RdpStatus.Port;
                 IsSingleSessionPerUser = RdpStatus.SingleSessionPerUser;
@@ -1711,7 +1822,7 @@ public partial class NetworkToolsViewModel : ObservableObject
         try
         {
             var settings = await _tcpOptimizerService.GetTcpSettingsAsync();
-            DispatcherHelper.RunOnUIThread(() =>
+            RunOnUIThreadIfActive(() =>
             {
                 if (!string.IsNullOrWhiteSpace(settings.AutoTuningLevel))
                 {

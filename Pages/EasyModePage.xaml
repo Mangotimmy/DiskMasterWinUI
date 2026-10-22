@@ -196,7 +196,7 @@
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                         CornerRadius="8" Padding="14">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch">
                         <StackPanel Spacing="10">
                             <!-- Header with Legend -->
                             <Grid>
@@ -289,31 +289,24 @@
                             </Border>
 
                             <!-- Mouse Move & Resize Slider Section with KPI Cards -->
-                            <Grid ColumnSpacing="12" Margin="0,4,0,0">
+                            <Grid ColumnSpacing="12" RowSpacing="8" Margin="0,4,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
 
-                                <StackPanel Grid.Column="0" Spacing="4">
-                                    <Slider Minimum="10" Maximum="100" StepFrequency="1"
-                                            IsEnabled="{x:Bind ViewModel.IsResizeSliderEnabled, Mode=OneWay}"
-                                            Value="{x:Bind ViewModel.ResizeSliderValue, Mode=TwoWay}" />
-                                    <!-- Quick Size Preset Chips (Zero-Keyboard) -->
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <TextBlock x:Name="QuickSizeLabel" Text="Quick Size:" VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                        <Button Content="10 GB" Command="{x:Bind ViewModel.ApplySizePresetCommand}" CommandParameter="10" Padding="8,3" FontSize="11" IsEnabled="{x:Bind ViewModel.IsResizeSliderEnabled, Mode=OneWay}" />
-                                        <Button Content="20 GB" Command="{x:Bind ViewModel.ApplySizePresetCommand}" CommandParameter="20" Padding="8,3" FontSize="11" IsEnabled="{x:Bind ViewModel.IsResizeSliderEnabled, Mode=OneWay}" />
-                                        <Button Content="50 GB" Command="{x:Bind ViewModel.ApplySizePresetCommand}" CommandParameter="50" Padding="8,3" FontSize="11" IsEnabled="{x:Bind ViewModel.IsResizeSliderEnabled, Mode=OneWay}" />
-                                        <Button Content="100 GB" Command="{x:Bind ViewModel.ApplySizePresetCommand}" CommandParameter="100" Padding="8,3" FontSize="11" IsEnabled="{x:Bind ViewModel.IsResizeSliderEnabled, Mode=OneWay}" />
-                                        <Button Content="50%" Command="{x:Bind ViewModel.ApplySizePresetCommand}" CommandParameter="50%" Padding="8,3" FontSize="11" IsEnabled="{x:Bind ViewModel.IsResizeSliderEnabled, Mode=OneWay}" />
-                                        <Button Content="Max" Command="{x:Bind ViewModel.ApplySizePresetCommand}" CommandParameter="Max" Padding="8,3" FontSize="11" IsEnabled="{x:Bind ViewModel.IsResizeSliderEnabled, Mode=OneWay}" />
-                                    </StackPanel>
-                                </StackPanel>
+                                <Slider Grid.Row="0" Grid.Column="0" Minimum="10" Maximum="100" StepFrequency="1"
+                                        VerticalAlignment="Center"
+                                        IsEnabled="{x:Bind ViewModel.IsResizeSliderEnabled, Mode=OneWay}"
+                                        Value="{x:Bind ViewModel.ResizeSliderValue, Mode=TwoWay}" />
 
                                 <!-- Target Size KPI Card -->
-                                <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                <Border Grid.Row="0" Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
                                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                                         CornerRadius="6" Padding="12,6" MinWidth="130" VerticalAlignment="Center">
                                     <StackPanel Spacing="2">
@@ -323,7 +316,7 @@
                                 </Border>
 
                                 <!-- Operation Delta KPI Card -->
-                                <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                <Border Grid.Row="0" Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
                                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                                         CornerRadius="6" Padding="12,6" MinWidth="140" VerticalAlignment="Center">
                                     <StackPanel Spacing="2">
@@ -332,6 +325,17 @@
                                                    Foreground="{ThemeResource AccentFillColorDefaultBrush}" FontWeight="SemiBold" FontSize="13" />
                                     </StackPanel>
                                 </Border>
+
+                                <!-- Quick Size Preset Chips (Zero-Keyboard) -->
+                                <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="6">
+                                    <TextBlock x:Name="QuickSizeLabel" Text="Quick Size:" VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <Button Content="10 GB" Command="{x:Bind ViewModel.ApplySizePresetCommand}" CommandParameter="10" Padding="8,3" FontSize="11" IsEnabled="{x:Bind ViewModel.IsResizeSliderEnabled, Mode=OneWay}" />
+                                    <Button Content="20 GB" Command="{x:Bind ViewModel.ApplySizePresetCommand}" CommandParameter="20" Padding="8,3" FontSize="11" IsEnabled="{x:Bind ViewModel.IsResizeSliderEnabled, Mode=OneWay}" />
+                                    <Button Content="50 GB" Command="{x:Bind ViewModel.ApplySizePresetCommand}" CommandParameter="50" Padding="8,3" FontSize="11" IsEnabled="{x:Bind ViewModel.IsResizeSliderEnabled, Mode=OneWay}" />
+                                    <Button Content="100 GB" Command="{x:Bind ViewModel.ApplySizePresetCommand}" CommandParameter="100" Padding="8,3" FontSize="11" IsEnabled="{x:Bind ViewModel.IsResizeSliderEnabled, Mode=OneWay}" />
+                                    <Button Content="50%" Command="{x:Bind ViewModel.ApplySizePresetCommand}" CommandParameter="50%" Padding="8,3" FontSize="11" IsEnabled="{x:Bind ViewModel.IsResizeSliderEnabled, Mode=OneWay}" />
+                                    <Button Content="Max" Command="{x:Bind ViewModel.ApplySizePresetCommand}" CommandParameter="Max" Padding="8,3" FontSize="11" IsEnabled="{x:Bind ViewModel.IsResizeSliderEnabled, Mode=OneWay}" />
+                                </StackPanel>
                             </Grid>
                         </StackPanel>
                     </ScrollViewer>
@@ -346,7 +350,7 @@
                                         Margin="0,4" />
 
                 <!-- 2. Middle: Suggested Command Preview + Management Tools -->
-                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
+                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch">
                     <StackPanel Spacing="12">
                         <!-- Suggested DiskPart Command -->
                         <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -383,26 +387,28 @@
                                   HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                             <StackPanel Spacing="14">
                                 <!-- Format & Drive Letter -->
-                                <Grid ColumnSpacing="10">
+                                <Grid ColumnSpacing="10" RowSpacing="10">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="100" />
                                         <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
 
-                                    <ComboBox x:Name="FsBox" Grid.Column="0" Header="File System"
+                                    <ComboBox x:Name="FsBox" Grid.Row="0" Grid.Column="0" Header="File System"
                                               ItemsSource="{x:Bind ViewModel.FileSystemOptions}"
                                               SelectedItem="{x:Bind ViewModel.FormatFileSystem, Mode=TwoWay}" />
 
-                                    <ComboBox x:Name="ClusterBox" Grid.Column="1" Header="Cluster Size"
+                                    <ComboBox x:Name="ClusterBox" Grid.Row="0" Grid.Column="1" Header="Cluster Size"
                                               ItemsSource="{x:Bind ViewModel.ClusterSizes}"
                                               SelectedItem="{x:Bind ViewModel.SelectedClusterSize, Mode=TwoWay}" />
 
-                                    <Grid Grid.Column="2" ColumnSpacing="4">
+                                    <Grid Grid.Row="0" Grid.Column="2" ColumnSpacing="4">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
@@ -414,32 +420,38 @@
                                                 ToolTipService.ToolTip="變更磁碟區標籤 (免格式化直接重命名)" />
                                     </Grid>
 
-                                    <ToggleSwitch x:Name="QuickFormatSwitch" Grid.Column="3"
+                                    <ToggleSwitch x:Name="QuickFormatSwitch" Grid.Row="0" Grid.Column="3"
                                                   IsOn="{x:Bind ViewModel.QuickFormat, Mode=TwoWay}"
                                                   OffContent="完整格式化" OnContent="快速格式化"
                                                   VerticalAlignment="Bottom" Margin="0,0,0,2" />
 
-                                    <Button x:Name="FormatBtn" Grid.Column="4" Content="💾 Format"
+                                    <Button x:Name="FormatBtn" Grid.Row="1" Grid.Column="0" Content="💾 Format"
                                             Command="{x:Bind ViewModel.FormatVolumeCommand}" VerticalAlignment="Bottom" />
 
-                                    <ComboBox x:Name="LetterBox" Grid.Column="5" Header="Drive Letter"
+                                    <ComboBox x:Name="LetterBox" Grid.Row="1" Grid.Column="1" Header="Drive Letter"
                                               ItemsSource="{x:Bind ViewModel.AvailableLetters}"
                                               SelectedItem="{x:Bind ViewModel.AssignLetter, Mode=TwoWay}" />
 
-                                    <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="6" VerticalAlignment="Bottom">
-                                        <Button x:Name="AssignLetterBtn" Content="📌 Assign"
-                                                Command="{x:Bind ViewModel.AssignLetterCommand}" />
-                                        <Button x:Name="RemoveLetterBtn" Content="🚫 Remove"
-                                                Command="{x:Bind ViewModel.RemoveLetterCommand}" />
-                                        <Button x:Name="DetailVolumeBtn" Content="ℹ️ Detail"
-                                                Command="{x:Bind ViewModel.DetailVolumeCommand}" />
-                                        <Button x:Name="SetVolReadOnlyBtn" Content="🔒 Read-Only"
-                                                Command="{x:Bind ViewModel.SetVolumeReadOnlyCommand}"
-                                                ToolTipService.ToolTip="Set Volume Read-Only" />
-                                        <Button x:Name="ClearVolReadOnlyBtn" Content="🔓 Clear R/O"
-                                                Command="{x:Bind ViewModel.ClearVolumeReadOnlyCommand}"
-                                                ToolTipService.ToolTip="Clear Volume Read-Only" />
-                                    </StackPanel>
+                                    <Button x:Name="AssignLetterBtn" Grid.Row="1" Grid.Column="2" Content="📌 Assign"
+                                            HorizontalAlignment="Left"
+                                            Command="{x:Bind ViewModel.AssignLetterCommand}" VerticalAlignment="Bottom" />
+
+                                    <Button x:Name="RemoveLetterBtn" Grid.Row="1" Grid.Column="3" Content="🚫 Remove"
+                                            Command="{x:Bind ViewModel.RemoveLetterCommand}" VerticalAlignment="Bottom" />
+
+                                    <Button x:Name="DetailVolumeBtn" Grid.Row="2" Grid.Column="0" Content="ℹ️ Detail"
+                                            Command="{x:Bind ViewModel.DetailVolumeCommand}" VerticalAlignment="Bottom" />
+
+                                    <Button x:Name="SetVolReadOnlyBtn" Grid.Row="2" Grid.Column="1" Content="🔒 Read-Only"
+                                            Command="{x:Bind ViewModel.SetVolumeReadOnlyCommand}"
+                                            VerticalAlignment="Bottom"
+                                            ToolTipService.ToolTip="Set Volume Read-Only" />
+
+                                    <Button x:Name="ClearVolReadOnlyBtn" Grid.Row="2" Grid.Column="2" Content="🔓 Clear R/O"
+                                            HorizontalAlignment="Left"
+                                            Command="{x:Bind ViewModel.ClearVolumeReadOnlyCommand}"
+                                            VerticalAlignment="Bottom"
+                                            ToolTipService.ToolTip="Clear Volume Read-Only" />
                                 </Grid>
 
                                 <!-- Quick Label Chips (Zero-Keyboard) -->
@@ -454,48 +466,62 @@
                                 </StackPanel>
 
                                 <!-- Create, Delete, Clean -->
-                                <Grid ColumnSpacing="8">
+                                <Grid ColumnSpacing="8" RowSpacing="8">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="150" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
 
-                                    <TextBox x:Name="PartSizeBox" Grid.Column="0" Header="New Size (MB, blank=Max)"
+                                    <TextBox x:Name="PartSizeBox" Grid.Row="0" Grid.Column="0" Header="New Size (MB, blank=Max)"
                                              Text="{x:Bind ViewModel.PartitionSizeMB, Mode=TwoWay}"
                                              PlaceholderText="Full unallocated" />
 
-                                    <Button x:Name="CreatePartBtn" Grid.Column="1" Content="➕ Create Primary"
+                                    <Button x:Name="CreatePartBtn" Grid.Row="0" Grid.Column="1" Content="➕ Create Primary"
                                             Command="{x:Bind ViewModel.CreatePartitionCommand}" VerticalAlignment="Bottom" />
 
-                                    <Button x:Name="ExtendVolumeBtn" Grid.Column="2" Content="↔️ Extend"
+                                    <Button x:Name="ExtendVolumeBtn" Grid.Row="0" Grid.Column="2" Content="↔️ Extend"
                                             Command="{x:Bind ViewModel.ExtendVolumeCommand}" VerticalAlignment="Bottom" />
 
-                                    <Button x:Name="DeletePartBtn" Grid.Column="3" Content="🗑️ Delete Partition"
+                                    <Button x:Name="DeletePartBtn" Grid.Row="1" Grid.Column="0" Content="🗑️ Delete Partition"
+                                            HorizontalAlignment="Left"
                                             Command="{x:Bind ViewModel.DeletePartitionCommand}" VerticalAlignment="Bottom" />
 
-                                    <Button x:Name="CleanDiskBtn" Grid.Column="4" Content="🧹 Clean Disk"
+                                    <Button x:Name="CleanDiskBtn" Grid.Row="1" Grid.Column="1" Content="🧹 Clean Disk"
                                             Command="{x:Bind ViewModel.CleanDiskCommand}" VerticalAlignment="Bottom" />
 
-                                    <Button x:Name="DetailDiskBtn" Grid.Column="5" Content="ℹ️ Detail"
+                                    <Button x:Name="DetailDiskBtn" Grid.Row="1" Grid.Column="2" Content="ℹ️ Detail"
                                             Command="{x:Bind ViewModel.DetailDiskCommand}" VerticalAlignment="Bottom" />
                                 </Grid>
 
                                 <!-- Advanced Partition & Layout Actions -->
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Button x:Name="StdUefiLayoutBtn" Content="⚡ 一鍵標準 UEFI 4分區佈局"
+                                <Grid ColumnSpacing="8" RowSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Button x:Name="StdUefiLayoutBtn" Grid.Row="0" Grid.Column="0" Content="⚡ 一鍵標準 UEFI 4分區佈局"
                                             Command="{x:Bind ViewModel.CreateStandardUefiLayoutCommand}"
+                                            HorizontalAlignment="Stretch"
                                             Style="{StaticResource AccentButtonStyle}" />
-                                    <Button x:Name="CreateWinReBtn" Content="🩹 建立 WinRE 修復磁區"
-                                            Command="{x:Bind ViewModel.CreateRecoveryPartitionCommand}" />
-                                    <Button x:Name="ExtendFsBtn" Content="↔️ 延伸檔案系統 (Extend FS)"
-                                            Command="{x:Bind ViewModel.ExtendFilesystemCommand}" />
-                                    <Button x:Name="ShrinkQueryBtn" Content="🔍 查詢最大可縮減空間"
-                                            Command="{x:Bind ViewModel.ShrinkQueryMaxCommand}" />
-                                </StackPanel>
+                                    <Button x:Name="CreateWinReBtn" Grid.Row="0" Grid.Column="1" Content="🩹 建立 WinRE 修復磁區"
+                                            Command="{x:Bind ViewModel.CreateRecoveryPartitionCommand}"
+                                            HorizontalAlignment="Stretch" />
+                                    <Button x:Name="ExtendFsBtn" Grid.Row="1" Grid.Column="0" Content="↔️ 延伸檔案系統 (Extend FS)"
+                                            Command="{x:Bind ViewModel.ExtendFilesystemCommand}"
+                                            HorizontalAlignment="Stretch" />
+                                    <Button x:Name="ShrinkQueryBtn" Grid.Row="1" Grid.Column="1" Content="🔍 查詢最大可縮減空間"
+                                            Command="{x:Bind ViewModel.ShrinkQueryMaxCommand}"
+                                            HorizontalAlignment="Stretch" />
+                                </Grid>
 
                                 <!-- Boot Repair -->
                                 <Grid ColumnSpacing="12">

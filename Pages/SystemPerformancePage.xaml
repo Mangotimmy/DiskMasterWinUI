@@ -17,70 +17,87 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <!-- Top Bar -->
-        <Grid Grid.Row="0" ColumnSpacing="12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+        <!-- Top Bar — primary actions on row 0 and the secondary HUD actions on row 1. One single
+             auto-width strip of five long buttons used to overrun the window edge on narrow widths. -->
+        <Grid Grid.Row="0" RowSpacing="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
-            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
-                <Button Command="{x:Bind ViewModel.RefreshMetricsCommand}" Style="{StaticResource AccentButtonStyle}">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <FontIcon Glyph="&#xE72C;" FontSize="14" />
-                        <TextBlock Text="重新整理效能" />
-                    </StackPanel>
-                </Button>
-                <Button Command="{x:Bind ViewModel.KillAllNotRespondingCommand}">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <FontIcon Glyph="&#xE711;" FontSize="14" Foreground="OrangeRed" />
-                        <TextBlock Text="一鍵終結所有無響應程式" />
-                    </StackPanel>
-                </Button>
-                <Button Click="TogglePerformanceOverlay_Click" AutomationProperties.AutomationId="HudToggleButton">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <FontIcon Glyph="&#xE737;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                        <TextBlock x:Name="OverlayToggleBtnText" Text="置頂效能懸浮窗 (FPS HUD)" />
-                    </StackPanel>
-                </Button>
-                <Button x:Name="HudClickThroughBtn" Click="ToggleHudClickThrough_Click" ToolTipService.ToolTip="切換 HUD 滑鼠穿透 (滑鼠動作直接穿透 HUD 操作背景視窗，全域快捷鍵 [Ctrl+Shift+H])">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <FontIcon x:Name="HudClickThroughIcon" Glyph="&#xE8C0;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                        <TextBlock x:Name="HudClickThroughBtnText" Text="滑鼠穿透 [Ctrl+Shift+H]" />
-                    </StackPanel>
-                </Button>
-                <DropDownButton AutomationProperties.AutomationId="HudStyleMenuButton" ToolTipService.ToolTip="HUD 外觀樣式、色彩主題與進階設定">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <FontIcon Glyph="&#xE790;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                        <TextBlock Text="HUD 樣式與主題" />
-                    </StackPanel>
-                    <DropDownButton.Flyout>
-                        <MenuFlyout>
-                            <MenuFlyoutSubItem Text="🎨 主題色彩 (Theme)">
-                                <MenuFlyoutItem Text="⚡ 賽博霓虹 (Cyberpunk)" Click="PageHudTheme_Click" Tag="Cyberpunk" />
-                                <MenuFlyoutItem Text="🟢 矩陣幽綠 (Emerald)" Click="PageHudTheme_Click" Tag="Emerald" />
-                                <MenuFlyoutItem Text="🔵 冰晶蔚藍 (Ocean)" Click="PageHudTheme_Click" Tag="Ocean" />
-                                <MenuFlyoutItem Text="🟣 炫彩日冕 (Solar)" Click="PageHudTheme_Click" Tag="Solar" />
-                                <MenuFlyoutItem Text="⚫ 曜石黑魂 (Midnight)" Click="PageHudTheme_Click" Tag="Midnight" />
-                            </MenuFlyoutSubItem>
-                            <MenuFlyoutSubItem Text="🎛️ 懸浮型態 (Style)">
-                                <MenuFlyoutItem Text="橫向長條型 (Bar)" Click="PageHudStyle_Click" Tag="Bar" />
-                                <MenuFlyoutItem Text="完整卡片型 (Card)" Click="PageHudStyle_Click" Tag="Card" />
-                                <MenuFlyoutItem Text="極簡徽章型 (Badge)" Click="PageHudStyle_Click" Tag="Badge" />
-                            </MenuFlyoutSubItem>
-                            <MenuFlyoutSeparator />
-                            <MenuFlyoutItem Text="⚙️ 開啟進階設定面板" Click="OpenHudSettings_Click" AutomationProperties.AutomationId="OpenHudSettingsMenuItem" />
-                        </MenuFlyout>
-                    </DropDownButton.Flyout>
-                </DropDownButton>
-            </StackPanel>
+            <Grid Grid.Row="0" ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-            <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
-                       VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}"
-                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                    <Button Command="{x:Bind ViewModel.RefreshMetricsCommand}" Style="{StaticResource AccentButtonStyle}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                            <TextBlock Text="重新整理效能" />
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{x:Bind ViewModel.KillAllNotRespondingCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE711;" FontSize="14" Foreground="OrangeRed" />
+                            <TextBlock Text="一鍵終結所有無響應程式" />
+                        </StackPanel>
+                    </Button>
+                    <Button Click="TogglePerformanceOverlay_Click" AutomationProperties.AutomationId="HudToggleButton">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE737;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                            <TextBlock x:Name="OverlayToggleBtnText" Text="置頂效能懸浮窗 (FPS HUD)" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
 
-            <ProgressRing Grid.Column="2" IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" Width="24" Height="24" />
+                <ProgressRing Grid.Column="1" IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" Width="24" Height="24" />
+            </Grid>
+
+            <Grid Grid.Row="1" ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
+                           VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="HudClickThroughBtn" Click="ToggleHudClickThrough_Click" ToolTipService.ToolTip="切換 HUD 滑鼠穿透 (滑鼠動作直接穿透 HUD 操作背景視窗，全域快捷鍵 [Ctrl+Shift+H])">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon x:Name="HudClickThroughIcon" Glyph="&#xE8C0;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                            <TextBlock x:Name="HudClickThroughBtnText" Text="滑鼠穿透 [Ctrl+Shift+H]" />
+                        </StackPanel>
+                    </Button>
+                    <DropDownButton AutomationProperties.AutomationId="HudStyleMenuButton" ToolTipService.ToolTip="HUD 外觀樣式、色彩主題與進階設定">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE790;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                            <TextBlock Text="HUD 樣式與主題" />
+                        </StackPanel>
+                        <DropDownButton.Flyout>
+                            <MenuFlyout>
+                                <MenuFlyoutSubItem Text="🎨 主題色彩 (Theme)">
+                                    <MenuFlyoutItem Text="⚡ 賽博霓虹 (Cyberpunk)" Click="PageHudTheme_Click" Tag="Cyberpunk" />
+                                    <MenuFlyoutItem Text="🟢 矩陣幽綠 (Emerald)" Click="PageHudTheme_Click" Tag="Emerald" />
+                                    <MenuFlyoutItem Text="🔵 冰晶蔚藍 (Ocean)" Click="PageHudTheme_Click" Tag="Ocean" />
+                                    <MenuFlyoutItem Text="🟣 炫彩日冕 (Solar)" Click="PageHudTheme_Click" Tag="Solar" />
+                                    <MenuFlyoutItem Text="⚫ 曜石黑魂 (Midnight)" Click="PageHudTheme_Click" Tag="Midnight" />
+                                </MenuFlyoutSubItem>
+                                <MenuFlyoutSubItem Text="🎛️ 懸浮型態 (Style)">
+                                    <MenuFlyoutItem Text="橫向長條型 (Bar)" Click="PageHudStyle_Click" Tag="Bar" />
+                                    <MenuFlyoutItem Text="完整卡片型 (Card)" Click="PageHudStyle_Click" Tag="Card" />
+                                    <MenuFlyoutItem Text="極簡徽章型 (Badge)" Click="PageHudStyle_Click" Tag="Badge" />
+                                </MenuFlyoutSubItem>
+                                <MenuFlyoutSeparator />
+                                <MenuFlyoutItem Text="⚙️ 開啟進階設定面板" Click="OpenHudSettings_Click" AutomationProperties.AutomationId="OpenHudSettingsMenuItem" />
+                            </MenuFlyout>
+                        </DropDownButton.Flyout>
+                    </DropDownButton>
+                </StackPanel>
+            </Grid>
         </Grid>
 
         <!-- Main TabView -->

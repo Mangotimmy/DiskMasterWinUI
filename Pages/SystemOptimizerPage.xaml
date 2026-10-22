@@ -109,9 +109,11 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Grid.Column="0" Spacing="3">
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <TextBlock x:Name="GameDvrTitle" Text="停用 Game DVR / Xbox Game Bar (GameDVR_Enabled = 0)" FontWeight="SemiBold" />
-                                                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,1">
+                                                <!-- Label above its registry badge: side by side they clipped inside
+                                                     the narrow two-column sub-card at 1000 DIP window widths. -->
+                                                <StackPanel Spacing="4">
+                                                    <TextBlock x:Name="GameDvrTitle" Text="停用 Game DVR / Xbox Game Bar (GameDVR_Enabled = 0)" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                    <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,1" HorizontalAlignment="Left">
                                                         <TextBlock Text="HKCU\System\GameConfigStore" FontFamily="Consolas" FontSize="10" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
                                                     </Border>
                                                 </StackPanel>
@@ -683,9 +685,9 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0" Spacing="3">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <TextBlock x:Name="DpsServiceLabel" Text="停用 DPS 診斷原則服務防記憶體膨脹 (DPS Start = 4)" FontWeight="SemiBold" />
-                                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,1">
+                                            <StackPanel Spacing="4">
+                                                <TextBlock x:Name="DpsServiceLabel" Text="停用 DPS 診斷原則服務防記憶體膨脹 (DPS Start = 4)" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,1" HorizontalAlignment="Left">
                                                     <TextBlock Text="HKLM\SYSTEM\CurrentControlSet\Services\DPS" FontFamily="Consolas" FontSize="10" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
                                                 </Border>
                                             </StackPanel>
@@ -703,9 +705,9 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0" Spacing="3">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <TextBlock x:Name="L2tpVpnLabel" Text="L2TP/IPsec VPN NAT 穿透連線修復 (AssumeUDPEncapsulationContextOnSendRule = 2)" FontWeight="SemiBold" />
-                                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,1">
+                                            <StackPanel Spacing="4">
+                                                <TextBlock x:Name="L2tpVpnLabel" Text="L2TP/IPsec VPN NAT 穿透連線修復 (AssumeUDPEncapsulationContextOnSendRule = 2)" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,1" HorizontalAlignment="Left">
                                                     <TextBlock Text="HKLM\SYSTEM\CurrentControlSet\Services\PolicyAgent" FontFamily="Consolas" FontSize="10" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
                                                 </Border>
                                             </StackPanel>
@@ -1696,17 +1698,24 @@
                                             </Border>
                                         </StackPanel>
 
-                                        <StackPanel Orientation="Horizontal" Spacing="12">
-                                            <TextBlock Text="{x:Bind ViewModel.OneDriveRunningStatusText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" />
-                                            <TextBlock Text="•" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                            <TextBlock Text="{x:Bind ViewModel.OneDriveRedirectStatusText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" />
-                                            <TextBlock Text="•" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                            <TextBlock Text="{x:Bind ViewModel.OneDriveCloudFilesStatusText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" />
-                                            <TextBlock Text="•" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                            <TextBlock Text="{x:Bind ViewModel.OneDriveGhostIconStatusText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" />
-                                            <TextBlock Text="•" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                            <TextBlock Text="{x:Bind ViewModel.OneDrivePolicyStatusText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" />
-                                        </StackPanel>
+                                        <!-- Five status chips wrapped into a two-column grid: as one long
+                                             single-line row they ran underneath the refresh button. -->
+                                        <Grid ColumnSpacing="16" RowSpacing="4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="{x:Bind ViewModel.OneDriveRunningStatusText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" />
+                                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{x:Bind ViewModel.OneDriveRedirectStatusText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" />
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="{x:Bind ViewModel.OneDriveCloudFilesStatusText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" />
+                                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{x:Bind ViewModel.OneDriveGhostIconStatusText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" />
+                                            <TextBlock Grid.Row="2" Grid.Column="0" Text="{x:Bind ViewModel.OneDrivePolicyStatusText, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" />
+                                        </Grid>
                                     </StackPanel>
 
                                     <Button Grid.Column="2" Content="🔄 重新整理" Command="{x:Bind ViewModel.RefreshOneDriveStatusCommand}"
@@ -1922,6 +1931,7 @@
                     <Button Grid.Column="1" Content="Clear" Command="{x:Bind ViewModel.ClearLogCommand}" Padding="8,2" FontSize="11" />
                 </Grid>
                 <ScrollViewer Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                              VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled"
                               CornerRadius="6" Padding="10">
                     <TextBlock Text="{x:Bind ViewModel.ConsoleLog, Mode=OneWay}"

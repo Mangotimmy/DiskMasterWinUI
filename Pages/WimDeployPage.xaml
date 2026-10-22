@@ -30,13 +30,14 @@
             </StackPanel>
             <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}"
                        VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}"
-                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                       TextTrimming="CharacterEllipsis" MaxWidth="420" />
         </Grid>
 
         <!-- Main Body -->
         <Grid Grid.Row="1" ColumnSpacing="14">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="520" MinWidth="460" MaxWidth="720" />
+                <ColumnDefinition Width="1*" MinWidth="440" />
                 <ColumnDefinition Width="*" MinWidth="320" />
             </Grid.ColumnDefinitions>
 
@@ -44,7 +45,7 @@
             <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                     CornerRadius="8" Padding="16">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch">
                     <StackPanel Spacing="12">
                         <!-- 🌐 Official Windows ISO / WIM Downloader Expander -->
                         <Expander Header="🌐 下載微軟官方 Windows 系統映像"
@@ -262,20 +263,14 @@
 
                                         <!-- Custom URL Input & Temp Clean -->
                                         <StackPanel Spacing="6">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0" Text="自訂高速鏡像/直鏈網址 (選填)" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
-                                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                                                    <Button Content="🌐 開啟微軟官網獲取直鏈" Command="{x:Bind ViewModel.OpenMicrosoftPortalCommand}"
-                                                            Padding="8,2" FontSize="11" ToolTipService.ToolTip="於預設瀏覽器開啟微軟官方網站獲取當日有效直鏈" />
-                                                    <Button Content="📋 貼上剪貼簿直鏈" Command="{x:Bind ViewModel.PasteDirectLinkCommand}"
-                                                            Style="{StaticResource AccentButtonStyle}" Padding="8,2" FontSize="11"
-                                                            ToolTipService.ToolTip="自動貼上剪貼簿中的 .iso/.wim 網址並觸發 Range 探針" />
-                                                </StackPanel>
-                                            </Grid>
+                                            <TextBlock Text="自訂高速鏡像/直鏈網址 (選填)" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <Button Content="🌐 開啟微軟官網獲取直鏈" Command="{x:Bind ViewModel.OpenMicrosoftPortalCommand}"
+                                                        Padding="8,2" FontSize="11" ToolTipService.ToolTip="於預設瀏覽器開啟微軟官方網站獲取當日有效直鏈" />
+                                                <Button Content="📋 貼上剪貼簿直鏈" Command="{x:Bind ViewModel.PasteDirectLinkCommand}"
+                                                        Style="{StaticResource AccentButtonStyle}" Padding="8,2" FontSize="11"
+                                                        ToolTipService.ToolTip="自動貼上剪貼簿中的 .iso/.wim 網址並觸發 Range 探針" />
+                                            </StackPanel>
                                             <TextBox Text="{x:Bind ViewModel.CustomDownloadUrl, Mode=TwoWay}"
                                                      PlaceholderText="https://... 可貼上微軟當日直鏈或校園高速鏡像 (右鍵選單支援快捷操作)">
                                                 <TextBox.ContextFlyout>
@@ -601,10 +596,14 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
-                            <FontIcon Glyph="&#xE756;" FontSize="16" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                            <TextBlock x:Name="DeployLogTitle" Text="Deployment Progress &amp; DISM Console" Style="{StaticResource BodyStrongTextBlockStyle}" />
-                        </StackPanel>
+                        <Grid Grid.Column="0" ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Grid.Column="0" Glyph="&#xE756;" FontSize="16" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" x:Name="DeployLogTitle" Text="Deployment Progress &amp; DISM Console" Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </Grid>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
                             <Button x:Name="CopyDeployLogBtn" Content="📋 複製日誌" Command="{x:Bind ViewModel.CopyDeployLogCommand}" Padding="8,2" FontSize="11" />
                             <Button x:Name="ClearDeployLogBtn" Content="Clear" Command="{x:Bind ViewModel.ClearDeployLogCommand}" Padding="8,2" FontSize="11" />

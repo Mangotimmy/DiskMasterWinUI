@@ -222,7 +222,7 @@ public class CliToolsService
                     {
                         try
                         {
-                            var proc = Process.GetProcessById(pid);
+                            using var proc = Process.GetProcessById(pid);
                             procName = proc.ProcessName;
                             try { procPath = proc.MainModule?.FileName ?? ""; } catch { }
                         }

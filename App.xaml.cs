@@ -147,6 +147,8 @@ public partial class App : Application
                 int currentPid = Environment.ProcessId;
                 foreach (var proc in System.Diagnostics.Process.GetProcessesByName("DiskMasterWinUI"))
                 {
+                    try
+                    {
                     if (proc.Id != currentPid)
                     {
                         if (proc.MainWindowHandle != IntPtr.Zero)
@@ -177,6 +179,11 @@ public partial class App : Application
                             }, IntPtr.Zero);
                         }
                         break;
+                    }
+                    }
+                    finally
+                    {
+                        try { proc.Dispose(); } catch { }
                     }
                 }
             }

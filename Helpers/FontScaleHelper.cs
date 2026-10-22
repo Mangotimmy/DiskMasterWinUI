@@ -7,8 +7,18 @@ using Microsoft.UI.Xaml.Media;
 namespace DiskMasterWinUI.Helpers;
 
 /// <summary>
-/// Recursively manages and propagates font family and font size scaling across all pages,
-/// controls, and windows without accumulative sizing drift.
+/// Applies a font family and a proportional font-size scale to a page/control tree without
+/// accumulative sizing drift: the first font size seen on an element is stored as its original,
+/// so re-applying a different factor is idempotent and always starts from the authored value.
+///
+/// IMPORTANT — do not reintroduce per-element Loaded subscriptions here.
+/// An earlier version attached a one-shot Loaded handler to every element that was not loaded yet,
+/// and every handler re-walked its entire subtree when it fired. On a big page (Network Tools has
+/// seven sub-tabs plus a text editor and several lists) that made each tab re-attach an
+/// O(elements × depth) storm on the UI thread — the direct cause of the repeated
+/// "switch to Network Tools and the whole window freezes" hangs. This walk is intentionally a pure,
+/// allocation-bounded, one-shot traversal: it is cheap enough to run when a page is created and when
+/// the user changes typography or zoom, and it never runs on a per-navigation or per-element event.
 /// </summary>
 public static class FontScaleHelper
 {
@@ -25,22 +35,9 @@ public static class FontScaleHelper
     public static void SetOriginalFontSize(DependencyObject obj, double value) =>
         obj.SetValue(OriginalFontSizeProperty, value);
 
-    private static readonly DependencyProperty IsListeningLoadedProperty =
-        DependencyProperty.RegisterAttached(
-            "IsListeningLoaded",
-            typeof(bool),
-            typeof(FontScaleHelper),
-            new PropertyMetadata(false));
-
-    private static bool GetIsListeningLoaded(DependencyObject obj) =>
-        (bool)obj.GetValue(IsListeningLoadedProperty);
-
-    private static void SetIsListeningLoaded(DependencyObject obj, bool value) =>
-        obj.SetValue(IsListeningLoadedProperty, value);
-
     /// <summary>
-    /// Applies the specified font family and scale factor to the root element and all its visual and logical children.
-    /// If an element is not yet loaded, a one-shot Loaded handler is attached to ensure proper traversal when it renders.
+    /// Applies the specified font family and scale factor to the root element and all its visual and
+    /// logical children.
     /// </summary>
     public static void ApplyFontAndScale(DependencyObject? root, FontFamily? fontFamily, double scaleFactor)
     {
@@ -53,22 +50,6 @@ public static class FontScaleHelper
     private static void TraverseAndApply(DependencyObject root, FontFamily? fontFamily, double scaleFactor, HashSet<object> visited)
     {
         if (!visited.Add(root)) return;
-
-        if (root is FrameworkElement fe && !fe.IsLoaded && !GetIsListeningLoaded(fe))
-        {
-            SetIsListeningLoaded(fe, true);
-            RoutedEventHandler? handler = null;
-            handler = (s, e) =>
-            {
-                fe.Loaded -= handler;
-                SetIsListeningLoaded(fe, false);
-                var fontName = Services.SettingsService.Instance.Current.CustomFontFamily;
-                if (string.IsNullOrWhiteSpace(fontName)) fontName = "Segoe UI Variable";
-                var scale = Services.SettingsService.Instance.Current.CustomFontScale > 0 ? Services.SettingsService.Instance.Current.CustomFontScale : 100.0;
-                ApplyFontAndScale(fe, new FontFamily(fontName), scale / 100.0);
-            };
-            fe.Loaded += handler;
-        }
 
         ApplyToElement(root, fontFamily, scaleFactor);
 
@@ -87,52 +68,47 @@ public static class FontScaleHelper
         }
         catch { }
 
-        // 2. Logical and structural tree traversal (critical for unparented/unloaded Pages, UserControls & Controls)
-        if (root is UserControl uc && uc.Content is DependencyObject ucContent)
+        // 2. Logical and structural tree traversal (critical for unparented/unloaded Pages & Controls)
+        switch (root)
         {
-            TraverseAndApply(ucContent, fontFamily, scaleFactor, visited);
-        }
-        else if (root is ContentControl cc && cc.Content is DependencyObject ccContent)
-        {
-            TraverseAndApply(ccContent, fontFamily, scaleFactor, visited);
-        }
-        else if (root is Border border && border.Child is DependencyObject borderChild)
-        {
-            TraverseAndApply(borderChild, fontFamily, scaleFactor, visited);
-        }
-        else if (root is Viewbox vb && vb.Child is DependencyObject vbChild)
-        {
-            TraverseAndApply(vbChild, fontFamily, scaleFactor, visited);
-        }
-        else if (root is Panel panel)
-        {
-            foreach (var child in panel.Children)
-            {
-                if (child != null)
+            case UserControl uc when uc.Content is DependencyObject ucContent:
+                TraverseAndApply(ucContent, fontFamily, scaleFactor, visited);
+                break;
+            case ContentControl cc when cc.Content is DependencyObject ccContent:
+                TraverseAndApply(ccContent, fontFamily, scaleFactor, visited);
+                break;
+            case Border border when border.Child is DependencyObject borderChild:
+                TraverseAndApply(borderChild, fontFamily, scaleFactor, visited);
+                break;
+            case Viewbox vb when vb.Child is DependencyObject vbChild:
+                TraverseAndApply(vbChild, fontFamily, scaleFactor, visited);
+                break;
+            case Panel panel:
+                foreach (var child in panel.Children)
                 {
-                    TraverseAndApply(child, fontFamily, scaleFactor, visited);
+                    if (child != null)
+                    {
+                        TraverseAndApply(child, fontFamily, scaleFactor, visited);
+                    }
                 }
-            }
-        }
-        else if (root is Expander exp)
-        {
-            if (exp.Header is DependencyObject expHeader) TraverseAndApply(expHeader, fontFamily, scaleFactor, visited);
-            if (exp.Content is DependencyObject expContent) TraverseAndApply(expContent, fontFamily, scaleFactor, visited);
-        }
-        else if (root is SplitView sv)
-        {
-            if (sv.Pane is DependencyObject svPane) TraverseAndApply(svPane, fontFamily, scaleFactor, visited);
-            if (sv.Content is DependencyObject svContent) TraverseAndApply(svContent, fontFamily, scaleFactor, visited);
-        }
-        else if (root is ItemsControl ic)
-        {
-            foreach (var item in ic.Items)
-            {
-                if (item is DependencyObject itemDep)
+                break;
+            case Expander exp:
+                if (exp.Header is DependencyObject expHeader) TraverseAndApply(expHeader, fontFamily, scaleFactor, visited);
+                if (exp.Content is DependencyObject expContent) TraverseAndApply(expContent, fontFamily, scaleFactor, visited);
+                break;
+            case SplitView sv:
+                if (sv.Pane is DependencyObject svPane) TraverseAndApply(svPane, fontFamily, scaleFactor, visited);
+                if (sv.Content is DependencyObject svContent) TraverseAndApply(svContent, fontFamily, scaleFactor, visited);
+                break;
+            case ItemsControl ic:
+                foreach (var item in ic.Items)
                 {
-                    TraverseAndApply(itemDep, fontFamily, scaleFactor, visited);
+                    if (item is DependencyObject itemDep)
+                    {
+                        TraverseAndApply(itemDep, fontFamily, scaleFactor, visited);
+                    }
                 }
-            }
+                break;
         }
     }
 

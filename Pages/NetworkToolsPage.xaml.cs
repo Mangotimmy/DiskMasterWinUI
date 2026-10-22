@@ -105,7 +105,20 @@ public sealed partial class NetworkToolsPage : Page
     private void Page_Loaded(object sender, RoutedEventArgs e)
     {
         ApplyLanguage();
+        // Re-activation: clears any cancellation left behind by Unloaded and (re)starts the load
+        // exactly once. Skipped work is retried here, so data is never stale after a tab switch.
+        ViewModel.OnPageActivated();
         RunObserved(ViewModel.InitializeAsync(), "NetworkToolsPage.InitializeAsync");
+    }
+
+    /// <summary>
+    /// The page is cached (NavigationCacheMode.Required). When it leaves the visual tree every
+    /// page-scoped refresh loop / timer must stop, otherwise a cached page keeps touching the UI
+    /// thread after the user has moved on (this was one of the freeze contributors).
+    /// </summary>
+    private void Page_Unloaded(object sender, RoutedEventArgs e)
+    {
+        ViewModel.OnPageDeactivated();
     }
 
     /// <summary>
@@ -284,7 +297,10 @@ public sealed partial class NetworkToolsPage : Page
         if (string.IsNullOrWhiteSpace(folderPath)) return;
         try
         {
-            NetTabView.SelectedItem = TabNetShare;
+            // 七個工具分頁已收進三個類別的第二層 TabView：先切到「檔案與系統」類別，
+            // 再選取其中的「網路共用」工具分頁，最後才載入指定的共用資料夾。
+            NetTabView.SelectedItem = TabCategoryFiles;
+            FileSystemTabView.SelectedItem = TabNetShare;
             ViewModel.LoadShareFolderTarget(folderPath);
         }
         catch { }

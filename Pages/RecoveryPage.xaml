@@ -55,9 +55,13 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBox x:Name="TargetPathBox" Grid.Column="0" Header="或輸入路徑（磁碟機 / 資料夾 / .img 磁碟映像檔）"
+                        <TextBox x:Name="TargetPathBox" Grid.Column="0"
                                  Text="{x:Bind ViewModel.TargetPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                 PlaceholderText="例如 D:\ 或 D:\Photos 或 C:\dump\disk.img" />
+                                 PlaceholderText="例如 D:\ 或 D:\Photos 或 C:\dump\disk.img">
+                            <TextBox.Header>
+                                <TextBlock Text="或輸入路徑（磁碟機 / 資料夾 / .img 磁碟映像檔）" TextWrapping="Wrap" />
+                            </TextBox.Header>
+                        </TextBox>
                         <Button x:Name="BrowseTargetFolderBtn" Grid.Column="1" Content="📁 資料夾" VerticalAlignment="Bottom"
                                 Click="BrowseTargetFolder_Click"
                                 ToolTipService.ToolTip="瀏覽要掃描的來源資料夾"
@@ -109,8 +113,8 @@
         <!-- ═══ Results + destination / recover ═══ -->
         <Grid Grid.Row="2" ColumnSpacing="12">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="380" />
+                <ColumnDefinition Width="2.4*" />
+                <ColumnDefinition Width="1*" MinWidth="320" />
             </Grid.ColumnDefinitions>
 
             <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -141,7 +145,7 @@
 
                     <ListView Grid.Row="1" x:Name="ResultsList"
                               ItemsSource="{x:Bind ViewModel.Results, Mode=OneWay}"
-                              SelectionMode="None" MinHeight="260" MaxHeight="560"
+                              SelectionMode="None"
                               HorizontalAlignment="Stretch"
                               ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                               ScrollViewer.HorizontalScrollMode="Disabled">
@@ -154,11 +158,11 @@
                             <Grid Padding="12,6" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" ColumnSpacing="8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="36" />
-                                    <ColumnDefinition Width="120" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="240" />
-                                    <ColumnDefinition Width="90" />
-                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="110" />
+                                    <ColumnDefinition Width="2*" />
+                                    <ColumnDefinition Width="1.2*" />
+                                    <ColumnDefinition Width="80" />
+                                    <ColumnDefinition Width="100" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="選取" FontWeight="SemiBold" FontSize="12" />
                                 <TextBlock Grid.Column="1" Text="復原信心" FontWeight="SemiBold" FontSize="12" />
@@ -173,11 +177,11 @@
                                 <Grid Padding="12,8" ColumnSpacing="8" HorizontalAlignment="Stretch">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="36" />
-                                        <ColumnDefinition Width="120" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="240" />
-                                        <ColumnDefinition Width="90" />
-                                        <ColumnDefinition Width="120" />
+                                        <ColumnDefinition Width="110" />
+                                        <ColumnDefinition Width="2*" />
+                                        <ColumnDefinition Width="1.2*" />
+                                        <ColumnDefinition Width="80" />
+                                        <ColumnDefinition Width="100" />
                                     </Grid.ColumnDefinitions>
 
                                     <CheckBox Grid.Column="0" MinWidth="0" VerticalAlignment="Center"

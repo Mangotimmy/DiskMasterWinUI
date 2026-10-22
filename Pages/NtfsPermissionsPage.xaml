@@ -17,28 +17,36 @@
         </Grid.RowDefinitions>
 
         <!-- ═══ Top Path Selection & Elevation Bar ═══ -->
-        <Grid Grid.Row="0" ColumnSpacing="12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+        <Grid Grid.Row="0" RowSpacing="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
-            <TextBox x:Name="TargetPathBox" Grid.Column="0" Header="Target Drive or Directory"
-                     Text="{x:Bind ViewModel.TargetPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                     PlaceholderText="e.g. D:\ or C:\Users\Public" />
+            <Grid Grid.Row="0" ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-            <Button x:Name="BrowseFolderBtn" Grid.Column="1" Content="📁 Browse Folder" VerticalAlignment="Bottom"
-                    Click="BrowseFolder_Click" />
+                <TextBox x:Name="TargetPathBox" Grid.Column="0" Header="Target Drive or Directory"
+                         Text="{x:Bind ViewModel.TargetPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         PlaceholderText="e.g. D:\ or C:\Users\Public" />
 
-            <Button Grid.Column="2" Content="🔍 深度探測 NTFS" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Bottom"
-                    Command="{x:Bind ViewModel.InspectNtfsFeaturesCommand}"
-                    IsEnabled="{x:Bind ViewModel.IsSummaryLoading, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}" />
+                <Button x:Name="BrowseFolderBtn" Grid.Column="1" Content="📁 Browse Folder" VerticalAlignment="Bottom"
+                        Click="BrowseFolder_Click" />
 
-            <InfoBar x:Name="AdminInfoBar" Grid.Column="3" IsOpen="{x:Bind ViewModel.IsAdmin, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}"
+                <Button Grid.Column="2" Content="🔍 深度探測 NTFS" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Bottom"
+                        Command="{x:Bind ViewModel.InspectNtfsFeaturesCommand}"
+                        IsEnabled="{x:Bind ViewModel.IsSummaryLoading, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}" />
+            </Grid>
+
+            <!-- Admin warning is on its own full-width row so the Auto-width bar can never squeeze it
+                 off the right edge at narrow window widths. -->
+            <InfoBar x:Name="AdminInfoBar" Grid.Row="1" IsOpen="{x:Bind ViewModel.IsAdmin, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}"
                      Severity="Warning" Title="Not Admin" IsClosable="False"
-                     Message="Taking ownership and modifying ACLs requires Administrator." VerticalAlignment="Bottom">
+                     Message="Taking ownership and modifying ACLs requires Administrator.">
                 <InfoBar.ActionButton>
                     <Button x:Name="RestartAdminBtn" Content="Restart as Admin" Command="{x:Bind ViewModel.RestartAsAdminCommand}" />
                 </InfoBar.ActionButton>
@@ -54,7 +62,7 @@
                 <!-- ════ Tab 1: 常用快捷操作 (Quick Actions) ════ -->
                 <TabViewItem x:Name="TabQuickActions" Header="⚡ 常用快捷操作 (Quick Actions)" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
-                        <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
+                        <StackPanel Spacing="16" HorizontalAlignment="Stretch">
                             
                             <!-- Presets Grid -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -172,7 +180,7 @@
                 <!-- ════ Tab 2: NTFS 深度特性探索 (NTFS Explorer) ════ -->
                 <TabViewItem x:Name="TabNtfsExplorer" Header="🔍 NTFS 深度特性探索" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
-                        <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
+                        <StackPanel Spacing="16" HorizontalAlignment="Stretch">
 
                             <!-- Status & Quick Stats Overview -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -366,7 +374,7 @@
                 <!-- ════ Tab 3: 自訂 icacls 規則建置器 ════ -->
                 <TabViewItem x:Name="TabRuleBuilder" Header="🛠️ 自訂 icacls 規則建置器" IsClosable="False">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
-                        <StackPanel Spacing="16" MaxWidth="1100" HorizontalAlignment="Stretch">
+                        <StackPanel Spacing="16" HorizontalAlignment="Stretch">
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                                     CornerRadius="8" Padding="16">
@@ -525,6 +533,7 @@
                         </Grid>
 
                         <ScrollViewer Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                      VerticalScrollBarVisibility="Auto"
                                       HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled"
                                       CornerRadius="8" Padding="12">
                             <TextBlock Text="{x:Bind ViewModel.TerminalOutput, Mode=OneWay}"

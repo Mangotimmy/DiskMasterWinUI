@@ -103,11 +103,18 @@ public class OneDriveService
             try
             {
                 var procs = Process.GetProcessesByName("OneDrive");
-                info.IsRunning = procs.Length > 0;
-                if (info.IsRunning && !info.IsInstalled && procs.Length > 0)
+                try
                 {
-                    info.IsInstalled = true;
-                    try { info.ExePath = procs[0].MainModule?.FileName ?? ""; } catch { }
+                    info.IsRunning = procs.Length > 0;
+                    if (info.IsRunning && !info.IsInstalled && procs.Length > 0)
+                    {
+                        info.IsInstalled = true;
+                        try { info.ExePath = procs[0].MainModule?.FileName ?? ""; } catch { }
+                    }
+                }
+                finally
+                {
+                    foreach (var p in procs) { try { p.Dispose(); } catch { } }
                 }
             }
             catch { }
@@ -211,9 +218,16 @@ public class OneDriveService
         try
         {
             var procs = Process.GetProcessesByName("OneDrive");
-            foreach (var p in procs)
+            try
             {
-                try { p.Kill(); p.WaitForExit(3000); } catch { }
+                foreach (var p in procs)
+                {
+                    try { p.Kill(); p.WaitForExit(3000); } catch { }
+                }
+            }
+            finally
+            {
+                foreach (var p in procs) { try { p.Dispose(); } catch { } }
             }
             messages.Add("已強制結束所有 OneDrive 正在執行的處理程序。");
         }

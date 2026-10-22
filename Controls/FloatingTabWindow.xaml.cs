@@ -18,6 +18,7 @@ public sealed partial class FloatingTabWindow : Window
 
     private bool _isDocking = false;
     private string _lastAppliedFontSignature = "";
+    private bool _typographyNeedsReset;
 
     /// <summary>Frame that owns the hosted page while this window is alive (diagnostics only).</summary>
     public Frame ContentFrame => FloatingContentFrame;
@@ -151,11 +152,27 @@ public sealed partial class FloatingTabWindow : Window
         var font = settings.CustomFontFamily;
         if (string.IsNullOrWhiteSpace(font)) font = "Segoe UI Variable";
         var scalePercent = settings.CustomFontScale > 0 ? settings.CustomFontScale : 100.0;
-        string signature = font + "|" + scalePercent.ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
+        // Effective text scale includes the interface zoom, exactly like the main window (the zoom is
+        // applied as text scaling so the layout always stays filled).
+        int zoomPercent = (settings.ScalePercent >= 80 && settings.ScalePercent <= 150) ? settings.ScalePercent : 100;
+        double zoomFactor = zoomPercent / 100.0;
+        double effectivePercent = scalePercent * (zoomFactor < 1.0 ? Math.Max(0.9, zoomFactor) : zoomFactor);
+        string signature = font + "|" + scalePercent.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + "|" + zoomPercent;
         if (string.Equals(_lastAppliedFontSignature, signature, StringComparison.Ordinal)) return;
         _lastAppliedFontSignature = signature;
 
-        double scaleFactor = scalePercent / 100.0;
+        double scaleFactor = Math.Clamp(effectivePercent / 100.0, 0.6, 3.0);
+
+        // Default typography needs no tree walk at all (the XAML already matches it); the walk is kept
+        // for the non-default case and for resetting back to the originals.
+        bool isDefaultTypography = scaleFactor > 0.999 && scaleFactor < 1.001 &&
+            (string.IsNullOrWhiteSpace(font) || font.Equals("Segoe UI Variable", StringComparison.OrdinalIgnoreCase));
+        if (isDefaultTypography && !_typographyNeedsReset)
+        {
+            UpdateFloatingViewportLayout();
+            return;
+        }
+        _typographyNeedsReset = !isDefaultTypography;
 
         try
         {
@@ -181,29 +198,30 @@ public sealed partial class FloatingTabWindow : Window
         UpdateFloatingViewportLayout();
     }
 
+    /// <summary>
+    /// Keeps the hosted page filling the floating window. The former ScaleTransform zoom layout is gone
+    /// (it drew the page scaled, top-left aligned, and left blank bands); the page now stretches to the
+    /// viewport and only content taller than the window scrolls.
+    /// </summary>
     private void UpdateFloatingViewportLayout()
     {
         if (FloatingScrollViewer == null || FloatingContentRoot == null) return;
-        var viewportW = FloatingScrollViewer.ActualWidth;
-        var viewportH = FloatingScrollViewer.ActualHeight;
-        if (viewportW <= 0) return;
+        double viewportH = FloatingScrollViewer.ViewportHeight;
+        if (double.IsNaN(viewportH) || viewportH <= 0) viewportH = FloatingScrollViewer.ActualHeight;
+        if (viewportH <= 0) return;
 
-        int savedScale = SettingsService.Instance.Current.ScalePercent;
-        double scaleFactor = (savedScale >= 80 && savedScale <= 150) ? savedScale / 100.0 : 1.0;
-        var contentH = FloatingContentFrame?.ActualHeight ?? FloatingContentRoot.ActualHeight;
-        var (layoutW, offsetX, bottomMargin, factor) = DisplayHelper.CalculateScaledViewportLayout(
-            viewportW, viewportH, contentH, scaleFactor);
-
-        FloatingContentRoot.Width = layoutW;
-        FloatingContentRoot.MaxWidth = layoutW;
+        if (Math.Abs(FloatingContentRoot.MinHeight - viewportH) > 0.5)
+        {
+            FloatingContentRoot.MinHeight = viewportH;
+        }
+        if (!double.IsNaN(FloatingContentRoot.Width)) FloatingContentRoot.ClearValue(FrameworkElement.WidthProperty);
+        if (!double.IsNaN(FloatingContentRoot.MaxWidth)) FloatingContentRoot.ClearValue(FrameworkElement.MaxWidthProperty);
+        if (FloatingContentRoot.Margin != new Thickness(0)) FloatingContentRoot.Margin = new Thickness(0);
         if (FloatingContentFrame != null)
         {
-            FloatingContentFrame.Width = layoutW;
-            FloatingContentFrame.MaxWidth = layoutW;
+            if (!double.IsNaN(FloatingContentFrame.Width)) FloatingContentFrame.ClearValue(FrameworkElement.WidthProperty);
+            if (!double.IsNaN(FloatingContentFrame.MaxWidth)) FloatingContentFrame.ClearValue(FrameworkElement.MaxWidthProperty);
         }
-        FloatingScaleTransform.ScaleX = factor;
-        FloatingScaleTransform.ScaleY = factor;
-        FloatingContentRoot.Margin = new Thickness(offsetX, 0, 0, bottomMargin);
     }
 
     private void FloatingScrollViewer_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -214,15 +232,6 @@ public sealed partial class FloatingTabWindow : Window
     private void FloatingContentFrame_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         UpdateFloatingViewportLayout();
-    }
-
-    private void FloatingContentRoot_BringIntoViewRequested(UIElement sender, BringIntoViewRequestedEventArgs args)
-    {
-        var r = args.TargetRect;
-        if (!double.IsNaN(r.X) && r.X != 0)
-        {
-            args.TargetRect = new Windows.Foundation.Rect(0, r.Y, Math.Min(1.0, Math.Max(0.0, r.Width)), r.Height);
-        }
     }
 
     private void DockRight_Click(object sender, RoutedEventArgs e)

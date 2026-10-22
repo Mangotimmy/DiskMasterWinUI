@@ -48,6 +48,8 @@
 
                     <!-- Script Templates & Quick Actions -->
                     <StackPanel Grid.Row="0" Spacing="6">
+                        <!-- Two rows: the eight script templates no longer form one long single-line strip
+                             that overflows the page at narrow window widths. -->
                         <StackPanel Orientation="Horizontal" Spacing="4">
                             <TextBlock x:Name="TemplatesLabel" Text="Templates:" VerticalAlignment="Center" Margin="0,0,8,0"
                                        Style="{StaticResource CaptionTextBlockStyle}" />
@@ -55,6 +57,8 @@
                             <Button x:Name="TplCleanGptBtn" Content="Clean + GPT" Click="Template_CleanGPT" />
                             <Button x:Name="TplCleanMbrBtn" Content="Clean + MBR" Click="Template_CleanMBR" />
                             <Button x:Name="TplUsbBootBtn" Content="USB Boot" Click="Template_USB" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="4">
                             <Button x:Name="TplWinInstallBtn" Content="Win Install" Click="Template_WinInstall" />
                             <Button x:Name="TplStandardUefiBtn" Content="UEFI 4分區" Click="Template_StandardUEFI" />
                             <Button x:Name="TplWinReBtn" Content="WinRE 分割區" Click="Template_WinRE" />
@@ -62,6 +66,7 @@
                         </StackPanel>
 
                         <!-- Quick Disk Commands (Zero-Keyboard) -->
+                        <!-- Split over two rows so the quick-action strip cannot run past the window edge. -->
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <TextBlock x:Name="QuickActionsLabel" Text="Quick Actions:" VerticalAlignment="Center" Margin="0,0,4,0"
                                        Style="{StaticResource CaptionTextBlockStyle}" />
@@ -70,6 +75,8 @@
                                        Width="90" VerticalAlignment="Center" />
                             <Button x:Name="ClearReadOnlyBtn" Content="🔓 Clear Read-Only" Command="{x:Bind ViewModel.ClearReadOnlyCommand}" />
                             <Button x:Name="SetOnlineBtn" Content="🌐 Online Disk" Command="{x:Bind ViewModel.SetDiskOnlineCommand}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
                             <Button x:Name="SetOfflineBtn" Content="📴 Offline Disk" Command="{x:Bind ViewModel.SetDiskOfflineCommand}" />
                             <Button x:Name="GetUniqueIdBtn" Content="🆔 Unique ID" Command="{x:Bind ViewModel.GetDiskUniqueIdCommand}" />
                             <Button x:Name="RescanDisksBtn" Content="🔄 Rescan Devices" Command="{x:Bind ViewModel.RescanDisksCommand}" />
@@ -106,6 +113,7 @@
 
                     <!-- Output -->
                     <ScrollViewer Grid.Row="4" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                  VerticalScrollBarVisibility="Auto"
                                   CornerRadius="8" Padding="12"
                                   HorizontalScrollBarVisibility="Disabled"
                                   HorizontalScrollMode="Disabled">
@@ -197,6 +205,8 @@
                                 <Button Content="📋 RE 狀態 (/info)" Command="{x:Bind ViewModel.ReagentcInfoCommand}" />
                                 <Button Content="✅ 啟用 RE (/enable)" Command="{x:Bind ViewModel.ReagentcEnableCommand}" />
                                 <Button Content="❌ 停用 RE (/disable)" Command="{x:Bind ViewModel.ReagentcDisableCommand}" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
                                 <Button Content="🔄 下次開機進入 RE (/boottoore)" Command="{x:Bind ViewModel.ReagentcBootToReCommand}" />
                                 <Button Content="🧹 清潔 BCD 重建 (/c)" Command="{x:Bind ViewModel.BcdBootCleanCommand}" />
                             </StackPanel>
@@ -236,6 +246,7 @@
                             <Button Content="Clear" Command="{x:Bind ViewModel.ClearBootOutputCommand}" />
                         </StackPanel>
                         <ScrollViewer Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                      VerticalScrollBarVisibility="Auto"
                                       CornerRadius="8" Padding="12"
                                       HorizontalScrollBarVisibility="Disabled"
                                       HorizontalScrollMode="Disabled">
@@ -352,6 +363,7 @@
                     </Grid.RowDefinitions>
                     <Button x:Name="ClearFullLogBtn" Content="清除記錄" Command="{x:Bind ViewModel.ClearFullLogCommand}" />
                     <ScrollViewer Grid.Row="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                  VerticalScrollBarVisibility="Auto"
                                   CornerRadius="8" Padding="12"
                                   HorizontalScrollBarVisibility="Disabled"
                                   HorizontalScrollMode="Disabled">

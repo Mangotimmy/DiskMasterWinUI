@@ -10,7 +10,7 @@
     Loaded="Page_Loaded">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Padding="20" HorizontalContentAlignment="Stretch">
-        <StackPanel Spacing="20" HorizontalAlignment="Center" MaxWidth="1200" Margin="0,0,0,24">
+        <StackPanel Spacing="20" HorizontalAlignment="Stretch" Margin="0,0,0,24">
 
             <!-- Hero Health Score Card -->
             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
@@ -163,7 +163,7 @@
                     </Grid.ColumnDefinitions>
                     <ProgressRing Grid.Column="0" IsActive="{x:Bind ViewModel.IsOperating, Mode=OneWay}" Width="20" Height="20" />
                     <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.OperationStatus, Mode=OneWay}"
-                               VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" />
+                               VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" />
                 </Grid>
             </Border>
         </StackPanel>
