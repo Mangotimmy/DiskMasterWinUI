@@ -10,6 +10,7 @@
 // The harness never leaves the registration installed.
 using System.Diagnostics;
 using System.Text;
+using Microsoft.Win32;
 using DiskMasterWinUI.Services;
 
 internal static class Program
@@ -87,6 +88,32 @@ internal static class Program
         Console.WriteLine($"  .reg backups created: {CountBackups() - backupCountBefore} (left in {service.GetBackupDirectory()} by design)");
 
         Console.WriteLine();
+        Console.WriteLine("  -- extended verbs: Add to PATH cascade structure --");
+        var beforeExt = SnapshotScoped();
+        var ext = service.InstallExtended(
+            allUsers: false, enableRecovery: false, enableNtfs: false, enableLanShare: false,
+            enableImageMount: false, enableDiskCheck: false, enableAddToPath: true);
+        Check(ext.Success, "InstallExtended(AddToPath) reported success", ext.Message);
+        foreach (var classPath in ShellIntegrationService.ExtendedAddToPathClassPaths)
+        {
+            var key = @"HKCU\Software\Classes\" + classPath;
+            Check(Query(key, "ExtendedSubCommandsKey") == classPath,
+                $"ExtendedSubCommandsKey [{classPath}]", Query(key, "ExtendedSubCommandsKey"));
+            Check(Query(key, "SubCommands") == null,
+                $"no stale SubCommands [{classPath}]", Query(key, "SubCommands"));
+            Check(Query(key, "") == null,
+                $"no (Default) label [{classPath}]", Query(key, ""));
+            Check(!string.IsNullOrWhiteSpace(Query(key + @"\shell\UserPath\command", "")),
+                $"UserPath command [{classPath}]");
+            Check(!string.IsNullOrWhiteSpace(Query(key + @"\shell\SystemPath\command", "")),
+                $"SystemPath command [{classPath}]");
+        }
+        var removedExt = service.UninstallAllExtended(false);
+        Check(removedExt.Success, "UninstallAllExtended() reported success", removedExt.Message);
+        var afterExt = SnapshotScoped();
+        Check(beforeExt == afterExt, "HKCU restored after extended install/uninstall", Diff(beforeExt, afterExt));
+
+        Console.WriteLine();
         Console.WriteLine(_failures == 0
             ? "RESULT: verified — registration works and HKCU was restored exactly (nothing left installed)."
             : $"RESULT: {_failures} check(s) failed.");
@@ -142,6 +169,9 @@ internal static class Program
         @"Software\Classes\Directory\shell",
         @"Software\Classes\Directory\Background\shell",
         @"Software\Classes\Directory\Background",
+        @"Software\Classes\Directory\shell\DiskMasterAddToPath",
+        @"Software\Classes\Directory\Background\shell\DiskMasterAddToPath",
+        @"Software\Classes\Drive\shell\DiskMasterAddToPath",
         @"Software\DiskMasterPro"
     };
 
@@ -173,14 +203,17 @@ internal static class Program
 
     private static string? Query(string keyPath, string valueName)
     {
-        var (output, _, code) = RunReg(valueName.Length == 0
-            ? $"query \"{keyPath}\" /ve"
-            : $"query \"{keyPath}\" /v \"{valueName}\"");
-        if (code != 0) return null;
-        var line = output.Split('\n').FirstOrDefault(l => l.Contains("REG_SZ", StringComparison.OrdinalIgnoreCase));
-        if (line == null) return null;
-        var index = line.IndexOf("REG_SZ", StringComparison.OrdinalIgnoreCase);
-        return line[(index + "REG_SZ".Length)..].Trim();
+        // Read through the registry API instead of parsing reg.exe text: reg.exe reports
+        // "(value not set)" for a missing default and re-encodes non-ASCII labels, which made
+        // the MUIVerb comparison fail even when the registration was correct.
+        if (!keyPath.StartsWith(@"HKCU\", StringComparison.OrdinalIgnoreCase)) return null;
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(keyPath[@"HKCU\".Length..]);
+            if (key == null) return null;
+            return key.GetValue(valueName.Length == 0 ? null : valueName) as string;
+        }
+        catch { return null; }
     }
 
     private static int CountBackups()

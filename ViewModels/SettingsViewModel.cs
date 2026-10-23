@@ -24,6 +24,9 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _shellEnableAddToPath = true;
     [ObservableProperty] private string _shellStatusSummary = "尚未檢測右鍵選單狀態";
 
+    // ── Background memory ──
+    [ObservableProperty] private bool _backgroundMemorySaver = true;
+
     /// <summary>Explorer context-menu integration is available across environments.</summary>
     public bool IsShellIntegrationAvailable => true;
 
@@ -267,6 +270,7 @@ public partial class SettingsViewModel : ObservableObject
             UpdateFrequency = s.UpdateFrequency ?? "Daily";
             MinimizeToTray = s.MinimizeToTray;
             CloseToTray = s.CloseToTray;
+            BackgroundMemorySaver = s.BackgroundMemorySaver;
             EnableTaskbarFlash = s.EnableTaskbarFlash;
             EnableAudioFeedback = s.EnableAudioFeedback;
             EnableWindowsNotificationCenter = s.EnableWindowsNotificationCenter;
@@ -420,6 +424,7 @@ public partial class SettingsViewModel : ObservableObject
         s.UpdateFrequency = UpdateFrequency;
         s.MinimizeToTray = MinimizeToTray;
         s.CloseToTray = CloseToTray;
+        s.BackgroundMemorySaver = BackgroundMemorySaver;
         s.EnableTaskbarFlash = EnableTaskbarFlash;
         s.EnableAudioFeedback = EnableAudioFeedback;
         s.EnableWindowsNotificationCenter = EnableWindowsNotificationCenter;
@@ -935,6 +940,13 @@ public partial class SettingsViewModel : ObservableObject
         var res = _shellIntegration.UninstallAllExtended(ShellAllUsersScope);
         StatusMessage = res.Headline;
         RefreshShellIntegrationStatus();
+    }
+
+    [RelayCommand]
+    public void TrimBackgroundMemory()
+    {
+        DiskMasterWinUI.Helpers.BackgroundMemorySaver.TrimNow();
+        StatusMessage = "已釋放背景記憶體 (working set trimmed)";
     }
 
     [RelayCommand]

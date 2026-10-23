@@ -325,41 +325,37 @@
                 </Grid>
             </TabViewItem>
 
-            <!-- ── Tab 3: Global Boot Settings ── -->
-            <TabViewItem x:Name="TabGlobalSettings" Header="全域開機設定 (Global Settings)" IsClosable="False">
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                        CornerRadius="8" Padding="20" Margin="0,10,16,20" HorizontalAlignment="Stretch">
-                    <StackPanel Spacing="16">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <FontIcon Glyph="&#xE713;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                            <TextBlock Text="Boot Configuration Data (BCD) Global Settings" Style="{StaticResource SubtitleTextBlockStyle}" />
-                        </StackPanel>
-
-                        <!-- Timeout -->
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="Boot Menu Timeout (Seconds)" FontWeight="SemiBold" />
-                            <Slider Minimum="0" Maximum="60" StepFrequency="1"
-                                    Value="{x:Bind ViewModel.TimeoutSeconds, Mode=TwoWay}" />
-                            <TextBlock Text="{x:Bind ViewModel.TimeoutSeconds, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" />
-                        </StackPanel>
-
-                        <!-- Policy -->
-                        <ToggleSwitch Header="Boot Menu Policy (Metro vs Legacy F8)"
-                                      IsOn="{x:Bind ViewModel.IsModernMenuPolicy, Mode=TwoWay}"
-                                      OnContent="Standard (Modern Blue Metro Menu)"
-                                      OffContent="Legacy (Classic Text/F8 Menu)" />
-
-                        <Button x:Name="ApplyGlobalSettingsBtn" Content="💾 Apply Global Settings" Command="{x:Bind ViewModel.ApplyGlobalSettingsCommand}"
-                                Style="{StaticResource AccentButtonStyle}" />
-                    </StackPanel>
-                </Border>
-            </TabViewItem>
-
-            <!-- ── Tab 4: MSConfig 安全開機與旗標 (Safe Boot & Advanced Boot Flags) ── -->
+            <!-- ── Tab 3: MSConfig 安全開機與旗標 (Safe Boot & Advanced Boot Flags) ── -->
             <TabViewItem x:Name="TabSafeBoot" Header="🛡️ 安全開機 (Safe Boot)" IsClosable="False">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch" Margin="0,10,0,0">
                     <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
+                        <!-- Boot Menu Timeout & Policy (merged from the former Global Settings tab) -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE713;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                    <TextBlock Text="Boot Configuration Data (BCD) Global Settings" Style="{StaticResource SubtitleTextBlockStyle}" />
+                                </StackPanel>
+
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="Boot Menu Timeout (Seconds)" FontWeight="SemiBold" />
+                                    <Slider Minimum="0" Maximum="60" StepFrequency="1"
+                                            Value="{x:Bind ViewModel.TimeoutSeconds, Mode=TwoWay}" />
+                                    <TextBlock Text="{x:Bind ViewModel.TimeoutSeconds, Mode=OneWay}" Style="{StaticResource CaptionTextBlockStyle}" />
+                                </StackPanel>
+
+                                <ToggleSwitch Header="Boot Menu Policy (Metro vs Legacy F8)"
+                                              IsOn="{x:Bind ViewModel.IsModernMenuPolicy, Mode=TwoWay}"
+                                              OnContent="Standard (Modern Blue Metro Menu)"
+                                              OffContent="Legacy (Classic Text/F8 Menu)" />
+
+                                <Button x:Name="ApplyGlobalSettingsBtn" Content="💾 Apply Global Settings" Command="{x:Bind ViewModel.ApplyGlobalSettingsCommand}"
+                                        Style="{StaticResource AccentButtonStyle}" />
+                            </StackPanel>
+                        </Border>
+
                         <!-- Hero Card -->
                         <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"

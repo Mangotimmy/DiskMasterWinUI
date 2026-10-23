@@ -73,6 +73,7 @@ public class AppSettings
     // ── System Tray & Window Notifications ──
     public bool MinimizeToTray { get; set; } = false;
     public bool CloseToTray { get; set; } = false;
+    public bool BackgroundMemorySaver { get; set; } = true;
     public bool EnableTaskbarFlash { get; set; } = true;
     public bool EnableAudioFeedback { get; set; } = true;
     public string NotificationSoundScheme { get; set; } = "Default"; // "Default", "Chimes", "Ding", "Tada", "Crystal", "Custom"

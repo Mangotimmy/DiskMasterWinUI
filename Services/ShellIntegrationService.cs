@@ -256,8 +256,32 @@ public sealed class ShellIntegrationService
         var sb = new StringBuilder();
         sb.Append(IsInstalled() ? "已安裝（目前使用者）" : "未安裝（目前使用者）");
         sb.Append(IsInstalled(true) ? "；已安裝（所有使用者）" : "；未安裝（所有使用者）");
+        if (NeedsPathCascadeRepair()) sb.Append("；⚠ 目前使用者的「加至 PATH」子選單需重新套用");
+        if (NeedsPathCascadeRepair(true)) sb.Append("；⚠ 所有使用者的「加至 PATH」子選單需重新套用");
         sb.Append(File.Exists(ManifestPath) ? $"；備份清單：{ManifestPath}" : "；無備份清單");
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// True when an Add-to-PATH verb exists but was written by the legacy build that stored an
+    /// empty SubCommands value (Explorer then shows a chevron with no items).
+    /// </summary>
+    public bool NeedsPathCascadeRepair(bool allUsers = false)
+    {
+        try
+        {
+            var store = _storeFactory(allUsers);
+            foreach (var classPath in ExtendedAddToPathClassPaths)
+            {
+                var rel = @"Software\Classes\" + classPath;
+                if (!store.KeyExists(rel)) continue;
+                if (string.IsNullOrWhiteSpace(store.GetValue(rel, "ExtendedSubCommandsKey"))) return true;
+                if (string.IsNullOrWhiteSpace(store.GetValue(rel + @"\shell\UserPath\command", null))) return true;
+                if (string.IsNullOrWhiteSpace(store.GetValue(rel + @"\shell\SystemPath\command", null))) return true;
+            }
+            return false;
+        }
+        catch { return false; }
     }
 
     /// <summary>Registry paths this service uses — for documentation and installer scripts.</summary>
@@ -322,7 +346,7 @@ public sealed class ShellIntegrationService
             var store = _storeFactory(allUsers);
             var val = store.GetValue(@"Software\Classes\" + firstClassPath + @"\command", null)
                    ?? store.GetValue(@"Software\Classes\" + firstClassPath + @"\shell\UserPath\command", null)
-                   ?? store.GetValue(@"Software\Classes\" + firstClassPath, "SubCommands");
+                   ?? store.GetValue(@"Software\Classes\" + firstClassPath, "ExtendedSubCommandsKey");
             return !string.IsNullOrWhiteSpace(val);
         }
         catch { return false; }
@@ -452,11 +476,17 @@ public sealed class ShellIntegrationService
                 for (int i = 0; i < ExtendedAddToPathClassPaths.Length; i++)
                 {
                     var rel = @"Software\Classes\" + ExtendedAddToPathClassPaths[i];
-                    WriteValue(store, rel, null, "DiskMaster Add to PATH Environment", result);
+
+                    // Cascade contract (Windows 7+): ExtendedSubCommandsKey points at this verb's own
+                    // key and the submenu is built from its shell\* children. An empty SubCommands
+                    // value renders an empty cascade, and a non-empty (Default) value turns the parent
+                    // into a command. Clear both so re-applying repairs a 1.6.3 registration.
+                    RemoveValue(store, rel, "", result);
+                    RemoveValue(store, rel, "SubCommands", result);
                     WriteValue(store, rel, "MUIVerb", "🌐 DiskMaster: 加至 PATH 環境變數", result);
                     WriteValue(store, rel, "Icon", $"{appExe},0", result);
                     WriteValue(store, rel, "Position", "Bottom", result);
-                    WriteValue(store, rel, "SubCommands", "", result);
+                    WriteValue(store, rel, "ExtendedSubCommandsKey", ExtendedAddToPathClassPaths[i], result);
 
                     // Subcommand 1: User PATH
                     var userSub = rel + @"\shell\UserPath";

@@ -9,6 +9,11 @@ namespace DiskMasterWinUI.Services;
 /// </summary>
 public class TrayIconService : IDisposable
 {
+    /// <summary>Raised after the main window has been hidden to the tray.</summary>
+    public event Action? WindowHidden;
+    /// <summary>Raised after the main window has been restored from the tray.</summary>
+    public event Action? WindowShown;
+
     private const uint WM_USER = 0x0400;
     public const uint WM_TRAYICON = WM_USER + 2048;
 
@@ -229,6 +234,7 @@ public class TrayIconService : IDisposable
     {
         if (_hwnd == IntPtr.Zero) return;
         ShowWindow(_hwnd, SW_HIDE);
+        try { WindowHidden?.Invoke(); } catch { }
     }
 
     /// <summary>
@@ -239,6 +245,7 @@ public class TrayIconService : IDisposable
         if (_hwnd == IntPtr.Zero) return;
         ShowWindow(_hwnd, SW_RESTORE);
         SetForegroundWindow(_hwnd);
+        try { WindowShown?.Invoke(); } catch { }
     }
 
     private void ShowTrayContextMenu()

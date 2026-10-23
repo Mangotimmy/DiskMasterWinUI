@@ -161,6 +161,10 @@ public sealed partial class MainWindow : Window
                 });
             };
 
+            DiskMasterWinUI.Helpers.BackgroundMemorySaver.Initialize(DispatcherQueue);
+            TrayService.WindowHidden += DiskMasterWinUI.Helpers.BackgroundMemorySaver.OnHidden;
+            TrayService.WindowShown += DiskMasterWinUI.Helpers.BackgroundMemorySaver.OnShown;
+
             // Initialize Windows Notification Center & Toast integration
             WindowsNotificationService.Instance.Initialize(
                 onNavigate: (tag) =>

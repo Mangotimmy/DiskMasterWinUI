@@ -741,6 +741,7 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
                         <ToggleSwitch x:Name="MinimizeToTrayToggle" Grid.Row="0" Grid.Column="0" Header="視窗最小化時縮小至系統匣"
@@ -763,6 +764,19 @@
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon Glyph="&#xE7E7;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
                                 <TextBlock Text="🔔 發送測試通知至 Windows 通知清單" />
+                            </StackPanel>
+                        </Button>
+                        <ToggleSwitch x:Name="BackgroundMemorySaverToggle" Grid.Row="3" Grid.Column="0"
+                                      Header="縮小至系統匣後自動釋放背景記憶體"
+                                      OffContent="已停用" OnContent="已啟用"
+                                      IsOn="{x:Bind ViewModel.BackgroundMemorySaver, Mode=TwoWay}"
+                                      ToolTipService.ToolTip="僅降低工作集 (工作管理員的記憶體欄位)，不會關閉頁面或遺失狀態。" />
+                        <Button x:Name="TrimMemoryNowBtn" Grid.Row="3" Grid.Column="1"
+                                Command="{x:Bind ViewModel.TrimBackgroundMemoryCommand}"
+                                VerticalAlignment="Center" HorizontalAlignment="Stretch">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE945;" FontSize="14" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                <TextBlock x:Name="TrimMemoryNowText" Text="🧹 立即釋放背景記憶體" />
                             </StackPanel>
                         </Button>
                     </Grid>

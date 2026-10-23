@@ -217,6 +217,10 @@ public sealed partial class SettingsPage : Page
         CloseToTrayToggle.Header = LocalizationService.T("點擊關閉 (X) 時縮小至系統匣", "点击关闭 (X) 时缩小至系统托盘", "Close Button (X) Minimizes to Tray", "閉じる (X) 時にトレイへ格納");
         CloseToTrayToggle.OffContent = LocalizationService.T("直接退出", "直接退出", "Exit Application", "アプリ終了");
         CloseToTrayToggle.OnContent = LocalizationService.T("後台保留", "后台保留", "Keep in Tray", "トレイに常駐");
+        BackgroundMemorySaverToggle.Header = LocalizationService.T("縮小至系統匣後自動釋放背景記憶體", "缩小到系统托盘后自动释放后台内存", "Release Background Memory When Hidden", "トレイ格納後にバックグラウンドメモリを解放");
+        BackgroundMemorySaverToggle.OffContent = LocalizationService.T("已停用", "已停用", "Disabled", "無効");
+        BackgroundMemorySaverToggle.OnContent = LocalizationService.T("已啟用", "已启用", "Enabled", "有効");
+        TrimMemoryNowText.Text = LocalizationService.T("🧹 立即釋放背景記憶體", "🧹 立即释放后台内存", "🧹 Release Memory Now", "🧹 メモリを今すぐ解放");
         TaskbarFlashToggle.Header = LocalizationService.T("任務完成或警告時閃爍工作列", "任务完成或警告时闪烁任务栏", "Flash Taskbar on Warning & Finish", "警告・完了時にタスクバーを点滅");
         TaskbarFlashToggle.OffContent = LocalizationService.T("已停用", "已停用", "Disabled", "無効");
         TaskbarFlashToggle.OnContent = LocalizationService.T("已啟用", "已启用", "Enabled", "有効");

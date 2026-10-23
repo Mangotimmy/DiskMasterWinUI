@@ -79,13 +79,6 @@ public sealed partial class BootManagerPage : Page
             "ja-JP" => "新規パーティションにブート再構築",
             _ => "全新分割區建置開機引導"
         };
-        TabGlobalSettings.Header = lang switch
-        {
-            "zh-CN" => "全局引导设置",
-            "en-US" => "Global Settings",
-            "ja-JP" => "グローバルブート設定",
-            _ => "全域開機設定"
-        };
         TabTpm.Header = LocalizationService.Instance["TabTpm"];
 
         SearchBox.PlaceholderText = lang switch

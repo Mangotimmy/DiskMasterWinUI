@@ -136,7 +136,7 @@ if ($Scenario -in @('full','burst')) {
     # once, and only then does the measurement window represent steady state.
     $stable = 0
     $prevH = -1
-    while ($warmupCycles -lt $MaxWarmupCycles -and $stable -lt 4) {
+    while ($warmupCycles -lt $MaxWarmupCycles -and ($stable -lt 4 -or $warmupCycles -lt 24)) {
         [System.Windows.Forms.SendKeys]::SendWait('^{TAB}')
         $s = Add-Sample 'warmup'
         $warmupCycles++
