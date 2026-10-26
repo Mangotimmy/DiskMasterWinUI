@@ -52,10 +52,17 @@ public sealed partial class DiskToolsPage : Page
         };
         TabVhdx.Header = lang switch
         {
-            "zh-CN" => "💽 VHD/VHDX 虚拟磁盘与缓存清理",
-            "en-US" => "💽 VHD/VHDX & Cache Cleanup",
-            "ja-JP" => "💽 VHD/VHDX 仮想ディスクとキャッシュ消去",
-            _ => "💽 VHD/VHDX 虛擬磁碟與快取清理"
+            "zh-CN" => "💽 VHD/VHDX 虚拟磁盘",
+            "en-US" => "💽 VHD/VHDX Virtual Disks",
+            "ja-JP" => "💽 VHD/VHDX 仮想ディスク",
+            _ => "💽 VHD/VHDX 虛擬磁碟"
+        };
+        TabCleaner.Header = lang switch
+        {
+            "zh-CN" => "🧹 磁盘与暂存清理",
+            "en-US" => "🧹 Disk & Cache Cleaner",
+            "ja-JP" => "🧹 ディスク＆キャッシュ消去",
+            _ => "🧹 磁碟與暫存清理"
         };
         TabCloneFormat.Header = lang switch
         {

@@ -1158,6 +1158,71 @@ public partial class DiskToolsViewModel : ObservableObject
         }
         finally { IsLoading = false; }
     }
+    [RelayCommand]
+    public async Task CleanTempFilesAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            StatusMessage = "正在清理系統與使用者暫存檔案 (%TEMP% & Windows Temp)...";
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 啟動暫存檔案清理 (%TEMP% / Windows Temp / INetCache)...");
+            var (summary, freed) = await _cacheCleanService.CleanTempFilesAsync(AppendLog);
+            CacheCleanupSummary = summary;
+            AppendLog($"[暫存檔清理] {summary}");
+            StatusMessage = summary;
+            MainWindow.CurrentInstance?.CompanionSay("系統與使用者暫存檔清理完成！");
+        }
+        catch (Exception ex)
+        {
+            GlobalExceptionHandler.ReportException(ex, "清理暫存檔案");
+            StatusMessage = $"清理失敗: {ex.Message}";
+        }
+        finally { IsLoading = false; }
+    }
+
+    [RelayCommand]
+    public async Task CleanWindowsOldAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            StatusMessage = "正在清理舊版 Windows 備份目錄 (Windows.old)...";
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 啟動 Windows.old 歷史版本回退目錄清理...");
+            var (summary, freed) = await _cacheCleanService.CleanWindowsOldAsync(AppendLog);
+            CacheCleanupSummary = summary;
+            AppendLog($"[Windows.old 清理] {summary}");
+            StatusMessage = summary;
+            MainWindow.CurrentInstance?.CompanionSay("舊版 Windows 備份清理完畢！");
+        }
+        catch (Exception ex)
+        {
+            GlobalExceptionHandler.ReportException(ex, "清理 Windows.old");
+            StatusMessage = $"清理失敗: {ex.Message}";
+        }
+        finally { IsLoading = false; }
+    }
+
+    [RelayCommand]
+    public async Task CleanAppCacheAsync()
+    {
+        try
+        {
+            IsLoading = true;
+            StatusMessage = "正在清理應用程式與瀏覽器快取 (Edge/Chrome/Firefox/GPU Shader)...";
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] 啟動應用程式與瀏覽器深度快取清理...");
+            var (summary, freed) = await _cacheCleanService.CleanAppCacheAsync(AppendLog);
+            CacheCleanupSummary = summary;
+            AppendLog($"[應用程式快取清理] {summary}");
+            StatusMessage = summary;
+            MainWindow.CurrentInstance?.CompanionSay("應用程式快取與 Shader 快取清理完成！");
+        }
+        catch (Exception ex)
+        {
+            GlobalExceptionHandler.ReportException(ex, "清理應用程式快取");
+            StatusMessage = $"清理失敗: {ex.Message}";
+        }
+        finally { IsLoading = false; }
+    }
 
     [RelayCommand]
     public async Task RefreshDiskHealthAsync()

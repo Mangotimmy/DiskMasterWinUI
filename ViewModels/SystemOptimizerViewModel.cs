@@ -14,6 +14,21 @@ public partial class SystemOptimizerViewModel : ObservableObject
     private readonly PowerPlanService _powerService = new();
     private readonly MemoryManagerService _memoryManager = new();
     private readonly PowerCfgService _powerCfg = new();
+    private readonly NvmeOptimizerService _nvmeService = new();
+
+    // -- NVMe StorNVMe Anti-Stutter & TRIM Telemetry --
+    [ObservableProperty] private bool _isApstDisabled;
+    [ObservableProperty] private int? _numberOfRequestsValue;
+    [ObservableProperty] private string _selectedQueuePreset = "64";
+    [ObservableProperty] private int _customNumberOfRequests = 64;
+    [ObservableProperty] private bool _isNtfsTrimEnabled;
+    [ObservableProperty] private bool _isReFsTrimEnabled;
+    [ObservableProperty] private string _trimStatusDisplay = "查詢中...";
+    [ObservableProperty] private string _apstStatusDisplay = "查詢中...";
+    [ObservableProperty] private string _queueStatusDisplay = "查詢中...";
+    [ObservableProperty] private bool _requiresRebootNotice;
+    [ObservableProperty] private bool _isNvmeLoading;
+    [ObservableProperty] private string _nvmeOperationMessage = "";
 
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private bool _isUpdatingProgrammatically;
@@ -283,6 +298,197 @@ public partial class SystemOptimizerViewModel : ObservableObject
     private bool _isLoadingRestorePoints;
 
     [RelayCommand]
+    public async Task RefreshNvmeTelemetryAsync()
+    {
+        try
+        {
+            IsNvmeLoading = true;
+            var trimTask = _nvmeService.QueryTrimStatusAsync();
+            var apstTask = _nvmeService.QueryApstStatusAsync();
+            var queueTask = _nvmeService.QueryNumberOfRequestsAsync();
+
+            await Task.WhenAll(trimTask, apstTask, queueTask);
+
+            var trim = await trimTask;
+            var apst = await apstTask;
+            var queue = await queueTask;
+
+            IsUpdatingProgrammatically = true;
+            IsNtfsTrimEnabled = trim.IsNtfsTrimEnabled;
+            IsReFsTrimEnabled = trim.IsReFsTrimEnabled;
+            TrimStatusDisplay = trim.StatusDisplay;
+
+            IsApstDisabled = apst.IsApstDisabled;
+            ApstStatusDisplay = apst.StatusDisplay;
+
+            NumberOfRequestsValue = queue.NumberOfRequests;
+            QueueStatusDisplay = queue.StatusDisplay;
+            if (queue.NumberOfRequests.HasValue)
+            {
+                CustomNumberOfRequests = queue.NumberOfRequests.Value;
+                SelectedQueuePreset = queue.NumberOfRequests.Value.ToString();
+            }
+            else
+            {
+                SelectedQueuePreset = "Default";
+            }
+        }
+        catch (Exception ex)
+        {
+            NvmeOperationMessage = $"更新 NVMe 狀態失敗: {ex.Message}";
+        }
+        finally
+        {
+            IsUpdatingProgrammatically = false;
+            IsNvmeLoading = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task ToggleApstAsync()
+    {
+        if (IsUpdatingProgrammatically) return;
+        try
+        {
+            IsNvmeLoading = true;
+            bool targetDisable = !IsApstDisabled;
+            var (success, msg) = await _nvmeService.SetApstDisabledAsync(targetDisable);
+            NvmeOperationMessage = msg;
+            if (success) RequiresRebootNotice = true;
+            await RefreshNvmeTelemetryAsync();
+        }
+        catch (Exception ex)
+        {
+            NvmeOperationMessage = $"變更 APST 失敗: {ex.Message}";
+        }
+        finally { IsNvmeLoading = false; }
+    }
+
+    [RelayCommand]
+    public async Task ApplyQueuePresetAsync(string? preset)
+    {
+        try
+        {
+            IsNvmeLoading = true;
+            var p = preset ?? SelectedQueuePreset;
+            if (p == "Default" || p == "預設" || p == "0")
+            {
+                var (ok, msg) = await _nvmeService.ResetNumberOfRequestsAsync();
+                NvmeOperationMessage = msg;
+                if (ok) RequiresRebootNotice = true;
+            }
+            else if (int.TryParse(p, out int val))
+            {
+                if (val <= 0)
+                {
+                    NvmeOperationMessage = "⚠️ 安全警告：NumberOfRequests 不能設為 0！";
+                    return;
+                }
+                var (ok, msg) = await _nvmeService.SetNumberOfRequestsAsync(val);
+                NvmeOperationMessage = msg;
+                if (ok) RequiresRebootNotice = true;
+            }
+            await RefreshNvmeTelemetryAsync();
+        }
+        catch (Exception ex)
+        {
+            NvmeOperationMessage = $"套用佇列上限失敗: {ex.Message}";
+        }
+        finally { IsNvmeLoading = false; }
+    }
+
+    [RelayCommand]
+    public async Task ApplyCustomQueueAsync()
+    {
+        if (CustomNumberOfRequests <= 0)
+        {
+            NvmeOperationMessage = "⚠️ 安全警告：NumberOfRequests 不能為 0！(數值 0 會導致裝置無法處理請求)";
+            return;
+        }
+        await ApplyQueuePresetAsync(CustomNumberOfRequests.ToString());
+    }
+
+    [RelayCommand]
+    public async Task ResetQueueToDefaultAsync()
+    {
+        await ApplyQueuePresetAsync("Default");
+    }
+
+    [RelayCommand]
+    public async Task ToggleTrimAsync()
+    {
+        if (IsUpdatingProgrammatically) return;
+        try
+        {
+            IsNvmeLoading = true;
+            bool targetEnable = !IsNtfsTrimEnabled;
+            var (ok, msg) = await _nvmeService.SetTrimEnabledAsync(targetEnable);
+            NvmeOperationMessage = msg;
+            await RefreshNvmeTelemetryAsync();
+        }
+        catch (Exception ex)
+        {
+            NvmeOperationMessage = $"設定 TRIM 失敗: {ex.Message}";
+        }
+        finally { IsNvmeLoading = false; }
+    }
+
+    [RelayCommand]
+    public async Task RunManualTrimAsync()
+    {
+        try
+        {
+            IsNvmeLoading = true;
+            NvmeOperationMessage = "正在執行 SSD 手動 TRIM 重修復 (ReTrim)...";
+            var (ok, msg) = await _nvmeService.RunManualTrimAsync();
+            NvmeOperationMessage = msg;
+            await RefreshNvmeTelemetryAsync();
+        }
+        catch (Exception ex)
+        {
+            NvmeOperationMessage = $"執行手動 TRIM 失敗: {ex.Message}";
+        }
+        finally { IsNvmeLoading = false; }
+    }
+
+    [RelayCommand]
+    public async Task ApplyGamingNvmeProfileAsync()
+    {
+        try
+        {
+            IsNvmeLoading = true;
+            NvmeOperationMessage = "正在套用老外實測推薦之電競 NVMe 防卡頓優化...";
+            var (ok, msg) = await _nvmeService.ApplyGamingNvmeAntiStutterProfileAsync();
+            NvmeOperationMessage = msg;
+            if (ok) RequiresRebootNotice = true;
+            await RefreshNvmeTelemetryAsync();
+        }
+        catch (Exception ex)
+        {
+            NvmeOperationMessage = $"套用電競 NVMe 優化失敗: {ex.Message}";
+        }
+        finally { IsNvmeLoading = false; }
+    }
+
+    [RelayCommand]
+    public async Task RestoreDefaultNvmeProfileAsync()
+    {
+        try
+        {
+            IsNvmeLoading = true;
+            var (ok, msg) = await _nvmeService.RestoreDefaultNvmeProfileAsync();
+            NvmeOperationMessage = msg;
+            if (ok) RequiresRebootNotice = true;
+            await RefreshNvmeTelemetryAsync();
+        }
+        catch (Exception ex)
+        {
+            NvmeOperationMessage = $"還原失敗: {ex.Message}";
+        }
+        finally { IsNvmeLoading = false; }
+    }
+
+    [RelayCommand]
     public async Task RefreshFastCoreSettingsAsync()
     {
         await Task.CompletedTask;
@@ -328,6 +534,7 @@ public partial class SystemOptimizerViewModel : ObservableObject
             IsClassicContextMenu = _folderCustomizer.IsClassicContextMenuEnabled();
             IsRightClickSpeedOptimized = _folderCustomizer.IsRightClickSpeedOptimized();
             IsGlobalFastFolderDiscoveryEnabled = _folderCustomizer.IsGlobalFastFolderDiscoveryEnabled();
+            _ = RefreshNvmeTelemetryAsync();
             IsExplorerWatchdogEnabled = ExplorerWatchdogService.Instance.IsEnabled;
             IsExplorerCurrentlyAlive = ExplorerWatchdogService.CheckExplorerRunning();
             ExplorerWatchdogRecoverySummary = ExplorerWatchdogService.Instance.LastRecoveryTimeText;

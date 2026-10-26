@@ -346,6 +346,39 @@
                             </ListView.ItemTemplate>
                         </ListView>
 
+                        <!-- Dedicated Direct Cleaner Action Bar -->
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Command="{x:Bind ViewModel.CleanTempFilesOnlyCommand}"
+                                    IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}"
+                                    HorizontalAlignment="Stretch">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="🧹" />
+                                    <TextBlock Text="清理暫存檔案 (Temp)" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                            <Button Grid.Column="1" Command="{x:Bind ViewModel.CleanWindowsOldOnlyCommand}"
+                                    IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}"
+                                    HorizontalAlignment="Stretch">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="💾" />
+                                    <TextBlock Text="清理 Windows.old 備份" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                            <Button Grid.Column="2" Command="{x:Bind ViewModel.CleanAppCacheOnlyCommand}"
+                                    IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}"
+                                    HorizontalAlignment="Stretch">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="🌐" />
+                                    <TextBlock Text="清理 App 應用與瀏覽器快取" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
                         <!-- Bottom Clean Buttons -->
                         <Grid ColumnSpacing="8">
                             <Grid.ColumnDefinitions>

@@ -791,6 +791,75 @@ public partial class SystemHealthViewModel : ObservableObject
     }
 
     [RelayCommand]
+    public async Task CleanTempFilesOnlyAsync()
+    {
+        if (IsRunning || IsCleaningTemp) return;
+        try
+        {
+            IsRunning = true;
+            IsCleaningTemp = true;
+            CurrentStatus = "正在清理系統與使用者暫存檔案 (%TEMP% & Windows Temp)...";
+            StatusBarViewModel.Instance.StartOperation("清理暫存檔案", CancelOperation);
+            _cts = new CancellationTokenSource();
+            var (files, bytes, display) = await _tempCleanService.CleanTempFilesAsync(AppendOutput, _cts.Token);
+            CurrentStatus = $"暫存檔案清理完成！釋放 {display}";
+            StatusBarViewModel.Instance.CompleteOperation($"暫存清理完成 (釋放 {display})");
+            await ScanTempCategoriesAsync();
+        }
+        finally
+        {
+            IsRunning = false;
+            IsCleaningTemp = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task CleanWindowsOldOnlyAsync()
+    {
+        if (IsRunning || IsCleaningTemp) return;
+        try
+        {
+            IsRunning = true;
+            IsCleaningTemp = true;
+            CurrentStatus = "正在清理舊版 Windows 備份目錄 (Windows.old)...";
+            StatusBarViewModel.Instance.StartOperation("清理 Windows.old", CancelOperation);
+            _cts = new CancellationTokenSource();
+            var (files, bytes, display) = await _tempCleanService.CleanWindowsOldAsync(AppendOutput, _cts.Token);
+            CurrentStatus = $"Windows.old 清理完成！釋放 {display}";
+            StatusBarViewModel.Instance.CompleteOperation($"Windows.old 清理完成 (釋放 {display})");
+            await ScanTempCategoriesAsync();
+        }
+        finally
+        {
+            IsRunning = false;
+            IsCleaningTemp = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task CleanAppCacheOnlyAsync()
+    {
+        if (IsRunning || IsCleaningTemp) return;
+        try
+        {
+            IsRunning = true;
+            IsCleaningTemp = true;
+            CurrentStatus = "正在清理應用程式與瀏覽器快取 (Edge/Chrome/Shader)...";
+            StatusBarViewModel.Instance.StartOperation("清理應用程式快取", CancelOperation);
+            _cts = new CancellationTokenSource();
+            var (files, bytes, display) = await _tempCleanService.CleanAppCacheAsync(AppendOutput, _cts.Token);
+            CurrentStatus = $"應用程式快取清理完成！釋放 {display}";
+            StatusBarViewModel.Instance.CompleteOperation($"App快取清理完成 (釋放 {display})");
+            await ScanTempCategoriesAsync();
+        }
+        finally
+        {
+            IsRunning = false;
+            IsCleaningTemp = false;
+        }
+    }
+
+    [RelayCommand]
     public async Task RunCleanmgrAsync()
     {
         if (IsRunning) return;

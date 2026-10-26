@@ -160,12 +160,12 @@ public class CacheCleanService
     }
 
     /// <summary>
-    /// Performs deep cleaning of system temp files, prefetch, WER logs, dumps, and download caches.
+    /// Performs deep cleaning of system temp files, prefetch, WER logs, dumps, app cache, and download caches.
     /// </summary>
     public async Task<(string Summary, long FreedBytes)> PerformSystemDeepCleanupAsync(Action<string> onOutput, CancellationToken ct = default)
     {
         var tempService = new TempCleanService();
-        var allCats = new[] { "UserTemp", "SystemTemp", "Prefetch", "MemoryDumps", "WerReports", "DeliveryOpt", "SetupFiles", "ThumbCache" };
+        var allCats = new[] { "UserTemp", "SystemTemp", "AppCache", "WindowsOld", "Prefetch", "MemoryDumps", "WerReports", "DeliveryOpt", "SetupFiles", "ThumbCache" };
         var (tFiles, tBytes, _) = await tempService.CleanSelectedCategoriesAsync(allCats, onOutput, ct);
         var (dFiles, dBytes, _) = await CleanDownloadCacheAsync();
         var scriptCount = await CleanDiskPartTempFilesAsync();
@@ -174,6 +174,39 @@ public class CacheCleanService
         long totalBytes = tBytes + dBytes;
         var summary = $"全域系統暫存與快取清理完成！共釋放 {FormatBytes(totalBytes)} (清理暫存檔 {tFiles + dFiles:N0} 個，移除 {scriptCount} 個 DiskPart 腳本與 DISM 掛載鎖定點)。";
         return (summary, totalBytes);
+    }
+
+    /// <summary>
+    /// Cleans temporary files (%TEMP%, Windows Temp, INetCache).
+    /// </summary>
+    public async Task<(string Summary, long FreedBytes)> CleanTempFilesAsync(Action<string> onOutput, CancellationToken ct = default)
+    {
+        var tempService = new TempCleanService();
+        var (files, bytes, freedDisplay) = await tempService.CleanTempFilesAsync(onOutput, ct);
+        var summary = $"暫存檔案清理完成！共移除 {files:N0} 個檔案，釋放 {freedDisplay} 磁碟空間。";
+        return (summary, bytes);
+    }
+
+    /// <summary>
+    /// Cleans Windows.old backup directory with administrative elevation fallback.
+    /// </summary>
+    public async Task<(string Summary, long FreedBytes)> CleanWindowsOldAsync(Action<string> onOutput, CancellationToken ct = default)
+    {
+        var tempService = new TempCleanService();
+        var (files, bytes, freedDisplay) = await tempService.CleanWindowsOldAsync(onOutput, ct);
+        var summary = $"舊版 Windows 備份 (Windows.old) 清理完成！釋放 {freedDisplay} 磁碟空間 (清理 {files:N0} 個檔案)。";
+        return (summary, bytes);
+    }
+
+    /// <summary>
+    /// Cleans browser, GPU shader, and common application caches.
+    /// </summary>
+    public async Task<(string Summary, long FreedBytes)> CleanAppCacheAsync(Action<string> onOutput, CancellationToken ct = default)
+    {
+        var tempService = new TempCleanService();
+        var (files, bytes, freedDisplay) = await tempService.CleanAppCacheAsync(onOutput, ct);
+        var summary = $"應用程式與瀏覽器快取清理完成！共移除 {files:N0} 個快取檔案，釋放 {freedDisplay}。";
+        return (summary, bytes);
     }
 
     private static string FormatBytes(long bytes)

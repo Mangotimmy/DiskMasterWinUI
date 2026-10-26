@@ -34,6 +34,20 @@ public sealed partial class SystemOptimizerPage : Page
         TabBackup.Header = lang switch { "zh-CN" => "💾 注册表备份与还原", "en-US" => "💾 Registry Backup & Restore", "ja-JP" => "💾 レジストリバックアップと復元", _ => "💾 登錄檔備份與還原" };
         TabOneDrive.Header = lang switch { "zh-CN" => "☁️ OneDrive 深度治理与卸载", "en-US" => "☁️ OneDrive Governance & Uninstall", "ja-JP" => "☁️ OneDrive 管理と削除", _ => "☁️ OneDrive 深度治理與卸載" };
         TabDrivers.Header = lang switch { "zh-CN" => "🏎️ OEM 驱动清理 (PnPUtil)", "en-US" => "🏎️ OEM Driver Cleanup (PnPUtil)", "ja-JP" => "🏎️ OEM ドライバの削除 (PnPUtil)", _ => "🏎️ OEM 驅動清理 (PnPUtil)" };
+        TabNvme.Header = lang switch { "zh-CN" => "🚀 NVMe与SSD调校", "en-US" => "🚀 NVMe & SSD", "ja-JP" => "🚀 NVMeとSSD最適化", _ => "🚀 NVMe與SSD調校" };
+        NvmeHeroTitle.Text = lang switch { "zh-CN" => "老外实测推荐：NVMe 极致防卡顿与 SSD TRIM 调校", "en-US" => "NVMe Anti-Stutter & SSD TRIM Tuning", "ja-JP" => "NVMeスタッター防止＆SSD TRIM調整", _ => "老外實測推薦：NVMe 極致防卡頓與 SSD TRIM 調校" };
+        NvmeHeroSubtitle.Text = lang switch
+        {
+            "zh-CN" => "一键关闭 NVMe 自主电源微睡眠 (EnableAPST=0)、最佳化 StorNVMe 队列并行上限 (NumberOfRequests=64，防止死锁与延迟飙升)、并全面启用 NTFS/ReFS TRIM 垃圾回收。",
+            "en-US" => "1-Click optimization: Disable NVMe APST micro-sleep (EnableAPST=0), optimize StorNVMe queue depth (NumberOfRequests=64 to prevent lockups), and enforce NTFS/ReFS TRIM garbage collection.",
+            "ja-JP" => "ワンクリック最適化：NVMe自律微小スリープ無効化 (EnableAPST=0)、StorNVMeキュー深度最適化 (NumberOfRequests=64)、NTFS/ReFS TRIM回収を完全有効化。",
+            _ => "一鍵關閉 NVMe 自主電源微睡眠 (EnableAPST=0)、最佳化 StorNVMe 佇列並行上限 (NumberOfRequests=64，防止死鎖與延遲飆升)、並全面啟用 NTFS/ReFS TRIM 垃圾回收。"
+        };
+        ApplyGamingNvmeBtn.Content = lang switch { "zh-CN" => "🚀 一键应用电竞防卡顿优化", "en-US" => "🚀 Apply Anti-Stutter Gaming Profile", "ja-JP" => "🚀 ゲーミング防スタッター適用", _ => "🚀 一鍵套用電競防卡頓優化" };
+        RestoreNvmeDefaultsBtn.Content = lang switch { "zh-CN" => "🛡️ 还原 Windows 默认", "en-US" => "🛡️ Restore Windows Defaults", "ja-JP" => "🛡️ 還原 Windows 預設", _ => "🛡️ 還原 Windows 預設" };
+        ApstCardTitle.Text = lang switch { "zh-CN" => "关闭 NVMe APST 自主电源微睡眠 (老外实测：彻底解决卡顿)", "en-US" => "Disable NVMe APST Sleep (Fix Micro-Stutters)", "ja-JP" => "NVMe APSTスリープを無効化 (スタッター解消)", _ => "關閉 NVMe APST 自主電源微睡眠 (老外實測：徹底解決卡頓)" };
+        QueueCardTitle.Text = lang switch { "zh-CN" => "StorNVMe 队列请求上限调校 (NumberOfRequests)", "en-US" => "StorNVMe Queue Depth (NumberOfRequests)", "ja-JP" => "StorNVMeキュー上限調整 (NumberOfRequests)", _ => "StorNVMe 佇列請求上限調校 (NumberOfRequests)" };
+        TrimCardTitle.Text = lang switch { "zh-CN" => "SSD 文件系统 TRIM 回收指令 (fsutil DisableDeleteNotify)", "en-US" => "SSD Filesystem TRIM (fsutil DisableDeleteNotify)", "ja-JP" => "SSD ファイルシステム TRIM (fsutil DisableDeleteNotify)", _ => "SSD 檔案系統 TRIM 廢料回收指令 (fsutil DisableDeleteNotify)" };
 
         HeroTitle.Text = lang switch { "zh-CN" => "电竞极致模式", "en-US" => "Ultra Gaming Mode (1-Click)", "ja-JP" => "ウルトラゲーミングモード", _ => "電競遊戲極致模式" };
         HeroSubtitle.Text = lang switch
@@ -574,6 +588,10 @@ public sealed partial class SystemOptimizerPage : Page
                 ViewModel.RefreshPersistedRulesCommand.Execute(null);
             }
         }
+        else if (ReferenceEquals(OptimizerTabView.SelectedItem, TabNvme))
+        {
+            ViewModel.RefreshNvmeTelemetryCommand.Execute(null);
+        }
         else if (ReferenceEquals(OptimizerTabView.SelectedItem, TabExplorerShell))
         {
             ViewModel.IsExplorerCurrentlyAlive = ExplorerWatchdogService.CheckExplorerRunning();
@@ -581,6 +599,20 @@ public sealed partial class SystemOptimizerPage : Page
             ViewModel.ExplorerWatchdogRecoverySummary = ExplorerWatchdogService.Instance.LastRecoveryTimeText;
         }
     }
+
+    private void ApstToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsApstDisabled) return;
+        if (ViewModel.ToggleApstCommand.CanExecute(null))
+            ViewModel.ToggleApstCommand.Execute(null);
+    }
+
+    private void TrimToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.IsOn == ViewModel.IsNtfsTrimEnabled) return;
+        if (ViewModel.ToggleTrimCommand.CanExecute(null))
+            ViewModel.ToggleTrimCommand.Execute(null);
+    }
 }
-
-

@@ -1907,6 +1907,190 @@
                     </ScrollViewer>
                 </TabViewItem>
 
+                <!-- ════ Tab 8: NVMe 防卡頓與 SSD TRIM 調校 (NVMe Anti-Stutter & TRIM) ════ -->
+                <TabViewItem x:Name="TabNvme" Header="🚀 NVMe與SSD (NVMe &amp; SSD)" IsClosable="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
+                        <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
+
+                            <!-- Hero Master Card -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource AccentFillColorDefaultBrush}" BorderThickness="2"
+                                    CornerRadius="10" Padding="18">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon Grid.Column="0" Glyph="&#xEDA2;" FontSize="44" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock x:Name="NvmeHeroTitle" Text="老外實測推薦：NVMe 極致防卡頓與 SSD TRIM 調校" FontWeight="Bold" FontSize="18" TextWrapping="Wrap" />
+                                            <Border Background="{ThemeResource AccentFillColorTertiaryBrush}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                                                <TextBlock Text="StorNVMe &amp; APST" FontSize="11" FontWeight="SemiBold" />
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock x:Name="NvmeHeroSubtitle" Text="一鍵關閉 NVMe 自主電源微睡眠 (EnableAPST=0)、最佳化 StorNVMe 佇列並行上限 (NumberOfRequests=64，防止死鎖與延遲飆升)、並全面啟用 NTFS/ReFS TRIM 垃圾回收。"
+                                                   Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                        <Button x:Name="ApplyGamingNvmeBtn" Content="🚀 一鍵套用電競防卡頓優化"
+                                                Command="{x:Bind ViewModel.ApplyGamingNvmeProfileCommand}"
+                                                Style="{StaticResource AccentButtonStyle}" Padding="14,8" />
+                                        <Button x:Name="RestoreNvmeDefaultsBtn" Content="🛡️ 還原 Windows 預設"
+                                                Command="{x:Bind ViewModel.RestoreDefaultNvmeProfileCommand}" Padding="12,8" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Reboot Alert Bar -->
+                            <InfoBar Severity="Warning" IsOpen="True" IsClosable="False"
+                                     Title="驅動程式參數重啟提示"
+                                     Message="⚠️ 注意：修改 StorNVMe 驅動參數 (EnableAPST / NumberOfRequests) 需重新啟動電腦後方能載入生效。" />
+
+                            <!-- Status Banner -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="14">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <!-- APST Status -->
+                                    <StackPanel Grid.Column="0" Spacing="4">
+                                        <TextBlock Text="⚡ NVMe APST 狀態" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Text="{x:Bind ViewModel.ApstStatusDisplay, Mode=OneWay}" FontWeight="Bold" FontSize="13" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <!-- Queue Status -->
+                                    <StackPanel Grid.Column="1" Spacing="4">
+                                        <TextBlock Text="📊 佇列並行上限 (Queue Depth)" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Text="{x:Bind ViewModel.QueueStatusDisplay, Mode=OneWay}" FontWeight="Bold" FontSize="13" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <!-- TRIM Status -->
+                                    <StackPanel Grid.Column="2" Spacing="4">
+                                        <TextBlock Text="✂️ SSD TRIM 回收通知" FontWeight="SemiBold" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Text="{x:Bind ViewModel.TrimStatusDisplay, Mode=OneWay}" FontWeight="Bold" FontSize="13" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <!-- Refresh Button -->
+                                    <Button Grid.Column="3" Command="{x:Bind ViewModel.RefreshNvmeTelemetryCommand}" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon Glyph="&#xE72C;" FontSize="12" />
+                                            <TextBlock Text="重新整理" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                            </Border>
+
+                            <!-- Card 1: Disable APST (Photo 4 & Photo 3) -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="6">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon Glyph="&#xE7E8;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                            <TextBlock x:Name="ApstCardTitle" Text="關閉 NVMe APST 自主電源微睡眠 (老外實測：徹底解決卡頓)" FontWeight="SemiBold" FontSize="15" />
+                                        </StackPanel>
+                                        <TextBlock x:Name="ApstCardDesc" Text="在 HKLM\SYSTEM\CurrentControlSet\Services\stornvme\Parameters\Device 寫入 EnableAPST = 0。關閉硬碟自主省電轉換，防止 SSD 在遊戲讀圖、資產串流或閒置後突然讀取時因喚醒延遲引發微卡頓（Frame-time Spikes）與 Event ID 129 重置。"
+                                                   Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <ToggleSwitch Grid.Column="1" x:Name="ApstToggle"
+                                                  IsOn="{x:Bind ViewModel.IsApstDisabled, Mode=OneWay}"
+                                                  Toggled="ApstToggle_Toggled"
+                                                  OnContent="已關閉微睡眠 (防卡頓已啟用)"
+                                                  OffContent="系統預設微睡眠" VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+
+                            <!-- Card 2: NumberOfRequests Queue Depth (Photo 2) -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE9D9;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        <TextBlock x:Name="QueueCardTitle" Text="StorNVMe 佇列請求上限調校 (NumberOfRequests)" FontWeight="SemiBold" FontSize="15" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="QueueCardDesc" Text="調校 Windows 內建 stornvme.sys 對 SSD 控制器派發的同時排隊 I/O 容量。⚠️ 注意：如影片特別強調，千萬不要建完之後直接保持為 0！(設為 0 會使驅動無法處理任何指令)。推薦 32 或 64 以達到極佳響應與抗過載穩定性。"
+                                               Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+
+                                    <!-- Quick Preset Buttons -->
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="推薦預設檔:" VerticalAlignment="Center" Style="{StaticResource CaptionTextBlockStyle}" />
+                                        <Button Content="32 (低延遲/抗過載)" Command="{x:Bind ViewModel.ApplyQueuePresetCommand}" CommandParameter="32" Padding="8,3" FontSize="12" />
+                                        <Button Content="64 (平衡電競推薦 - 主流最佳值)" Command="{x:Bind ViewModel.ApplyQueuePresetCommand}" CommandParameter="64" Style="{StaticResource AccentButtonStyle}" Padding="8,3" FontSize="12" />
+                                        <Button Content="128 (旗艦 PCIe 4.0/5.0)" Command="{x:Bind ViewModel.ApplyQueuePresetCommand}" CommandParameter="128" Padding="8,3" FontSize="12" />
+                                        <Button Content="255 (最大極限吞吐)" Command="{x:Bind ViewModel.ApplyQueuePresetCommand}" CommandParameter="255" Padding="8,3" FontSize="12" />
+                                        <Button Content="🔄 恢復系統預設" Command="{x:Bind ViewModel.ResetQueueToDefaultCommand}" Padding="8,3" FontSize="12" />
+                                    </StackPanel>
+
+                                    <!-- Custom Value Input -->
+                                    <Grid ColumnSpacing="12" Margin="0,4,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="200" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <NumberBox Grid.Column="0" Header="自訂請求數 (1 ~ 255，不可為 0)"
+                                                   Value="{x:Bind ViewModel.CustomNumberOfRequests, Mode=TwoWay}"
+                                                   Minimum="1" Maximum="255" SpinButtonPlacementMode="Compact" />
+                                        <Button Grid.Column="1" Content="💾 套用自訂上限"
+                                                Command="{x:Bind ViewModel.ApplyCustomQueueCommand}"
+                                                VerticalAlignment="Bottom" />
+                                        <TextBlock Grid.Column="2" Text="※ 數值僅接受 1-255，設為 0 會被系統防呆機制自動攔截保護。"
+                                                   VerticalAlignment="Bottom" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" Margin="0,0,0,8" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Card 3: TRIM (Photo 1) -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="6">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon Glyph="&#xE7C3;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                            <TextBlock x:Name="TrimCardTitle" Text="SSD 檔案系統 TRIM 廢料回收指令 (fsutil DisableDeleteNotify)" FontWeight="SemiBold" FontSize="15" />
+                                        </StackPanel>
+                                        <TextBlock x:Name="TrimCardDesc" Text="如附圖所示：fsutil behavior query DisableDeleteNotify 結果為 0 代表 TRIM 已啟用。啟用 TRIM 能在刪除檔案時通知 SSD 即時標記廢料區塊，避免寫入放大並維持 NVMe 長期極速讀寫效能。"
+                                                   Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,6,0,0">
+                                            <Button Content="✂️ 手動執行全磁碟 TRIM 重修復 (ReTrim)"
+                                                    Command="{x:Bind ViewModel.RunManualTrimCommand}" />
+                                            <Button Content="🟢 強制啟用 NTFS &amp; ReFS TRIM (設為 0)"
+                                                    Command="{x:Bind ViewModel.ToggleTrimCommand}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <ToggleSwitch Grid.Column="1" x:Name="TrimToggle"
+                                                  IsOn="{x:Bind ViewModel.IsNtfsTrimEnabled, Mode=OneWay}"
+                                                  Toggled="TrimToggle_Toggled"
+                                                  OnContent="TRIM 已啟用 (0)"
+                                                  OffContent="TRIM 已停用 (1)" VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+
+                            <!-- Operation Feedback Notice -->
+                            <InfoBar Severity="Informational"
+                                     IsOpen="{x:Bind ViewModel.NvmeOperationMessage, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}"
+                                     Title="操作執行反饋"
+                                     Message="{x:Bind ViewModel.NvmeOperationMessage, Mode=OneWay}" />
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabViewItem>
+
             </TabView.TabItems>
         </TabView>
 

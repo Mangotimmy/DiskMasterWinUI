@@ -6,12 +6,13 @@ namespace DiskMasterWinUI.Services;
 
 /// <summary>
 /// Service for analyzing, scanning, and safely cleaning system and user temporary files,
-/// crash dumps, Windows Error Reporting logs, prefetch data, and Windows upgrade remnants.
+/// Windows.old backup archives, application and browser caches, crash dumps, and Windows upgrade remnants.
 /// </summary>
 public class TempCleanService
 {
     private static readonly string WinDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
     private static readonly string LocalAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+    private static readonly string RoamingAppData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
     private static readonly string ProgramData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
     private static readonly string UserTemp = Path.GetTempPath();
 
@@ -28,7 +29,7 @@ public class TempCleanService
                 {
                     Id = "UserTemp",
                     Name = "使用者暫存檔案 (User Temp)",
-                    Description = "目前登入使用者應用程式所產生的暫存與中繼快取檔案",
+                    Description = "目前登入使用者應用程式所產生的暫存與中繼快取檔案 (%TEMP%)",
                     Path = UserTemp,
                     Icon = "👤"
                 },
@@ -39,6 +40,22 @@ public class TempCleanService
                     Description = "Windows 系統服務與安裝程式暫存目錄 (C:\\Windows\\Temp)",
                     Path = Path.Combine(WinDir, "Temp"),
                     Icon = "🪟"
+                },
+                new()
+                {
+                    Id = "AppCache",
+                    Name = "應用程式與瀏覽器快取 (App Cache)",
+                    Description = "Edge、Chrome、Firefox 瀏覽器快取、DirectX/GPU Shader 快取及 Discord/Spotify/Teams 快取",
+                    Path = LocalAppData,
+                    Icon = "🌐"
+                },
+                new()
+                {
+                    Id = "WindowsOld",
+                    Name = "舊版 Windows 備份 (Windows.old)",
+                    Description = "前次系統升級保留之回退目錄 (Windows.old / Windows.old.000)",
+                    Path = Path.Combine(Path.GetPathRoot(WinDir) ?? @"C:\", "Windows.old"),
+                    Icon = "💾"
                 },
                 new()
                 {
@@ -82,14 +99,6 @@ public class TempCleanService
                 },
                 new()
                 {
-                    Id = "WindowsOld",
-                    Name = "舊版 Windows 備份 (Windows.old)",
-                    Description = "前次系統升級保留之回退目錄 (Windows.old)",
-                    Path = Path.Combine(Path.GetPathRoot(WinDir) ?? @"C:\", "Windows.old"),
-                    Icon = "💾"
-                },
-                new()
-                {
                     Id = "ThumbCache",
                     Name = "檔案總管縮圖快取 (Thumbnail Cache)",
                     Description = "圖片與影片圖示縮圖資料庫 (thumbcache_*.db)",
@@ -130,9 +139,45 @@ public class TempCleanService
                     long totalBytes = 0;
                     int count = 0;
 
-                    if (cat.Id == "MemoryDumps")
+                    if (cat.Id == "AppCache")
                     {
-                        // Check MEMORY.DMP at root
+                        var cacheDirs = GetAppCacheDirectories();
+                        foreach (var dir in cacheDirs)
+                        {
+                            var (bytes, c) = ScanFolderSafe(dir, "*.*");
+                            totalBytes += bytes;
+                            count += c;
+                        }
+                    }
+                    else if (cat.Id == "WindowsOld")
+                    {
+                        var oldDirs = GetWindowsOldPaths();
+                        foreach (var dir in oldDirs)
+                        {
+                            var (bytes, c) = ScanFolderSafe(dir, "*.*");
+                            totalBytes += bytes;
+                            count += c;
+                        }
+                    }
+                    else if (cat.Id == "UserTemp")
+                    {
+                        if (Directory.Exists(UserTemp))
+                        {
+                            var (bytes, c) = ScanFolderSafe(UserTemp, "*.*");
+                            totalBytes += bytes;
+                            count += c;
+                        }
+
+                        var inetCache = Path.Combine(LocalAppData, @"Microsoft\Windows\INetCache");
+                        if (Directory.Exists(inetCache))
+                        {
+                            var (bytes, c) = ScanFolderSafe(inetCache, "*.*");
+                            totalBytes += bytes;
+                            count += c;
+                        }
+                    }
+                    else if (cat.Id == "MemoryDumps")
+                    {
                         var fullDump = Path.Combine(WinDir, "MEMORY.DMP");
                         if (File.Exists(fullDump))
                         {
@@ -145,7 +190,6 @@ public class TempCleanService
                             catch { }
                         }
 
-                        // Check Minidump folder
                         if (Directory.Exists(cat.Path))
                         {
                             var (bytes, c) = ScanFolderSafe(cat.Path, "*.dmp");
@@ -153,7 +197,6 @@ public class TempCleanService
                             count += c;
                         }
 
-                        // Check LocalAppData CrashDumps
                         var crashDir = Path.Combine(LocalAppData, "CrashDumps");
                         if (Directory.Exists(crashDir))
                         {
@@ -222,7 +265,7 @@ public class TempCleanService
             var targetSet = new HashSet<string>(categoryIds, StringComparer.OrdinalIgnoreCase);
 
             onOutput("══════════════════════════════════════════════════════════════");
-            onOutput($"[{DateTime.Now:HH:mm:ss}] 啟動系統暫存檔案深度清理引擎");
+            onOutput($"[{DateTime.Now:HH:mm:ss}] 啟動系統暫存與磁碟清理引擎");
             onOutput("══════════════════════════════════════════════════════════════");
 
             // User Temp
@@ -230,9 +273,11 @@ public class TempCleanService
             {
                 onOutput("▸ 正在清理使用者暫存目錄 (%TEMP%)...");
                 var (f, b) = CleanDirectoryInternal(UserTemp, "*.*", ct);
-                deletedFiles += f;
-                freedBytes += b;
-                onOutput($"  - 已清理 {f} 個暫存檔案 ({FormatBytes(b)})");
+                var inetCache = Path.Combine(LocalAppData, @"Microsoft\Windows\INetCache");
+                var (f2, b2) = CleanDirectoryInternal(inetCache, "*.*", ct);
+                deletedFiles += f + f2;
+                freedBytes += b + b2;
+                onOutput($"  - 已清理 {f + f2} 個使用者暫存檔案 ({FormatBytes(b + b2)})");
             }
 
             // System Temp
@@ -244,6 +289,64 @@ public class TempCleanService
                 deletedFiles += f;
                 freedBytes += b;
                 onOutput($"  - 已清理 {f} 個系統暫存檔 ({FormatBytes(b)})");
+            }
+
+            // App Cache
+            if (targetSet.Contains("AppCache"))
+            {
+                onOutput("▸ 正在清理應用程式與瀏覽器快取 (App Cache: Edge/Chrome/Firefox/GPU Shader)...");
+                int af = 0;
+                long ab = 0;
+                var cacheDirs = GetAppCacheDirectories();
+                foreach (var dir in cacheDirs)
+                {
+                    if (ct.IsCancellationRequested) break;
+                    var (f, b) = CleanDirectoryInternal(dir, "*.*", ct);
+                    af += f;
+                    ab += b;
+                }
+                deletedFiles += af;
+                freedBytes += ab;
+                onOutput($"  - 已清理 {af} 個應用程式快取檔案 ({FormatBytes(ab)})");
+            }
+
+            // Windows.old
+            if (targetSet.Contains("WindowsOld"))
+            {
+                var oldDirs = GetWindowsOldPaths();
+                if (oldDirs.Count > 0)
+                {
+                    onOutput("▸ 正在清理舊版 Windows 備份目錄 (Windows.old)...");
+                    int wf = 0;
+                    long wb = 0;
+                    foreach (var winOld in oldDirs)
+                    {
+                        if (ct.IsCancellationRequested) break;
+                        var (f, b) = CleanDirectoryInternal(winOld, "*.*", ct);
+                        wf += f;
+                        wb += b;
+
+                        // Check if locked subdirectories remain
+                        if (Directory.Exists(winOld))
+                        {
+                            try
+                            {
+                                onOutput($"  ▸ 取得 {winOld} 管理員擁有權並釋放權限...");
+                                ProcessHelper.RunProcessAsync("takeown.exe", $"/F \"{winOld}\" /A /R /D Y").GetAwaiter().GetResult();
+                                ProcessHelper.RunProcessAsync("icacls.exe", $"\"{winOld}\" /grant *S-1-5-32-544:F /T /C /Q").GetAwaiter().GetResult();
+                                ProcessHelper.RunProcessAsync("cmd.exe", $"/c rd /s /q \"{winOld}\"").GetAwaiter().GetResult();
+                            }
+                            catch { }
+                        }
+                    }
+                    deletedFiles += wf;
+                    freedBytes += wb;
+                    onOutput($"  - 已清理 {wf} 個 Windows.old 歷史備份檔案 ({FormatBytes(wb)})");
+                }
+                else
+                {
+                    onOutput("  - 未偵測到 Windows.old 備份目錄。");
+                }
             }
 
             // Prefetch
@@ -325,20 +428,6 @@ public class TempCleanService
                 onOutput($"  - 已清理 {sf} 個安裝殘留項目 ({FormatBytes(sb)})");
             }
 
-            // Windows.old
-            if (targetSet.Contains("WindowsOld"))
-            {
-                var winOld = Path.Combine(Path.GetPathRoot(WinDir) ?? @"C:\", "Windows.old");
-                if (Directory.Exists(winOld))
-                {
-                    onOutput("▸ 正在清理舊版 Windows 備份 (Windows.old)...");
-                    var (f, b) = CleanDirectoryInternal(winOld, "*.*", ct);
-                    deletedFiles += f;
-                    freedBytes += b;
-                    onOutput($"  - 已清理 {f} 個舊版本檔案 ({FormatBytes(b)})");
-                }
-            }
-
             // Thumbnail Cache
             if (targetSet.Contains("ThumbCache"))
             {
@@ -385,11 +474,35 @@ public class TempCleanService
             }
 
             onOutput("\n══════════════════════════════════════════════════════════════");
-            onOutput($"[{DateTime.Now:HH:mm:ss}] 🎉 系統暫存清理完成！共釋放 {FormatBytes(freedBytes)} 磁碟空間 (清理 {deletedFiles:N0} 個檔案)");
+            onOutput($"[{DateTime.Now:HH:mm:ss}] 🎉 磁碟清理完成！共釋放 {FormatBytes(freedBytes)} 磁碟空間 (清理 {deletedFiles:N0} 個檔案)");
             onOutput("══════════════════════════════════════════════════════════════");
 
             return (deletedFiles, freedBytes, FormatBytes(freedBytes));
         });
+    }
+
+    /// <summary>
+    /// Directly cleans temporary files (%TEMP%, Windows Temp, INetCache).
+    /// </summary>
+    public Task<(int DeletedFiles, long FreedBytes, string FreedDisplay)> CleanTempFilesAsync(Action<string> onOutput, CancellationToken ct = default)
+    {
+        return CleanSelectedCategoriesAsync(new[] { "UserTemp", "SystemTemp" }, onOutput, ct);
+    }
+
+    /// <summary>
+    /// Directly cleans Windows.old backup directories with administrative ownership release.
+    /// </summary>
+    public Task<(int DeletedFiles, long FreedBytes, string FreedDisplay)> CleanWindowsOldAsync(Action<string> onOutput, CancellationToken ct = default)
+    {
+        return CleanSelectedCategoriesAsync(new[] { "WindowsOld" }, onOutput, ct);
+    }
+
+    /// <summary>
+    /// Directly cleans browser, GPU shader, and common app caches.
+    /// </summary>
+    public Task<(int DeletedFiles, long FreedBytes, string FreedDisplay)> CleanAppCacheAsync(Action<string> onOutput, CancellationToken ct = default)
+    {
+        return CleanSelectedCategoriesAsync(new[] { "AppCache" }, onOutput, ct);
     }
 
     /// <summary>
@@ -404,6 +517,148 @@ public class TempCleanService
         return exitCode;
     }
 
+    /// <summary>
+    /// Collects known application and browser cache directories across active and system user profiles.
+    /// </summary>
+    public static List<string> GetAppCacheDirectories()
+    {
+        var list = new List<string>();
+        var localApps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var roamingApps = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        void AddIfValid(string? path, bool isRoaming)
+        {
+            if (!string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
+            {
+                if (isRoaming) roamingApps.Add(path);
+                else localApps.Add(path);
+            }
+        }
+
+        AddIfValid(Environment.GetEnvironmentVariable("LOCALAPPDATA"), false);
+        AddIfValid(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), false);
+        AddIfValid(Environment.GetEnvironmentVariable("APPDATA"), true);
+        AddIfValid(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), true);
+
+        // Also inspect profiles under C:\Users\*
+        try
+        {
+            var usersDir = Path.Combine(Path.GetPathRoot(WinDir) ?? @"C:\", "Users");
+            if (Directory.Exists(usersDir))
+            {
+                foreach (var userDir in Directory.EnumerateDirectories(usersDir))
+                {
+                    var name = Path.GetFileName(userDir);
+                    if (name.Equals("Public", StringComparison.OrdinalIgnoreCase) ||
+                        name.Equals("Default", StringComparison.OrdinalIgnoreCase) ||
+                        name.Equals("All Users", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    var uLocal = Path.Combine(userDir, @"AppData\Local");
+                    if (Directory.Exists(uLocal)) localApps.Add(uLocal);
+                    var uRoaming = Path.Combine(userDir, @"AppData\Roaming");
+                    if (Directory.Exists(uRoaming)) roamingApps.Add(uRoaming);
+                }
+            }
+        }
+        catch { }
+
+        foreach (var localApp in localApps)
+        {
+            // Browsers
+            list.Add(Path.Combine(localApp, @"Microsoft\Edge\User Data\Default\Cache"));
+            list.Add(Path.Combine(localApp, @"Microsoft\Edge\User Data\Default\Code Cache"));
+            list.Add(Path.Combine(localApp, @"Microsoft\Edge\User Data\Default\GPUCache"));
+
+            list.Add(Path.Combine(localApp, @"Google\Chrome\User Data\Default\Cache"));
+            list.Add(Path.Combine(localApp, @"Google\Chrome\User Data\Default\Code Cache"));
+            list.Add(Path.Combine(localApp, @"Google\Chrome\User Data\Default\GPUCache"));
+
+            list.Add(Path.Combine(localApp, @"BraveSoftware\Brave-Browser\User Data\Default\Cache"));
+            list.Add(Path.Combine(localApp, @"BraveSoftware\Brave-Browser\User Data\Default\Code Cache"));
+
+            var firefoxProfiles = Path.Combine(localApp, @"Mozilla\Firefox\Profiles");
+            if (Directory.Exists(firefoxProfiles))
+            {
+                try
+                {
+                    foreach (var d in Directory.EnumerateDirectories(firefoxProfiles))
+                    {
+                        list.Add(Path.Combine(d, "cache2"));
+                    }
+                }
+                catch { }
+            }
+
+            list.Add(Path.Combine(localApp, @"Opera Software\Opera Stable\Cache"));
+            list.Add(Path.Combine(localApp, @"Opera Software\Opera GX Stable\Cache"));
+            list.Add(Path.Combine(localApp, @"Vivaldi\User Data\Default\Cache"));
+
+            // Shader Caches
+            list.Add(Path.Combine(localApp, "D3DSCache"));
+            list.Add(Path.Combine(localApp, @"NVIDIA\DXCache"));
+            list.Add(Path.Combine(localApp, @"NVIDIA\GLCache"));
+            list.Add(Path.Combine(localApp, @"AMD\DxCache"));
+            list.Add(Path.Combine(localApp, @"AMD\GLCache"));
+
+            list.Add(Path.Combine(localApp, @"Spotify\Storage"));
+            list.Add(Path.Combine(localApp, @"Packages\MSTeams_8wekyb3d8bbwe\LocalCache"));
+        }
+
+        foreach (var roamingApp in roamingApps)
+        {
+            list.Add(Path.Combine(roamingApp, @"discord\Cache"));
+            list.Add(Path.Combine(roamingApp, @"discord\Code Cache"));
+            list.Add(Path.Combine(roamingApp, @"discord\GPUCache"));
+            list.Add(Path.Combine(roamingApp, @"Microsoft\Teams\Cache"));
+            list.Add(Path.Combine(roamingApp, @"Code\Cache"));
+            list.Add(Path.Combine(roamingApp, @"Code\CachedData"));
+        }
+
+        return list.Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    /// <summary>
+    /// Searches for Windows.old and historical upgrade backup directories across drives.
+    /// </summary>
+    public static List<string> GetWindowsOldPaths()
+    {
+        var list = new List<string>();
+        try
+        {
+            var winRoot = Path.GetPathRoot(WinDir) ?? @"C:\";
+            var rootOld = Path.Combine(winRoot, "Windows.old");
+            if (Directory.Exists(rootOld)) list.Add(rootOld);
+
+            var drives = DriveInfo.GetDrives();
+            foreach (var d in drives)
+            {
+                if (!d.IsReady) continue;
+                try
+                {
+                    var p = Path.Combine(d.RootDirectory.FullName, "Windows.old");
+                    if (Directory.Exists(p)) list.Add(p);
+
+                    foreach (var oldDir in Directory.EnumerateDirectories(d.RootDirectory.FullName, "Windows.old.*"))
+                    {
+                        list.Add(oldDir);
+                    }
+                }
+                catch { }
+            }
+        }
+        catch { }
+
+        return list.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static readonly EnumerationOptions SafeEnumOptions = new()
+    {
+        RecurseSubdirectories = true,
+        IgnoreInaccessible = true,
+        AttributesToSkip = FileAttributes.ReparsePoint
+    };
+
     private static (long TotalBytes, int FileCount) ScanFolderSafe(string folderPath, string pattern)
     {
         long total = 0;
@@ -411,7 +666,9 @@ public class TempCleanService
         try
         {
             var dir = new DirectoryInfo(folderPath);
-            foreach (var fi in dir.EnumerateFiles(pattern, SearchOption.AllDirectories))
+            if (!dir.Exists) return (0, 0);
+
+            foreach (var fi in dir.EnumerateFiles(pattern, SafeEnumOptions))
             {
                 try
                 {
@@ -434,7 +691,7 @@ public class TempCleanService
         try
         {
             var dir = new DirectoryInfo(folderPath);
-            foreach (var file in dir.EnumerateFiles(searchPattern, SearchOption.AllDirectories))
+            foreach (var file in dir.EnumerateFiles(searchPattern, SafeEnumOptions))
             {
                 if (ct.IsCancellationRequested) break;
                 try
@@ -448,7 +705,7 @@ public class TempCleanService
             }
 
             // Try removing empty subdirectories
-            foreach (var sub in dir.EnumerateDirectories("*", SearchOption.AllDirectories))
+            foreach (var sub in dir.EnumerateDirectories("*", SafeEnumOptions))
             {
                 if (ct.IsCancellationRequested) break;
                 try

@@ -1501,7 +1501,7 @@
             </TabViewItem>
 
             <!-- ── Tab 4: VHD / VHDX 虛擬硬碟與暫存清理管理箱 ── -->
-            <TabViewItem x:Name="TabVhdx" Header="💽 VHD/VHDX 虛擬磁碟與快取清理" IsClosable="False">
+            <TabViewItem x:Name="TabVhdx" Header="💽 VHD/VHDX 虛擬磁碟 (Virtual Disks)" IsClosable="False">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch" Margin="0,10,0,0">
                     <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
 
@@ -1666,6 +1666,152 @@
                                            Visibility="{x:Bind ViewModel.CacheCleanupSummary, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}" />
                             </StackPanel>
                         </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </TabViewItem>
+
+            <!-- ── TabCleaner: 磁碟暫存與快取清理箱 (Disk Cleaner & Cache Cleanup) ── -->
+            <TabViewItem x:Name="TabCleaner" Header="🧹 磁碟清理 (Cleaner)" IsClosable="False">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch" Margin="0,10,0,0">
+                    <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
+
+                        <!-- Hero Master Card -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource AccentFillColorDefaultBrush}" BorderThickness="2"
+                                CornerRadius="10" Padding="18">
+                            <Grid ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Grid.Column="0" Glyph="&#xE74D;" FontSize="44" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="全方位磁碟與系統深度清理箱 (Disk &amp; System Cache Cleaner)" FontWeight="Bold" FontSize="18" TextWrapping="Wrap" />
+                                        <Border Background="{ThemeResource AccentFillColorTertiaryBrush}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                                            <TextBlock Text="DiskMaster Cleaner" FontSize="11" FontWeight="SemiBold" />
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock Text="快速清理系統與使用者暫存檔、舊版 Windows 備份 (Windows.old)、瀏覽器與應用程式快取、孤立掛載鎖定與多線程下載隔離區，安全釋放大量磁碟空間。"
+                                               Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                    <Button Content="⚡ 一鍵全域快取清理"
+                                            Command="{x:Bind ViewModel.PerformFullCleanupCommand}"
+                                            Style="{StaticResource AccentButtonStyle}" Padding="14,8" />
+                                    <Button Content="🧹 全系統暫存深度清理"
+                                            Command="{x:Bind ViewModel.PerformSystemDeepCleanupCommand}"
+                                            Padding="12,8" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Card 1: Temp Files Cleaner -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="16">
+                            <Grid ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Spacing="4">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE74D;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        <TextBlock Text="🧹 系統與使用者暫存檔案清理 (System &amp; User Temp Files)" FontWeight="SemiBold" FontSize="15" />
+                                    </StackPanel>
+                                    <TextBlock Text="清理目前登入使用者的暫存目錄 (%TEMP%)、Windows 系統安裝與服務暫存 (C:\Windows\Temp) 以及 Windows Web 暫存 (INetCache)。執行時會自動跳過使用中的鎖定檔案，安全可靠。"
+                                               Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="🧹 清理暫存檔案 (Clean Temp)"
+                                        Command="{x:Bind ViewModel.CleanTempFilesCommand}"
+                                        Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center" Padding="12,8" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Card 2: Windows.old Cleaner -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="16">
+                            <Grid ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Spacing="4">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE7C3;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        <TextBlock Text="💾 舊版 Windows 備份清理 (Windows.old Cleaner)" FontWeight="SemiBold" FontSize="15" />
+                                    </StackPanel>
+                                    <TextBlock Text="Windows 大版本升級後產生的歷史退回備份 (Windows.old / Windows.old.000)。受 TrustedInstaller 權限保護，手動無法直接刪除；點擊後自動解除所有權鎖定並徹底清除，通常可釋放 10GB ~ 40GB+ 磁碟空間。"
+                                               Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="💾 清理 Windows.old 備份"
+                                        Command="{x:Bind ViewModel.CleanWindowsOldCommand}"
+                                        Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center" Padding="12,8" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Card 3: App Cache Cleaner -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="16">
+                            <Grid ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Spacing="4">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE774;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                        <TextBlock Text="🌐 應用程式與瀏覽器快取清理 (App Cache Cleaner)" FontWeight="SemiBold" FontSize="15" />
+                                    </StackPanel>
+                                    <TextBlock Text="清理 Microsoft Edge、Google Chrome、Firefox、Brave、Opera 瀏覽器快取，DirectX、NVIDIA、AMD GPU Shader 編譯快取，以及 Discord、Spotify、Teams、VS Code 快取檔案。"
+                                               Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="🌐 清理應用程式快取"
+                                        Command="{x:Bind ViewModel.CleanAppCacheCommand}"
+                                        Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center" Padding="12,8" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Card 4: Download & System Residuals -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="12">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE896;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                    <TextBlock Text="📥 下載暫存快取與系統殘留深度清理 (Residual Cleaner)" FontWeight="SemiBold" FontSize="15" />
+                                </StackPanel>
+                                <TextBlock Text="清理多線程分段下載隔離區 (.tmp_dm)、未完成的 ISO 暫存檔、DISM 孤立掛載鎖定點與 DiskPart 臨時腳本，安全釋放硬碟空間。"
+                                           Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Content="📥 清理下載暫存 (.tmp_dm)"
+                                            Command="{x:Bind ViewModel.CleanDownloadCacheCommand}"
+                                            HorizontalAlignment="Stretch" />
+                                    <Button Grid.Column="1" Content="🔒 清理 DISM 掛載鎖"
+                                            Command="{x:Bind ViewModel.CleanDismMountsCommand}"
+                                            HorizontalAlignment="Stretch" />
+                                    <Button Grid.Column="2" Content="📜 清理臨時指令檔"
+                                            Command="{x:Bind ViewModel.CleanDiskPartScriptsCommand}"
+                                            HorizontalAlignment="Stretch" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Status Result Banner -->
+                        <TextBlock Text="{x:Bind ViewModel.CacheCleanupSummary, Mode=OneWay}"
+                                   FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                   Visibility="{x:Bind ViewModel.CacheCleanupSummary, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}" />
 
                     </StackPanel>
                 </ScrollViewer>
