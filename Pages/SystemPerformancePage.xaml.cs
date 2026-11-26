@@ -67,11 +67,21 @@ public sealed partial class SystemPerformancePage : Page
     {
         ApplyLanguage();
         UpdateOverlayButtonState();
+        DiskMasterWinUI.Controls.PerformanceOverlayWindow.OverlayStateChanged -= OnOverlayStateChanged;
         DiskMasterWinUI.Controls.PerformanceOverlayWindow.OverlayStateChanged += OnOverlayStateChanged;
+        ViewModel.DiskHistoryUpdated -= OnDiskHistoryUpdated;
         ViewModel.DiskHistoryUpdated += OnDiskHistoryUpdated;
         ViewModel.StartAutoRefresh();
         await ViewModel.InitializeAsync();
         RedrawDiskChart();
+    }
+
+    private async void ProcessGroupEcoQos_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is DiskMasterWinUI.Models.ProcessGroupMemoryItem group)
+        {
+            await ViewModel.ToggleProcessGroupEcoQosCommand.ExecuteAsync(group);
+        }
     }
 
     private void OnOverlayStateChanged()

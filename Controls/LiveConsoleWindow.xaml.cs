@@ -25,8 +25,8 @@ public sealed partial class LiveConsoleWindow : Window
     public static LiveConsoleWindow? CurrentInstance { get; private set; }
 
     private const int MaxVisibleItems = 2000;
-    // Open with the entire current ring buffer, not just the newest 300 rows.
-    private const int InitialItems = MaxVisibleItems;
+    // Open with the newest 150 items for instant, smooth window presentation without UI stalls.
+    private const int InitialItems = 150;
     private const int MaxPendingItems = 5000;
 
     private readonly ObservableCollection<ActionLogItem> _visibleItems = new();

@@ -1808,10 +1808,32 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Status Result Banner -->
-                        <TextBlock Text="{x:Bind ViewModel.CacheCleanupSummary, Mode=OneWay}"
-                                   FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                                   Visibility="{x:Bind ViewModel.CacheCleanupSummary, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}" />
+                        <!-- Status Result Banner & Clear Status Option -->
+                        <Border Visibility="{x:Bind ViewModel.CacheCleanupSummary, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}"
+                                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="14,10">
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <FontIcon Grid.Column="0" Glyph="&#xE73E;" FontSize="18" Foreground="{ThemeResource SystemFillColorSuccessBrush}" VerticalAlignment="Center" />
+
+                                <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.CacheCleanupSummary, Mode=OneWay}"
+                                           FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+
+                                <Button Grid.Column="2" Command="{x:Bind ViewModel.ClearCacheCleanupSummaryCommand}"
+                                        ToolTipService.ToolTip="清除目前狀態 (Delete Current Status)"
+                                        Padding="8,6" VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE894;" FontSize="12" />
+                                </Button>
+                            </Grid>
+                        </Border>
 
                     </StackPanel>
                 </ScrollViewer>

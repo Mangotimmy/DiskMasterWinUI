@@ -120,6 +120,18 @@ public class AppSettings
     public bool ShellEnableDiskCheck { get; set; } = true;
     public bool ShellEnableAddToPath { get; set; } = true;
     public bool ShellAllUsersScope { get; set; } = false;
+
+    // ── PC Clean-Run & Auto RAM Guard Settings ──
+    public bool AutoRamGuardEnabled { get; set; } = false;
+    public int AutoRamGuardThresholdPercent { get; set; } = 82;
+    public int AutoRamGuardCooldownMinutes { get; set; } = 10;
+    public bool AutoRamGuardPurgeStandbyList { get; set; } = true;
+    public bool AutoRamGuardExcludeForeground { get; set; } = true;
+    public string AutoRamGuardWhitelistCsv { get; set; } = "obs64,audiodg,voicemeeter,dwm";
+
+    // ── Windows Update Repair Preferences ──
+    public bool WuRepairPromptReboot { get; set; } = true;
+    public bool WuRepairBackupSoftwareDist { get; set; } = true;
 }
 
 public class SettingsService

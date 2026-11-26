@@ -173,8 +173,8 @@ public class MemoryManagerService
         try
         {
             var psExe = GetPowerShellExe();
-            var ensureSysMain = "if ((Get-Service SysMain -ErrorAction SilentlyContinue).Status -ne 'Running') { Start-Service SysMain -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 300 }";
-            var psCmd = $"{ensureSysMain}; Get-MMAgent | Out-String";
+            // Strictly read-only: never silently re-start SysMain if the user intentionally disabled it to save RAM/disk.
+            var psCmd = "Get-MMAgent | Out-String";
 
             var (stdout, _, exitCode) = await ProcessHelper.RunProcessAsync(psExe, $"-NoProfile -Command \"{psCmd}\"");
 
@@ -268,20 +268,25 @@ public class MemoryManagerService
                 combined = $"{retryOut}\n{retryErr}";
             }
 
-            // Friendly interpretation for specific Windows system scenarios (no raw CIM exception dumps)
-            if (combined.Contains("50") || combined.Contains("不支援這個要求") || combined.Contains("InvalidOperation"))
+            // Never mask permission errors as success
+            bool isAccessDenied = Regex.IsMatch(combined, @"Access\s+is\s+denied|PermissionDenied|Windows\s+System\s+Error\s+5\b|0x80070005|拒絕存取", RegexOptions.IgnoreCase);
+            if (!isAccessDenied)
             {
-                return (true, $"{featureName}: 當前硬體/NVMe 儲存層已由 Windows 核心直接最佳化 (略過傳統預取)");
-            }
+                // Strict error-code matching for known hardware/service-transition responses
+                if (Regex.IsMatch(combined, @"Windows\s+System\s+Error\s+50\b|0x80070032|ERROR_NOT_SUPPORTED|不支援這個要求", RegexOptions.IgnoreCase))
+                {
+                    return (true, $"{featureName}: 當前硬體/NVMe 儲存層已由 Windows 核心直接最佳化 (略過傳統預取)");
+                }
 
-            if (combined.Contains("1061") || combined.Contains("ResourceBusy") || combined.Contains("服務無法在此時接受控制訊息"))
-            {
-                return (true, $"{featureName}: 系統快取服務忙碌中，已由 Windows 記憶體管理器自動排程套用");
-            }
+                if (Regex.IsMatch(combined, @"Windows\s+System\s+Error\s+1061\b|\bResourceBusy\b|服務無法在此時接受控制訊息", RegexOptions.IgnoreCase))
+                {
+                    return (false, $"{featureName}: 系統快取服務 (SysMain) 正忙碌中，請稍後再試");
+                }
 
-            if (combined.Contains("351") || combined.Contains("關機作業失敗"))
-            {
-                return (true, $"{featureName}: 系統服務狀態轉換中，設定已就緒");
+                if (Regex.IsMatch(combined, @"Windows\s+System\s+Error\s+351\b|關機作業失敗", RegexOptions.IgnoreCase))
+                {
+                    return (false, $"{featureName}: 系統服務正處於狀態轉換中，請稍候重試");
+                }
             }
 
             var cleanErr = ExtractCleanErrorMessage(combined);
@@ -372,8 +377,13 @@ public class MemoryManagerService
         try
         {
             var psExe = GetPowerShellExe();
-            var script = "Disable-MMAgent -mc -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 200; Disable-MMAgent -PageCombining -ErrorAction SilentlyContinue";
-            await ProcessHelper.RunProcessAsync(psExe, $"-NoProfile -Command \"{script}\"");
+            var script = "$ErrorActionPreference='Stop'; Disable-MMAgent -mc; Start-Sleep -Milliseconds 200; Disable-MMAgent -PageCombining";
+            var (stdout, stderr, exitCode) = await ProcessHelper.RunProcessAsync(psExe, $"-NoProfile -Command \"{script}\"");
+            if (exitCode != 0)
+            {
+                var err = ExtractCleanErrorMessage($"{stdout}\n{stderr}");
+                return (false, $"套用電競低延遲記憶體設定失敗: {err}");
+            }
             return (true, "已成功套用【電競極限低延遲記憶體】(記憶體壓縮: 關閉 / 分頁合併: 關閉)");
         }
         finally
@@ -392,8 +402,13 @@ public class MemoryManagerService
         try
         {
             var psExe = GetPowerShellExe();
-            var script = "if ((Get-Service SysMain -ErrorAction SilentlyContinue).Status -ne 'Running') { Start-Service SysMain -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 500 }; Enable-MMAgent -mc -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 200; Enable-MMAgent -PageCombining -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 200; Enable-MMAgent -ApplicationPreLaunch -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 200; try { Enable-MMAgent -ApplicationLaunchPrefetching -ErrorAction Stop } catch { Enable-MMAgent -ApplicationLaunchProfiling -ErrorAction SilentlyContinue }; Start-Sleep -Milliseconds 200; try { Enable-MMAgent -OperationAPI -ErrorAction Stop } catch { Enable-MMAgent -OperationRecording -ErrorAction SilentlyContinue }";
-            await ProcessHelper.RunProcessAsync(psExe, $"-NoProfile -Command \"{script}\"");
+            var script = "$ErrorActionPreference='Stop'; if ((Get-Service SysMain -ErrorAction SilentlyContinue).Status -ne 'Running') { Start-Service SysMain -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 500 }; Enable-MMAgent -mc; Start-Sleep -Milliseconds 200; Enable-MMAgent -PageCombining; Start-Sleep -Milliseconds 200; Enable-MMAgent -ApplicationPreLaunch; Start-Sleep -Milliseconds 200; try { Enable-MMAgent -ApplicationLaunchPrefetching -ErrorAction Stop } catch { Enable-MMAgent -ApplicationLaunchProfiling -ErrorAction SilentlyContinue }; Start-Sleep -Milliseconds 200; try { Enable-MMAgent -OperationAPI -ErrorAction Stop } catch { Enable-MMAgent -OperationRecording -ErrorAction SilentlyContinue }";
+            var (stdout, stderr, exitCode) = await ProcessHelper.RunProcessAsync(psExe, $"-NoProfile -Command \"{script}\"");
+            if (exitCode != 0)
+            {
+                var err = ExtractCleanErrorMessage($"{stdout}\n{stderr}");
+                return (false, $"還原 Windows 預設記憶體設定失敗: {err}");
+            }
             return (true, "已成功還原【Windows 官方預設記憶體配置】(記憶體壓縮/分頁合併/預先啟動等核心功能已啟用)");
         }
         finally

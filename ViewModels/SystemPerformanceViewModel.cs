@@ -10,10 +10,15 @@ namespace DiskMasterWinUI.ViewModels;
 public partial class SystemPerformanceViewModel : ObservableObject
 {
     private readonly SystemPerformanceService _perfService = new();
+    private readonly CleanRunOptimizerService _cleanRunService = new();
     private readonly DispatcherQueueTimer _refreshTimer;
 
     [ObservableProperty] private SystemMetricsSnapshot _currentMetrics = new();
     [ObservableProperty] private SystemInfoSummary _systemInfo = new();
+    [ObservableProperty] private RamPressureReport _ramPressure = new();
+    [ObservableProperty] private bool _isAnalyzingRamPressure;
+    [ObservableProperty] private bool _hasWebView2Owners;
+    [ObservableProperty] private string _ramReleaseFeedback = "";
     [ObservableProperty] private DiskPerformanceItem? _selectedDisk;
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private bool _isAutoRefresh = true;
@@ -72,11 +77,12 @@ public partial class SystemPerformanceViewModel : ObservableObject
         IsLoading = true;
         try
         {
-            // Execute metrics, process hunter, and system profile concurrently
+            // Execute metrics, process hunter, RAM pressure doctor, and system profile concurrently
             await Task.WhenAll(
                 RefreshMetricsAsync(),
                 RefreshProcessesCoreAsync(forceWmicRefresh: true),
-                RefreshSystemInfoAsync()
+                RefreshSystemInfoAsync(),
+                RefreshRamPressureAsync()
             );
         }
         finally
@@ -386,6 +392,52 @@ public partial class SystemPerformanceViewModel : ObservableObject
         var (ok, msg) = await _perfService.KillProcessTreeAsync(item.Pid);
         StatusMessage = msg;
         await RefreshProcessesCoreAsync(forceWmicRefresh: true);
+    }
+
+    [RelayCommand]
+    public async Task RefreshRamPressureAsync()
+    {
+        if (IsAnalyzingRamPressure) return;
+        IsAnalyzingRamPressure = true;
+        try
+        {
+            var report = await _cleanRunService.AnalyzeRamPressureAsync();
+            RamPressure = report;
+            HasWebView2Owners = report.WebView2Owners.Count > 0;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"RAM 壓力診斷失敗: {ex.Message}";
+        }
+        finally
+        {
+            IsAnalyzingRamPressure = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task ReleaseRamSafelyAsync()
+    {
+        var s = SettingsService.Instance.Current;
+        StatusMessage = "正在執行前景保護安全記憶體釋放...";
+        var res = await _cleanRunService.ReleaseMemorySafelyAsync(
+            purgeStandbyList: s.AutoRamGuardPurgeStandbyList,
+            excludeForeground: s.AutoRamGuardExcludeForeground,
+            whitelistCsv: s.AutoRamGuardWhitelistCsv);
+        RamReleaseFeedback = res.Message;
+        StatusMessage = res.Message;
+        await Task.WhenAll(RefreshMetricsAsync(), RefreshRamPressureAsync());
+    }
+
+    [RelayCommand]
+    public async Task ToggleProcessGroupEcoQosAsync(ProcessGroupMemoryItem? group)
+    {
+        if (group == null) return;
+        bool targetEco = !group.IsEcoQosApplied;
+        var (ok, _, msg) = await _cleanRunService.SetProcessGroupEfficiencyModeAsync(group.ProcessName, targetEco);
+        if (ok) group.IsEcoQosApplied = targetEco;
+        RamReleaseFeedback = msg;
+        StatusMessage = msg;
     }
 
     [RelayCommand]

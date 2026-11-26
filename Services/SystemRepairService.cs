@@ -72,24 +72,132 @@ public class SystemRepairService
 
     public async Task<bool> RunOneClickFullHealthRepairAsync(Action<string> onOutput, CancellationToken ct = default)
     {
+        var result = await RunFullDismSfcSequenceAsync(
+            runScanHealth: true,
+            runCheckHealth: true,
+            runRestoreHealth: true,
+            repairSource: null,
+            runSfc: true,
+            onOutput: onOutput,
+            ct: ct);
+        return result.Success;
+    }
+
+    /// <summary>
+    /// Executes the Microsoft-recommended DISM &amp; SFC component store repair pipeline:
+    /// ScanHealth -> CheckHealth -> RestoreHealth (optional /Source) -> sfc /scannow,
+    /// while detecting critical CBS error codes such as 0x800F0831 and 0x800F081F.
+    /// </summary>
+    public async Task<DismSfcRepairResult> RunFullDismSfcSequenceAsync(
+        bool runScanHealth,
+        bool runCheckHealth,
+        bool runRestoreHealth,
+        string? repairSource,
+        bool runSfc,
+        Action<string> onOutput,
+        CancellationToken ct = default)
+    {
+        string? detectedError = null;
+        bool rebootRecommended = false;
+        int lastExitCode = 0;
+        bool anyFailed = false;
+
+        void InterceptOutput(string line)
+        {
+            onOutput(line);
+            if (!string.IsNullOrWhiteSpace(line))
+            {
+                if (line.Contains("0x800f0831", StringComparison.OrdinalIgnoreCase) || line.Contains("CBS_E_STORE_CORRUPTION", StringComparison.OrdinalIgnoreCase))
+                    detectedError = "0x800F0831";
+                else if (line.Contains("0x800f081f", StringComparison.OrdinalIgnoreCase))
+                    detectedError ??= "0x800F081F";
+                else if (line.Contains("0x800f0906", StringComparison.OrdinalIgnoreCase))
+                    detectedError ??= "0x800F0906";
+                else if (line.Contains("successfully repaired", StringComparison.OrdinalIgnoreCase) ||
+                         line.Contains("成功修復", StringComparison.OrdinalIgnoreCase) ||
+                         line.Contains("restart", StringComparison.OrdinalIgnoreCase) ||
+                         line.Contains("重新啟動", StringComparison.OrdinalIgnoreCase))
+                    rebootRecommended = true;
+            }
+        }
+
+        int totalSteps = (runScanHealth ? 1 : 0) + (runCheckHealth ? 1 : 0) + (runRestoreHealth ? 1 : 0) + (runSfc ? 1 : 0);
+        int currentStep = 0;
+
         onOutput("══════════════════════════════════════════════════════");
-        onOutput($"[{DateTime.Now:HH:mm:ss}] Starting 1-Click Complete Windows Health Repair Routine");
-        onOutput("Step 1/2: DISM /Online /Cleanup-Image /RestoreHealth");
+        onOutput($"[{DateTime.Now:HH:mm:ss}] 啟動 Windows 元件存放區與系統檔案修復流程 (DISM + SFC)");
         onOutput("══════════════════════════════════════════════════════");
 
-        var dismCode = await RunDismRestoreHealthAsync(onOutput, ct);
-        if (ct.IsCancellationRequested) return false;
+        if (runScanHealth)
+        {
+            if (ct.IsCancellationRequested) return new DismSfcRepairResult { Success = false, LastExitCode = -1, Summary = "作業已取消" };
+            currentStep++;
+            onOutput($"\n[Step {currentStep}/{totalSteps}] DISM /Online /Cleanup-Image /ScanHealth");
+            lastExitCode = await RunDismScanHealthAsync(InterceptOutput, ct);
+            if (lastExitCode == 3010) rebootRecommended = true;
+            else if (lastExitCode != 0) anyFailed = true;
+        }
+
+        if (runCheckHealth)
+        {
+            if (ct.IsCancellationRequested) return new DismSfcRepairResult { Success = false, LastExitCode = -1, Summary = "作業已取消" };
+            currentStep++;
+            onOutput($"\n[Step {currentStep}/{totalSteps}] DISM /Online /Cleanup-Image /CheckHealth");
+            lastExitCode = await RunDismCheckHealthAsync(InterceptOutput, ct);
+            if (lastExitCode == 3010) rebootRecommended = true;
+            else if (lastExitCode != 0) anyFailed = true;
+        }
+
+        if (runRestoreHealth)
+        {
+            if (ct.IsCancellationRequested) return new DismSfcRepairResult { Success = false, LastExitCode = -1, Summary = "作業已取消" };
+            currentStep++;
+            if (!string.IsNullOrWhiteSpace(repairSource))
+            {
+                onOutput($"\n[Step {currentStep}/{totalSteps}] DISM /Online /Cleanup-Image /RestoreHealth /Source:\"{repairSource}\" /LimitAccess");
+                lastExitCode = await RunDismRestoreHealthWithSourceAsync(repairSource.Trim(), InterceptOutput, ct);
+            }
+            else
+            {
+                onOutput($"\n[Step {currentStep}/{totalSteps}] DISM /Online /Cleanup-Image /RestoreHealth");
+                lastExitCode = await RunDismRestoreHealthAsync(InterceptOutput, ct);
+            }
+            if (lastExitCode == 3010) rebootRecommended = true;
+            else if (lastExitCode != 0) anyFailed = true;
+        }
+
+        if (runSfc)
+        {
+            if (ct.IsCancellationRequested) return new DismSfcRepairResult { Success = false, LastExitCode = -1, Summary = "作業已取消" };
+            currentStep++;
+            onOutput($"\n[Step {currentStep}/{totalSteps}] sfc /scannow (System File Checker)");
+            lastExitCode = await RunSfcScanNowAsync(InterceptOutput, ct);
+            if (lastExitCode == 3010) rebootRecommended = true;
+            else if (lastExitCode != 0) anyFailed = true;
+        }
+
+        if (detectedError == null && lastExitCode == unchecked((int)0x800F0831)) detectedError = "0x800F0831";
+        if (detectedError == null && lastExitCode == unchecked((int)0x800F081F)) detectedError = "0x800F081F";
+
+        bool success = !anyFailed;
+        string summary = success
+            ? (rebootRecommended ? "DISM / SFC 修復完成，建議重新啟動電腦套用變更。" : "DISM / SFC 修復完成，系統元件狀態健康。")
+            : detectedError != null
+                ? $"修復回報錯誤 {detectedError} (ExitCode={lastExitCode})：請掃描 CBS.log 找出缺失套件並從 Microsoft Update 目錄手動安裝，或指定本機 WIM/ESD 來源。"
+                : $"修復流程結束但部分步驟回傳錯誤碼 ({lastExitCode})，請檢視下方終端機輸出。";
 
         onOutput("\n══════════════════════════════════════════════════════");
-        onOutput("Step 2/2: SFC /scannow (System File Checker)");
+        onOutput($"[{DateTime.Now:HH:mm:ss}] {summary}");
         onOutput("══════════════════════════════════════════════════════");
 
-        var sfcCode = await RunSfcScanNowAsync(onOutput, ct);
-
-        onOutput("\n══════════════════════════════════════════════════════");
-        onOutput($"[{DateTime.Now:HH:mm:ss}] Full System Health Repair Complete! (DISM: {dismCode}, SFC: {sfcCode})");
-        onOutput("══════════════════════════════════════════════════════");
-        return dismCode == 0 && sfcCode == 0;
+        return new DismSfcRepairResult
+        {
+            Success = success,
+            LastExitCode = lastExitCode,
+            RebootRecommended = rebootRecommended || success,
+            DetectedErrorCode = detectedError,
+            Summary = summary
+        };
     }
     // ── Phase 2: Advanced DISM Operations ──
 
@@ -102,13 +210,7 @@ public class SystemRepairService
     }
 
     public async Task<int> RunDismCleanupResetBaseAsync(Action<string> onOutput, CancellationToken ct = default)
-    {
-        onOutput($"[{DateTime.Now:HH:mm:ss}] Starting dism /online /cleanup-image /startcomponentcleanup /resetbase...");
-        onOutput("[WARNING] After /ResetBase, previously installed updates cannot be uninstalled.");
-        var exitCode = await RunStreamingProcessAsync("dism.exe", "/online /cleanup-image /startcomponentcleanup /resetbase", onOutput, ct);
-        onOutput($"[{DateTime.Now:HH:mm:ss}] dism /resetbase finished with exit code {exitCode}.");
-        return exitCode;
-    }
+        => await RunDismResetBaseAsync(onOutput, ct);
 
     public async Task<int> RunDismRestoreHealthWithSourceAsync(string sourcePath, Action<string> onOutput, CancellationToken ct = default)
     {

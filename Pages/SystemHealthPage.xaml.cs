@@ -55,8 +55,24 @@ public sealed partial class SystemHealthPage : Page
         OfflineDismBtn.Content = lang switch { "zh-CN" => "🛠️ 离线 DISM 修复", "en-US" => "🛠️ Offline DISM Restore", "ja-JP" => "🛠️ オフライン DISM 修復", _ => "🛠️ 離線 DISM 修復" };
         OfflineSfcBtn.Content = lang switch { "zh-CN" => "🔍 离线 SFC 扫描修复", "en-US" => "🔍 Offline SFC Scan", "ja-JP" => "🔍 オフライン SFC スキャン", _ => "🔍 離線 SFC 掃描修復" };
 
-        WindowsUpdateExpander.Header = lang switch { "zh-CN" => "🔄 Windows Update 修复与更新管理", "en-US" => "🔄 Windows Update Repair & Management", "ja-JP" => "🔄 Windows Update 修復と更新管理", _ => "🔄 Windows Update 修復與更新管理" };
+        WindowsUpdateExpander.Header = lang switch { "zh-CN" => "🔄 Windows Update 与 0x800F0831 修复设置中心", "en-US" => "🔄 Windows Update & 0x800F0831 Repair Center", "ja-JP" => "🔄 Windows Update・0x800F0831 修復センター", _ => "🔄 Windows Update 與 0x800F0831 修復設定中心" };
         TempCleanExpander.Header = lang switch { "zh-CN" => "🧹 系统缓存与垃圾深度清理", "en-US" => "🧹 System Temp & Deep Cache Cleanup", "ja-JP" => "🧹 システム一時ファイル・キャッシュ徹底削除", _ => "🧹 系統暫存與垃圾深度清理" };
+    }
+
+    private void OpenCbsCatalog_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is DiskMasterWinUI.Models.CbsDiagnosticFinding finding)
+        {
+            ViewModel.OpenCatalogForQueryCommand.Execute(finding.SearchQuery);
+        }
+    }
+
+    private void OpenHistoryCatalog_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is DiskMasterWinUI.Models.WindowsUpdateHistoryItem item)
+        {
+            ViewModel.OpenCatalogForQueryCommand.Execute(item.SearchQuery);
+        }
     }
 
     private void FeatureToggle_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)

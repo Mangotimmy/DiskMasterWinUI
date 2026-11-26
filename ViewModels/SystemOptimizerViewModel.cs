@@ -28,7 +28,11 @@ public partial class SystemOptimizerViewModel : ObservableObject
     [ObservableProperty] private string _queueStatusDisplay = "查詢中...";
     [ObservableProperty] private bool _requiresRebootNotice;
     [ObservableProperty] private bool _isNvmeLoading;
-    [ObservableProperty] private string _nvmeOperationMessage = "";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasNvmeOperationMessage))]
+    private string _nvmeOperationMessage = "";
+
+    public bool HasNvmeOperationMessage => !string.IsNullOrWhiteSpace(NvmeOperationMessage);
 
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private bool _isUpdatingProgrammatically;

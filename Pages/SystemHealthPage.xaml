@@ -177,13 +177,13 @@
         <!-- ═══ System Health Tools, Windows Update & Cleanup ═══ -->
         <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch">
             <StackPanel Spacing="12">
-                <!-- ═══ Windows Update 修復與更新管理 ═══ -->
-                <Expander x:Name="WindowsUpdateExpander" Header="🔄 Windows Update 修復與更新管理 (Update Repair &amp; Reset)"
+                <!-- ═══ Windows Update 修復與更新管理 (含 0x800F0831 CBS 修復中心) ═══ -->
+                <Expander x:Name="WindowsUpdateExpander" Header="🔄 Windows Update 與 0x800F0831 修復設定中心 (Update &amp; CBS Repair)"
                           IsExpanded="True" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                     <StackPanel Spacing="12">
                         <!-- Status Bar -->
                         <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="12">
-                            <Grid ColumnSpacing="16" RowSpacing="6">
+                            <Grid ColumnSpacing="14" RowSpacing="8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
@@ -191,6 +191,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
@@ -215,15 +216,119 @@
                                 <Button Grid.Row="0" Grid.Column="3" Content="🔄 重新整理" Command="{x:Bind ViewModel.RefreshWindowsUpdateStatusCommand}"
                                         Padding="8,3" FontSize="11" />
 
-                                <InfoBar Grid.Row="1" Grid.ColumnSpan="4" IsOpen="{x:Bind ViewModel.WuInfo.IsRebootRequired, Mode=OneWay}"
-                                         Severity="Warning" IsClosable="False" Margin="0,6,0,0"
+                                <!-- TrustedInstaller / TiWorker Health Row -->
+                                <Grid Grid.Row="1" Grid.ColumnSpan="4" ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <TextBlock Text="元件安裝引擎:" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                        <TextBlock Text="{x:Bind ViewModel.WuInfo.TiWorkerSummary, Mode=OneWay}" FontWeight="SemiBold" FontSize="12" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="🛠️ 還原 TrustedInstaller 為手動 (省 RAM)"
+                                            Command="{x:Bind ViewModel.RestoreTrustedInstallerDefaultCommand}"
+                                            Visibility="{x:Bind ViewModel.WuInfo.IsTiWorkerAbnormal, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                            IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}"
+                                            Padding="10,3" FontSize="11" />
+                                </Grid>
+
+                                <InfoBar Grid.Row="2" Grid.ColumnSpan="4" IsOpen="{x:Bind ViewModel.WuInfo.IsRebootRequired, Mode=OneWay}"
+                                         Severity="Warning" IsClosable="False" Margin="0,2,0,0"
                                          Title="需要重新開機 (Reboot Required)"
-                                         Message="系統偵測到待處理之更新安裝，建議完成修復後重新啟動電腦。" />
+                                         Message="系統偵測到待處理之更新或 CBS 修復變更，建議完成修復後重新啟動電腦。">
+                                    <InfoBar.ActionButton>
+                                        <Button Content="🔄 排程重新啟動" Command="{x:Bind ViewModel.PromptRestartComputerCommand}" />
+                                    </InfoBar.ActionButton>
+                                </InfoBar>
                             </Grid>
                         </Border>
 
-                        <TextBlock Text="針對 0x80070002、0x80070003、0x80240034 等常見錯誤碼，自動停止服務、清空佇列、重新註冊 30+ 核心元件並重置網路堆疊；重置 SoftwareDistribution 可解決更新下載停滯問題。"
-                                   Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                        <!-- Error Code Quick Preset Selector -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="6" Padding="12">
+                            <StackPanel Spacing="8">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="⚡ 錯誤碼快速診斷預設:" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
+                                              ItemsSource="{x:Bind ViewModel.WuErrorPresets}"
+                                              SelectedItem="{x:Bind ViewModel.SelectedWuPreset, Mode=TwoWay}" />
+                                </Grid>
+                                <TextBlock Text="{x:Bind ViewModel.SelectedWuPresetDescription, Mode=OneWay}"
+                                           Style="{StaticResource CaptionTextBlockStyle}"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Granular Repair Settings Checklist -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="6" Padding="12">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="🛠️ 自訂 Windows Update 修復項目設定 (依勾選順序安全執行)" FontWeight="SemiBold" FontSize="13" />
+                                <Grid ColumnSpacing="16" RowSpacing="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <CheckBox Grid.Row="0" Grid.Column="0" Content="1. DISM /ScanHealth (深度掃描存放區損毀)"
+                                              IsChecked="{x:Bind ViewModel.WuRepairOptions.RunDismScanHealth, Mode=TwoWay}" />
+                                    <CheckBox Grid.Row="0" Grid.Column="1" Content="2. DISM /CheckHealth (檢查損毀標記)"
+                                              IsChecked="{x:Bind ViewModel.WuRepairOptions.RunDismCheckHealth, Mode=TwoWay}" />
+
+                                    <CheckBox Grid.Row="1" Grid.Column="0" Content="3. DISM /RestoreHealth (線上/來源修復元件庫)"
+                                              IsChecked="{x:Bind ViewModel.WuRepairOptions.RunDismRestoreHealth, Mode=TwoWay}" />
+                                    <CheckBox Grid.Row="1" Grid.Column="1" Content="4. SFC /scannow (修復受保護系統檔案)"
+                                              IsChecked="{x:Bind ViewModel.WuRepairOptions.RunSfcScanNow, Mode=TwoWay}" />
+
+                                    <CheckBox Grid.Row="2" Grid.Column="0" Content="5. 重設 WU / BITS 服務與清空 BITS 佇列"
+                                              IsChecked="{x:Bind ViewModel.WuRepairOptions.ResetWuServicesAndBits, Mode=TwoWay}" />
+                                    <CheckBox Grid.Row="2" Grid.Column="1" Content="6. 重建 SoftwareDistribution 快取目錄"
+                                              IsChecked="{x:Bind ViewModel.WuRepairOptions.ResetSoftwareDistribution, Mode=TwoWay}" />
+
+                                    <CheckBox Grid.Row="3" Grid.Column="0" Content="7. 重新註冊 30+ Windows Update 核心 DLL"
+                                              IsChecked="{x:Bind ViewModel.WuRepairOptions.ReRegisterCoreDlls, Mode=TwoWay}" />
+                                    <CheckBox Grid.Row="3" Grid.Column="1" Content="8. 還原 bits / wuauserv 服務權限 (SDSet ACL)"
+                                              IsChecked="{x:Bind ViewModel.WuRepairOptions.ResetServiceSecurityDescriptors, Mode=TwoWay}" />
+
+                                    <CheckBox Grid.Row="4" Grid.Column="0" Content="9. 修復 TrustedInstaller 啟動類型為預設 Manual"
+                                              IsChecked="{x:Bind ViewModel.WuRepairOptions.FixTrustedInstallerStartupType, Mode=TwoWay}" />
+                                    <CheckBox Grid.Row="4" Grid.Column="1" Content="10. 修復後觸發現代更新掃描 (UsoClient)"
+                                              IsChecked="{x:Bind ViewModel.WuRepairOptions.TriggerUpdateScanAfter, Mode=TwoWay}" />
+
+                                    <CheckBox Grid.Row="5" Grid.Column="0" Content="進階：同時重置 Catroot2 (短暫重啟 CryptSvc)"
+                                              IsChecked="{x:Bind ViewModel.WuRepairOptions.ResetCatroot2WithCryptSvc, Mode=TwoWay}" />
+                                    <CheckBox Grid.Row="5" Grid.Column="1" Content="進階：重置網路堆疊 Winsock/IP (⚠ 需重開機)"
+                                              IsChecked="{x:Bind ViewModel.WuRepairOptions.ResetNetworkStack, Mode=TwoWay}" />
+
+                                    <CheckBox Grid.Row="6" Grid.Column="0" Content="DISM RestoreHealth 使用本機 WIM/ESD 來源"
+                                              IsChecked="{x:Bind ViewModel.WuRepairOptions.UseLocalRepairSource, Mode=TwoWay}" />
+                                    <CheckBox Grid.Row="6" Grid.Column="1" Content="修復完成且需要時提示重新啟動電腦"
+                                              IsChecked="{x:Bind ViewModel.WuRepairOptions.PromptRebootAfterRepair, Mode=TwoWay}" />
+                                </Grid>
+
+                                <TextBox Visibility="{x:Bind ViewModel.WuRepairOptions.UseLocalRepairSource, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                         Header="本機修復映像來源 (適用 0x800F0831 / 0x800F081F)"
+                                         PlaceholderText="例如: wim:D:\sources\install.wim:1 或 esd:D:\sources\install.esd:1"
+                                         Text="{x:Bind ViewModel.WuRepairOptions.LocalRepairSourcePath, Mode=TwoWay}" />
+                            </StackPanel>
+                        </Border>
 
                         <!-- Action Buttons -->
                         <Grid ColumnSpacing="8">
@@ -238,7 +343,7 @@
                                     IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <FontIcon Glyph="&#xE90F;" FontSize="14" />
-                                    <TextBlock Text="🛠️ 一鍵修復 Windows Update 錯誤" FontWeight="SemiBold" />
+                                    <TextBlock Text="🛠️ 執行自訂 Windows Update 修復流程" FontWeight="SemiBold" />
                                 </StackPanel>
                             </Button>
 
@@ -247,7 +352,7 @@
                                     IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <FontIcon Glyph="&#xE72C;" FontSize="14" />
-                                    <TextBlock Text="📂 重建 SoftwareDistribution 資料夾" FontWeight="SemiBold" />
+                                    <TextBlock Text="📂 重建 SoftwareDistribution 快取" FontWeight="SemiBold" />
                                 </StackPanel>
                             </Button>
 
@@ -255,6 +360,116 @@
                                     Command="{x:Bind ViewModel.TriggerUpdateCheckCommand}"
                                     IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}" />
                         </Grid>
+
+                        <!-- CBS.log & Failed Update History Diagnostics + Catalog + Troubleshooter -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                CornerRadius="6" Padding="12">
+                            <StackPanel Spacing="10">
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="🔎 CBS.log 損毀分析、失敗 KB 查詢與手動套件安裝 (對應 0x800F0831 步驟 2 &amp; 3)" FontWeight="SemiBold" FontSize="13" />
+                                        <TextBlock Text="{x:Bind ViewModel.CbsScanSummary, Mode=OneWay}"
+                                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <ProgressRing Grid.Column="1" IsActive="{x:Bind ViewModel.IsScanningCbs, Mode=OneWay}" Width="18" Height="18" />
+                                    <Button Grid.Column="2" Content="🔍 掃描 CBS.log 與更新歷程"
+                                            Command="{x:Bind ViewModel.ScanCbsAndUpdateHistoryCommand}"
+                                            IsEnabled="{x:Bind ViewModel.IsScanningCbs, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}" />
+                                </Grid>
+
+                                <!-- Quick Catalog Search + Local MSU/CAB Installer + Official Troubleshooter -->
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0" PlaceholderText="輸入 KB 編號或套件名稱搜尋 Microsoft Update 目錄 (例如 KB5034441)..."
+                                             Text="{x:Bind ViewModel.ManualCatalogSearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <Button Grid.Column="1" Content="🌐 Update 目錄"
+                                            Command="{x:Bind ViewModel.OpenCatalogForQueryCommand}"
+                                            ToolTipService.ToolTip="前往 Microsoft Update 目錄搜尋並下載獨立更新套件" />
+                                    <Button Grid.Column="2" Content="📦 安裝 .msu/.cab"
+                                            Command="{x:Bind ViewModel.InstallLocalUpdatePackageCommand}"
+                                            IsEnabled="{x:Bind ViewModel.IsRunning, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}"
+                                            ToolTipService.ToolTip="手動安裝從 Microsoft Update 目錄下載的 .msu 或 .cab 套件" />
+                                    <Button Grid.Column="3" Content="🩺 更新疑難排解員"
+                                            Command="{x:Bind ViewModel.LaunchWuTroubleshooterCommand}"
+                                            ToolTipService.ToolTip="開啟 Windows 設定 → 疑難排解 → Windows Update 疑難排解員" />
+                                    <Button Grid.Column="4" Content="📖 官方指南"
+                                            Command="{x:Bind ViewModel.OpenTroubleshootGuideCommand}"
+                                            ToolTipService.ToolTip="開啟 Microsoft 官方 0x800F0831 疑難排解文件" />
+                                </Grid>
+
+                                <!-- CBS.log Findings List -->
+                                <StackPanel Spacing="4" Visibility="{x:Bind ViewModel.HasCbsFindings, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Text="📋 CBS.log 偵測到的元件存放區錯誤與缺失套件:" FontWeight="SemiBold" FontSize="12" />
+                                    <ListView ItemsSource="{x:Bind ViewModel.CbsFindings, Mode=OneWay}" MaxHeight="160" SelectionMode="None" HorizontalAlignment="Stretch">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                <Setter Property="MinHeight" Value="36" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="models:CbsDiagnosticFinding">
+                                                <Grid Padding="6,4" ColumnSpacing="10">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="1">
+                                                        <TextBlock Text="{x:Bind DisplayTitle}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{x:Bind DisplaySubtitle}" FontSize="10" FontFamily="Consolas"
+                                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                    <Button Grid.Column="1" Content="🌐 搜尋目錄" Click="OpenCbsCatalog_Click" Padding="8,2" FontSize="11" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+
+                                <!-- Failed Update History List -->
+                                <StackPanel Spacing="4" Visibility="{x:Bind ViewModel.HasFailedUpdateHistory, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Text="🕒 Windows 更新歷程失敗記錄 (可一鍵前往目錄下載手動安裝):" FontWeight="SemiBold" FontSize="12" />
+                                    <ListView ItemsSource="{x:Bind ViewModel.FailedUpdateHistory, Mode=OneWay}" MaxHeight="160" SelectionMode="None" HorizontalAlignment="Stretch">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                <Setter Property="MinHeight" Value="36" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="models:WindowsUpdateHistoryItem">
+                                                <Grid Padding="6,4" ColumnSpacing="10">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="{x:Bind StatusBadge}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                    <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                                                        <TextBlock Text="{x:Bind Title}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{x:Bind DateDisplay}" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                    </StackPanel>
+                                                    <Button Grid.Column="2" Content="🌐 搜尋目錄" Click="OpenHistoryCatalog_Click" Padding="8,2" FontSize="11" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
 
                         <!-- Options & Policy Controls -->
                         <Grid ColumnSpacing="16" Padding="4,2">
@@ -312,39 +527,58 @@
                             </Button>
                         </Grid>
 
-                        <!-- Items ListView -->
-                        <ListView ItemsSource="{x:Bind ViewModel.TempCategories, Mode=OneWay}"
-                                  MaxHeight="220" SelectionMode="None"
-                                  HorizontalAlignment="Stretch"
-                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                  ScrollViewer.HorizontalScrollMode="Disabled">
-                            <ListView.ItemContainerStyle>
-                                <Style TargetType="ListViewItem">
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                </Style>
-                            </ListView.ItemContainerStyle>
-                            <ListView.ItemTemplate>
-                                <DataTemplate x:DataType="models:TempCategoryItem">
-                                    <Grid Padding="6,4" ColumnSpacing="12" HorizontalAlignment="Stretch">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <CheckBox Grid.Column="0" IsChecked="{x:Bind IsSelected, Mode=TwoWay}" VerticalAlignment="Center" />
-                                        <TextBlock Grid.Column="1" Text="{x:Bind Icon}" FontSize="16" VerticalAlignment="Center" Margin="0,0,4,0" />
-                                        <StackPanel Grid.Column="2" Spacing="1" VerticalAlignment="Center">
-                                            <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" FontSize="12" />
-                                            <TextBlock Text="{x:Bind Summary}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" />
-                                        </StackPanel>
-                                        <Border Grid.Column="3" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="8,3" VerticalAlignment="Center">
-                                            <TextBlock Text="{x:Bind SizeDisplay}" FontWeight="Bold" FontSize="12" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                                        </Border>
-                                    </Grid>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
+                        <!-- Items ListView Container with distinct border to prevent top-clipping -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="2">
+                            <ListView ItemsSource="{x:Bind ViewModel.TempCategories, Mode=OneWay}"
+                                      MaxHeight="260" SelectionMode="None"
+                                      HorizontalAlignment="Stretch"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                      ScrollViewer.HorizontalScrollMode="Disabled"
+                                      ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="MinHeight" Value="40" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="models:TempCategoryItem">
+                                        <Grid Padding="6,4" ColumnSpacing="12" HorizontalAlignment="Stretch">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <CheckBox Grid.Column="0" IsChecked="{x:Bind IsSelected, Mode=TwoWay}" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="{x:Bind Icon}" FontSize="16" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                            <StackPanel Grid.Column="2" Spacing="1" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" FontSize="12" />
+                                                    <Border Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}"
+                                                            CornerRadius="4" Padding="6,1" VerticalAlignment="Center"
+                                                            Visibility="{x:Bind IsRisky, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                        <TextBlock Text="⚠ 不可復原" FontSize="10" FontWeight="SemiBold"
+                                                                   Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock Text="{x:Bind Summary}" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" />
+                                                <TextBlock Text="{x:Bind RiskText}" TextWrapping="Wrap"
+                                                           Foreground="{ThemeResource SystemFillColorCriticalBrush}" FontSize="10"
+                                                           Visibility="{x:Bind HasRiskText, Converter={StaticResource BoolToVisibilityConverter}}" />
+                                            </StackPanel>
+                                            <Border Grid.Column="3" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="8,3" VerticalAlignment="Center">
+                                                <TextBlock Text="{x:Bind SizeDisplay}" FontWeight="Bold" FontSize="12" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                            </Border>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </Border>
 
                         <!-- Dedicated Direct Cleaner Action Bar -->
                         <Grid ColumnSpacing="8">
@@ -378,6 +612,56 @@
                                 </StackPanel>
                             </Button>
                         </Grid>
+
+                        <!-- Live Cleaning & Deletion Status Banner (Real-Time Current Status) -->
+                        <Border Visibility="{x:Bind ViewModel.HasCleaningStatus, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="14,10">
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <ProgressRing Grid.Column="0" IsActive="{x:Bind ViewModel.IsCleaningTemp, Mode=OneWay}"
+                                              Visibility="{x:Bind ViewModel.IsCleaningTemp, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                              Width="22" Height="22" VerticalAlignment="Center" />
+
+                                <FontIcon Grid.Column="0" Glyph="&#xE73E;" FontSize="20" Foreground="{ThemeResource SystemFillColorSuccessBrush}"
+                                          Visibility="{x:Bind ViewModel.IsCleaningTemp, Mode=OneWay, Converter={StaticResource InvertBoolToVisibilityConverter}}"
+                                          VerticalAlignment="Center" />
+
+                                <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                                    <TextBlock Text="{x:Bind ViewModel.CleaningStatusMessage, Mode=OneWay}"
+                                               FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{x:Bind ViewModel.CleaningDetailMessage, Mode=OneWay}"
+                                               FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+                                    <ProgressBar Value="{x:Bind ViewModel.CleaningProgressPercent, Mode=OneWay}"
+                                                 Maximum="100"
+                                                 IsIndeterminate="{x:Bind ViewModel.IsCleaningIndeterminate, Mode=OneWay}"
+                                                 Visibility="{x:Bind ViewModel.IsCleaningTemp, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                 Height="4" CornerRadius="2" Margin="0,3,0,0" />
+                                </StackPanel>
+
+                                <!-- Cancel Operation Button (visible while cleaning) -->
+                                <Button Grid.Column="2" Command="{x:Bind ViewModel.CancelOperationCommand}"
+                                        Visibility="{x:Bind ViewModel.IsCleaningTemp, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        Content="停止" Style="{StaticResource DefaultButtonStyle}"
+                                        Padding="12,5" VerticalAlignment="Center" />
+
+                                <!-- Clear / Delete current status button (always available when status banner is open) -->
+                                <Button Grid.Column="3" Command="{x:Bind ViewModel.ClearCleaningStatusCommand}"
+                                        ToolTipService.ToolTip="清除目前狀態 (Delete Current Status)"
+                                        Padding="8,6" VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE894;" FontSize="12" />
+                                </Button>
+                            </Grid>
+                        </Border>
 
                         <!-- Bottom Clean Buttons -->
                         <Grid ColumnSpacing="8">

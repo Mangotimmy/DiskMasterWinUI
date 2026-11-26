@@ -35,6 +35,10 @@ public sealed partial class SystemOptimizerPage : Page
         TabOneDrive.Header = lang switch { "zh-CN" => "☁️ OneDrive 深度治理与卸载", "en-US" => "☁️ OneDrive Governance & Uninstall", "ja-JP" => "☁️ OneDrive 管理と削除", _ => "☁️ OneDrive 深度治理與卸載" };
         TabDrivers.Header = lang switch { "zh-CN" => "🏎️ OEM 驱动清理 (PnPUtil)", "en-US" => "🏎️ OEM Driver Cleanup (PnPUtil)", "ja-JP" => "🏎️ OEM ドライバの削除 (PnPUtil)", _ => "🏎️ OEM 驅動清理 (PnPUtil)" };
         TabNvme.Header = lang switch { "zh-CN" => "🚀 NVMe与SSD调校", "en-US" => "🚀 NVMe & SSD", "ja-JP" => "🚀 NVMeとSSD最適化", _ => "🚀 NVMe與SSD調校" };
+        if (TabCleanRun != null)
+        {
+            TabCleanRun.Header = lang switch { "zh-CN" => "🧹 全机流畅与内存减负", "en-US" => "🧹 PC Clean-Run & RAM", "ja-JP" => "🧹 PC軽量化・RAM最適化", _ => "🧹 全機流暢與記憶體減負" };
+        }
         NvmeHeroTitle.Text = lang switch { "zh-CN" => "老外实测推荐：NVMe 极致防卡顿与 SSD TRIM 调校", "en-US" => "NVMe Anti-Stutter & SSD TRIM Tuning", "ja-JP" => "NVMeスタッター防止＆SSD TRIM調整", _ => "老外實測推薦：NVMe 極致防卡頓與 SSD TRIM 調校" };
         NvmeHeroSubtitle.Text = lang switch
         {
@@ -597,6 +601,31 @@ public sealed partial class SystemOptimizerPage : Page
             ViewModel.IsExplorerCurrentlyAlive = ExplorerWatchdogService.CheckExplorerRunning();
             ViewModel.IsExplorerWatchdogEnabled = ExplorerWatchdogService.Instance.IsEnabled;
             ViewModel.ExplorerWatchdogRecoverySummary = ExplorerWatchdogService.Instance.LastRecoveryTimeText;
+        }
+        else if (ReferenceEquals(OptimizerTabView.SelectedItem, TabCleanRun))
+        {
+            if (ViewModel.AllStartupEntries.Count == 0 && !ViewModel.IsCleanRunLoading)
+            {
+                ViewModel.RefreshCleanRunDataCommand.Execute(null);
+            }
+        }
+    }
+
+    private async void StartupEntry_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.DataContext is StartupEntryItem item && ts.IsOn != item.IsEnabled)
+        {
+            await ViewModel.ToggleStartupEntryAsync(item, ts.IsOn);
+        }
+    }
+
+    private async void BloatTweak_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_suppressToggled || ViewModel.IsUpdatingProgrammatically) return;
+        if (sender is ToggleSwitch ts && ts.DataContext is BackgroundBloatTweakItem item && ts.IsOn != item.IsOptimized)
+        {
+            await ViewModel.ToggleBackgroundBloatTweakAsync(item, ts.IsOn);
         }
     }
 

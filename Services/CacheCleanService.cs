@@ -165,7 +165,9 @@ public class CacheCleanService
     public async Task<(string Summary, long FreedBytes)> PerformSystemDeepCleanupAsync(Action<string> onOutput, CancellationToken ct = default)
     {
         var tempService = new TempCleanService();
-        var allCats = new[] { "UserTemp", "SystemTemp", "AppCache", "WindowsOld", "Prefetch", "MemoryDumps", "WerReports", "DeliveryOpt", "SetupFiles", "ThumbCache" };
+        // Deliberately excludes Windows.old / $WINDOWS.~BT: those destroy the rollback image and
+        // the last feature-update payload, so they are only reachable through explicit actions.
+        var allCats = new[] { "UserTemp", "SystemTemp", "AppCache", "Prefetch", "MemoryDumps", "WerReports", "DeliveryOpt", "ThumbCache" };
         var (tFiles, tBytes, _) = await tempService.CleanSelectedCategoriesAsync(allCats, onOutput, ct);
         var (dFiles, dBytes, _) = await CleanDownloadCacheAsync();
         var scriptCount = await CleanDiskPartTempFilesAsync();

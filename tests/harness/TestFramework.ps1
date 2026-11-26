@@ -39,7 +39,7 @@ function Initialize-TestAssembly {
         "$projectRoot\bin\Release\net9.0-windows10.0.26100.0\win-x64\DiskMasterWinUI.dll"
     )
 
-    $dllPath = $candidatePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+    $dllPath = $candidatePaths | Where-Object { Test-Path $_ } | Get-Item | Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName
     if (-not $dllPath) {
         throw "Could not locate compiled DiskMasterWinUI.dll in candidate paths: $($candidatePaths -join '; ')"
     }

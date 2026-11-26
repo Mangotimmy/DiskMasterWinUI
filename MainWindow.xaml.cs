@@ -164,6 +164,10 @@ public sealed partial class MainWindow : Window
             DiskMasterWinUI.Helpers.BackgroundMemorySaver.Initialize(DispatcherQueue);
             TrayService.WindowHidden += DiskMasterWinUI.Helpers.BackgroundMemorySaver.OnHidden;
             TrayService.WindowShown += DiskMasterWinUI.Helpers.BackgroundMemorySaver.OnShown;
+            if (!StartupCrashGuard.IsSafeMode)
+            {
+                AutoRamGuardService.Instance.Start();
+            }
 
             // Initialize Windows Notification Center & Toast integration
             WindowsNotificationService.Instance.Initialize(
@@ -203,6 +207,9 @@ public sealed partial class MainWindow : Window
             }
             else
             {
+                LocalizationService.Instance.LanguageChanged -= ApplyLanguage;
+                SettingsService.Instance.SettingsChanged -= OnSettingsChanged;
+                AutoRamGuardService.Instance.Dispose();
                 LiveConsoleWindow.CurrentInstance?.Close();
                 TrayService.Dispose();
             }

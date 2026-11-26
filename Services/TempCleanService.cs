@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using System.IO;
+using Microsoft.Win32;
 using DiskMasterWinUI.Helpers;
 using DiskMasterWinUI.Models;
 
@@ -15,6 +17,84 @@ public class TempCleanService
     private static readonly string RoamingAppData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
     private static readonly string ProgramData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
     private static readonly string UserTemp = Path.GetTempPath();
+
+    /// <summary>
+    /// Categories that are always disposable: caches and logs that Windows, browsers and
+    /// applications rebuild automatically. Only these are pre-selected.
+    /// </summary>
+    private static readonly HashSet<string> SafeCategoryIds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "UserTemp", "SystemTemp", "AppCache", "Prefetch", "WerReports", "DeliveryOpt", "ThumbCache"
+    };
+
+    /// <summary>
+    /// Categories that are never purged automatically because the data cannot be regenerated
+    /// or because removing it breaks installed software.
+    /// </summary>
+    private static string RiskTextFor(string id) => id switch
+    {
+        "PackageCache" => "永久刪除後，所有 MSI / Visual Studio 安裝的程式將無法「修復 / 變更 / 解除安裝」。僅在你能重新下載安裝檔時才勾選。",
+        "WindowsOld" => "刪除後將永久失去回復到前一個 Windows 版本的機會，無法復原。",
+        "SetupFiles" => "刪除後無法回復最近的 Windows 功能更新，且需重新下載升級檔案。",
+        "CbsLogs" => "系統元件維護 (DISM / 更新失敗) 的排錯紀錄，刪除後無法診斷更新錯誤。",
+        "DefenderCache" => "Defender 病毒碼歷史備份，刪除後下一次更新需重新下載完整定義檔。",
+        _ => ""
+    };
+
+    /// <summary>
+    /// Cache directories are owned by a running application. Deleting them while that process is
+    /// alive corrupts the app's own state database (Chrome/Edge then treat the profile as damaged
+    /// and silently reset it). Every cache path is therefore checked against this owner map first.
+    /// </summary>
+    private static readonly (string Process, string PathFragment)[] CacheOwners =
+    {
+        ("msedge",  @"\Microsoft\Edge\"),
+        ("chrome",  @"\Google\Chrome\"),
+        ("brave",   @"\BraveSoftware\"),
+        ("firefox", @"\Mozilla\Firefox\"),
+        ("opera",   @"\Opera Software\"),
+        ("vivaldi", @"\Vivaldi\"),
+        ("discord", @"\discord\"),
+        ("DiscordPTB", @"\discordptb\"),
+        ("Code",    @"\Code\Cache"),
+        ("Spotify", @"\Spotify\Storage"),
+        ("ms-teams", @"\MSTeams_"),
+        ("Teams",   @"\Microsoft\Teams\")
+    };
+
+    /// <summary>Returns the owning process name when a cache path's application is currently running.</summary>
+    private static string? GetRunningOwner(string cachePath)
+    {
+        foreach (var (process, fragment) in CacheOwners)
+        {
+            if (!cachePath.Contains(fragment, StringComparison.OrdinalIgnoreCase)) continue;
+            try
+            {
+                var procs = Process.GetProcessesByName(process);
+                if (procs.Length > 0) return process;
+            }
+            catch { }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Append-only audit journal. Every directory the cleaner is about to touch is written here
+    /// before a single file is removed, so any future damage can be traced to an exact run/path.
+    /// </summary>
+    public static void Journal(string entry)
+    {
+        try
+        {
+            var dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "DiskMaster", "Logs");
+            Directory.CreateDirectory(dir);
+            var file = Path.Combine(dir, $"clean_journal_{DateTime.Now:yyyyMMdd}.log");
+            File.AppendAllText(file, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} | {entry}{Environment.NewLine}");
+        }
+        catch { }
+    }
 
     /// <summary>
     /// Scans all standard temporary and cache locations asynchronously.
@@ -130,6 +210,17 @@ public class TempCleanService
                     Icon = "📝"
                 }
             };
+
+            // Only genuinely disposable caches start selected. Everything else (Windows.old
+            // rollback image, installer caches, component-store logs, upgrade remnants) must be
+            // opted into one by one so a single "select all + clean" can never destroy them.
+            foreach (var cat in categories)
+            {
+                bool safe = SafeCategoryIds.Contains(cat.Id);
+                cat.IsRisky = !safe;
+                cat.IsSelected = safe;
+                cat.RiskText = safe ? "" : RiskTextFor(cat.Id);
+            }
 
             // Scan each category in parallel
             Parallel.ForEach(categories, cat =>
@@ -256,13 +347,21 @@ public class TempCleanService
     public async Task<(int DeletedFiles, long FreedBytes, string FreedDisplay)> CleanSelectedCategoriesAsync(
         IEnumerable<string> categoryIds,
         Action<string> onOutput,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Action<int, int, string>? onProgress = null)
     {
+        Action<string> safeOut = msg => { try { onOutput?.Invoke(msg); } catch { } };
+        Action<int, int, string> safeProg = (c, t, n) => { try { onProgress?.Invoke(c, t, n); } catch { } };
+
         return await Task.Run(() =>
         {
+            var onOutput = safeOut;
+            var onProgress = safeProg;
             int deletedFiles = 0;
             long freedBytes = 0;
             var targetSet = new HashSet<string>(categoryIds, StringComparer.OrdinalIgnoreCase);
+            int totalCategories = targetSet.Count;
+            int currentStep = 0;
 
             onOutput("══════════════════════════════════════════════════════════════");
             onOutput($"[{DateTime.Now:HH:mm:ss}] 啟動系統暫存與磁碟清理引擎");
@@ -271,49 +370,80 @@ public class TempCleanService
             // User Temp
             if (targetSet.Contains("UserTemp"))
             {
+                ct.ThrowIfCancellationRequested();
+                currentStep++;
+                onProgress?.Invoke(currentStep, totalCategories, "使用者暫存目錄 (%TEMP%)");
                 onOutput("▸ 正在清理使用者暫存目錄 (%TEMP%)...");
                 var (f, b) = CleanDirectoryInternal(UserTemp, "*.*", ct);
                 var inetCache = Path.Combine(LocalAppData, @"Microsoft\Windows\INetCache");
                 var (f2, b2) = CleanDirectoryInternal(inetCache, "*.*", ct);
                 deletedFiles += f + f2;
                 freedBytes += b + b2;
-                onOutput($"  - 已清理 {f + f2} 個使用者暫存檔案 ({FormatBytes(b + b2)})");
+                onOutput($"  - 已清理 {f + f2:N0} 個使用者暫存檔案 ({FormatBytes(b + b2)})");
             }
 
             // System Temp
             if (targetSet.Contains("SystemTemp"))
             {
+                ct.ThrowIfCancellationRequested();
+                currentStep++;
+                onProgress?.Invoke(currentStep, totalCategories, "系統暫存目錄 (Windows Temp)");
                 var sysTemp = Path.Combine(WinDir, "Temp");
                 onOutput("▸ 正在清理系統暫存目錄 (C:\\Windows\\Temp)...");
                 var (f, b) = CleanDirectoryInternal(sysTemp, "*.*", ct);
                 deletedFiles += f;
                 freedBytes += b;
-                onOutput($"  - 已清理 {f} 個系統暫存檔 ({FormatBytes(b)})");
+                onOutput($"  - 已清理 {f:N0} 個系統暫存檔 ({FormatBytes(b)})");
             }
 
             // App Cache
             if (targetSet.Contains("AppCache"))
             {
+                ct.ThrowIfCancellationRequested();
+                currentStep++;
+                onProgress?.Invoke(currentStep, totalCategories, "應用程式與瀏覽器快取 (App Cache)");
                 onOutput("▸ 正在清理應用程式與瀏覽器快取 (App Cache: Edge/Chrome/Firefox/GPU Shader)...");
                 int af = 0;
                 long ab = 0;
                 var cacheDirs = GetAppCacheDirectories();
+                foreach (var d in cacheDirs) Journal($"[AppCache] target={d}");
+                var skipped = new List<string>();
                 foreach (var dir in cacheDirs)
                 {
                     if (ct.IsCancellationRequested) break;
+
+                    // Never touch a cache whose application is running: it would corrupt that app's
+                    // state and make it look like the profile was reset.
+                    string? owner = GetRunningOwner(dir);
+                    if (owner != null)
+                    {
+                        skipped.Add($"{owner} → {dir}");
+                        Journal($"[AppCache] SKIPPED (process running: {owner}) {dir}");
+                        continue;
+                    }
+
                     var (f, b) = CleanDirectoryInternal(dir, "*.*", ct);
                     af += f;
                     ab += b;
                 }
+                if (skipped.Count > 0)
+                {
+                    onOutput($"  ⚠ 已跳過 {skipped.Count} 個正在執行中的程式快取 (請先關閉該程式再清理)：");
+                    foreach (var s in skipped) onOutput($"      - {s}");
+                }
                 deletedFiles += af;
                 freedBytes += ab;
-                onOutput($"  - 已清理 {af} 個應用程式快取檔案 ({FormatBytes(ab)})");
+                onOutput($"  - 已清理 {af:N0} 個應用程式快取檔案 ({FormatBytes(ab)})");
             }
 
             // Windows.old
             if (targetSet.Contains("WindowsOld"))
             {
+                ct.ThrowIfCancellationRequested();
+                currentStep++;
+                onProgress?.Invoke(currentStep, totalCategories, "舊版 Windows 備份目錄 (Windows.old)");
                 var oldDirs = GetWindowsOldPaths();
+                foreach (var d in oldDirs) Journal($"[WindowsOld] target={d}");
                 if (oldDirs.Count > 0)
                 {
                     onOutput("▸ 正在清理舊版 Windows 備份目錄 (Windows.old)...");
@@ -322,26 +452,101 @@ public class TempCleanService
                     foreach (var winOld in oldDirs)
                     {
                         if (ct.IsCancellationRequested) break;
-                        var (f, b) = CleanDirectoryInternal(winOld, "*.*", ct);
-                        wf += f;
-                        wb += b;
+                        if (!Directory.Exists(winOld)) continue;
 
-                        // Check if locked subdirectories remain
-                        if (Directory.Exists(winOld))
+                        try
                         {
+                            var initialStats = ScanFolderSafe(winOld, "*.*");
+                            onOutput($"  ▸ 正在以 64 執行緒極速清除 {winOld} (共 {initialStats.FileCount:N0} 個檔案，約 {FormatBytes(initialStats.TotalBytes)})...");
+
+                            // Step 1: Pre-register cleanmgr volume caches for Previous Installations
                             try
                             {
-                                onOutput($"  ▸ 取得 {winOld} 管理員擁有權並釋放權限...");
-                                ProcessHelper.RunProcessAsync("takeown.exe", $"/F \"{winOld}\" /A /R /D Y").GetAwaiter().GetResult();
-                                ProcessHelper.RunProcessAsync("icacls.exe", $"\"{winOld}\" /grant *S-1-5-32-544:F /T /C /Q").GetAwaiter().GetResult();
-                                ProcessHelper.RunProcessAsync("cmd.exe", $"/c rd /s /q \"{winOld}\"").GetAwaiter().GetResult();
+                                using var key = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Previous Installations");
+                                key?.SetValue("StateFlags6488", 2, RegistryValueKind.DWord);
+                                using var key2 = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Temporary Setup Files");
+                                key2?.SetValue("StateFlags6488", 2, RegistryValueKind.DWord);
                             }
                             catch { }
+
+                            // Step 2: Multi-threaded Robocopy /MIR /B /MT:64 purge to an empty directory
+                            // Robocopy with /B (Backup mode) enables SE_BACKUP_NAME / SE_RESTORE_NAME,
+                            // bypassing TrustedInstaller and NTFS ACL locks in parallel at maximum drive speed.
+                            var emptyTempDir = Path.Combine(Path.GetTempPath(), $"dm_empty_{Guid.NewGuid():N}");
+                            Directory.CreateDirectory(emptyTempDir);
+
+                            try
+                            {
+                                using var progressCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                                var progressTask = Task.Run(async () =>
+                                {
+                                    var sw = Stopwatch.StartNew();
+                                    while (!progressCts.Token.IsCancellationRequested)
+                                    {
+                                        try
+                                        {
+                                            await Task.Delay(2000, progressCts.Token);
+                                            if (progressCts.Token.IsCancellationRequested) break;
+                                            onOutput?.Invoke($"  ▸ [多執行緒加速] 已清除執行 {sw.Elapsed.TotalSeconds:F0} 秒，正在快速釋放 NTFS 磁區...");
+                                        }
+                                        catch (OperationCanceledException) { break; }
+                                    }
+                                });
+
+                                var roboCmd = $"/c \"robocopy \"{emptyTempDir}\" \"{winOld}\" /MIR /B /MT:64 /R:0 /W:0 /NJH /NJS /NC /NS /NP /NFL /NDL >nul 2>&1\"";
+                                var roboTask = ProcessHelper.RunProcessAsync("cmd.exe", roboCmd, cancellationToken: ct);
+                                roboTask.GetAwaiter().GetResult();
+
+                                progressCts.Cancel();
+                                try { progressTask.GetAwaiter().GetResult(); } catch { }
+                            }
+                            finally
+                            {
+                                try { Directory.Delete(emptyTempDir, true); } catch { }
+                            }
+
+                            // Step 3: Remove empty root directory shell
+                            if (Directory.Exists(winOld) && !ct.IsCancellationRequested)
+                            {
+                                var rdTask = ProcessHelper.RunProcessAsync("cmd.exe", $"/c \"rd /s /q \"\\\\?\\{winOld}\" >nul 2>&1\"", cancellationToken: ct);
+                                rdTask.GetAwaiter().GetResult();
+                            }
+
+                            // Step 4: If any remnant exists, invoke cleanmgr to flush previous setup pointers
+                            if (Directory.Exists(winOld) && !ct.IsCancellationRequested)
+                            {
+                                onOutput($"  ▸ 正在呼叫 Windows 系統升級清除程式完成最終卸載...");
+                                var cleanmgrTask = ProcessHelper.RunProcessAsync("cleanmgr.exe", "/SAGERUN:6488", cancellationToken: ct);
+                                cleanmgrTask.GetAwaiter().GetResult();
+                            }
+
+                            (long TotalBytes, int FileCount) remainingStats = Directory.Exists(winOld) ? ScanFolderSafe(winOld, "*.*") : (0L, 0);
+                            long freedThis = Math.Max(0, initialStats.TotalBytes - remainingStats.TotalBytes);
+                            int filesThis = Math.Max(0, initialStats.FileCount - remainingStats.FileCount);
+                            wf += filesThis;
+                            wb += freedThis;
+
+                            if (!Directory.Exists(winOld) || remainingStats.TotalBytes == 0)
+                            {
+                                onOutput($"  ✔ {winOld} 目錄已徹底清除完成！(釋放 {FormatBytes(freedThis)})");
+                            }
+                            else
+                            {
+                                onOutput($"  - {winOld} 已清除大部分檔案 (釋放 {FormatBytes(freedThis)}，剩餘 {FormatBytes(remainingStats.TotalBytes)})");
+                            }
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            onOutput($"  ⚠ 清理 {winOld} 時發生非嚴重例外: {ex.Message}");
                         }
                     }
                     deletedFiles += wf;
                     freedBytes += wb;
-                    onOutput($"  - 已清理 {wf} 個 Windows.old 歷史備份檔案 ({FormatBytes(wb)})");
+                    onOutput($"  - Windows.old 歷史備份清理完成 (釋放 {FormatBytes(wb)})");
                 }
                 else
                 {
@@ -352,6 +557,9 @@ public class TempCleanService
             // Prefetch
             if (targetSet.Contains("Prefetch"))
             {
+                ct.ThrowIfCancellationRequested();
+                currentStep++;
+                onProgress?.Invoke(currentStep, totalCategories, "預先擷取快取 (Prefetch)");
                 var prefetch = Path.Combine(WinDir, "Prefetch");
                 onOutput("▸ 正在清理預先擷取快取 (Prefetch)...");
                 var (f, b) = CleanDirectoryInternal(prefetch, "*.pf", ct);
@@ -363,6 +571,9 @@ public class TempCleanService
             // Memory Dumps
             if (targetSet.Contains("MemoryDumps"))
             {
+                ct.ThrowIfCancellationRequested();
+                currentStep++;
+                onProgress?.Invoke(currentStep, totalCategories, "系統記憶體與損毀傾印 (Memory Dumps)");
                 onOutput("▸ 正在清理系統記憶體與損毀傾印 (Dumps)...");
                 var fullDump = Path.Combine(WinDir, "MEMORY.DMP");
                 if (File.Exists(fullDump))
@@ -389,6 +600,9 @@ public class TempCleanService
             // WER Logs
             if (targetSet.Contains("WerReports"))
             {
+                ct.ThrowIfCancellationRequested();
+                currentStep++;
+                onProgress?.Invoke(currentStep, totalCategories, "Windows 錯誤回報紀錄 (WER Reports)");
                 var werDir = Path.Combine(ProgramData, "Microsoft", "Windows", "WER");
                 onOutput("▸ 正在清理 Windows 錯誤回報紀錄 (WER)...");
                 var (f, b) = CleanDirectoryInternal(werDir, "*.*", ct);
@@ -400,6 +614,9 @@ public class TempCleanService
             // Delivery Optimization Cache
             if (targetSet.Contains("DeliveryOpt"))
             {
+                ct.ThrowIfCancellationRequested();
+                currentStep++;
+                onProgress?.Invoke(currentStep, totalCategories, "傳遞最佳化快取 (Delivery Optimization)");
                 var doDir = Path.Combine(WinDir, "SoftwareDistribution", "DeliveryOptimization", "Cache");
                 onOutput("▸ 正在清理傳遞最佳化快取 (Delivery Optimization)...");
                 var (f, b) = CleanDirectoryInternal(doDir, "*.*", ct);
@@ -411,6 +628,9 @@ public class TempCleanService
             // Setup Files ($WINDOWS.~BT)
             if (targetSet.Contains("SetupFiles"))
             {
+                ct.ThrowIfCancellationRequested();
+                currentStep++;
+                onProgress?.Invoke(currentStep, totalCategories, "Windows 安裝與升級殘留 ($WINDOWS.~BT)");
                 var root = Path.GetPathRoot(WinDir) ?? @"C:\";
                 string[] setupDirs = { "$WINDOWS.~BT", "$WINDOWS.~WS", "Windows\\Panther" };
                 onOutput("▸ 正在清理 Windows 安裝與版本升級殘留暫存...");
@@ -418,6 +638,7 @@ public class TempCleanService
                 long sb = 0;
                 foreach (var dir in setupDirs)
                 {
+                    if (ct.IsCancellationRequested) break;
                     var target = Path.Combine(root, dir);
                     var (f, b) = CleanDirectoryInternal(target, "*.*", ct);
                     sf += f;
@@ -431,6 +652,9 @@ public class TempCleanService
             // Thumbnail Cache
             if (targetSet.Contains("ThumbCache"))
             {
+                ct.ThrowIfCancellationRequested();
+                currentStep++;
+                onProgress?.Invoke(currentStep, totalCategories, "檔案總管縮圖快取 (Thumbnail Cache)");
                 var thumbDir = Path.Combine(LocalAppData, "Microsoft", "Windows", "Explorer");
                 onOutput("▸ 正在清理檔案總管縮圖快取 (thumbcache_*.db)...");
                 var (f, b) = CleanDirectoryInternal(thumbDir, "thumbcache_*.db", ct);
@@ -442,6 +666,9 @@ public class TempCleanService
             // Defender Cache
             if (targetSet.Contains("DefenderCache"))
             {
+                ct.ThrowIfCancellationRequested();
+                currentStep++;
+                onProgress?.Invoke(currentStep, totalCategories, "Defender 病毒碼備份 (Defender Cache)");
                 var defDir = Path.Combine(ProgramData, "Microsoft", "Windows Defender", "Definition Updates", "Backup");
                 onOutput("▸ 正在清理 Windows Defender 病毒碼歷史備份...");
                 var (f, b) = CleanDirectoryInternal(defDir, "*.*", ct);
@@ -450,20 +677,24 @@ public class TempCleanService
                 onOutput($"  - 已清理 {f} 個病毒碼備份檔 ({FormatBytes(b)})");
             }
 
-            // Package Cache
+            // Package Cache (ProgramDataPackage Cache) — HARD BLOCK.
+            // This folder is not a cache: MSI/VS-based installers keep the original payloads here
+            // and use them for repair, modify, update and uninstall. Purging it permanently breaks
+            // every installed MSI/VS application, so this category is never deleted.
             if (targetSet.Contains("PackageCache"))
             {
-                var pkgDir = Path.Combine(ProgramData, "Package Cache");
-                onOutput("▸ 正在清理安裝套件快取 (Package Cache)...");
-                var (f, b) = CleanDirectoryInternal(pkgDir, "*.*", ct);
-                deletedFiles += f;
-                freedBytes += b;
-                onOutput($"  - 已清理 {f} 個安裝快取檔 ({FormatBytes(b)})");
+                ct.ThrowIfCancellationRequested();
+                currentStep++;
+                onProgress?.Invoke(currentStep, totalCategories, "軟體安裝套件快取 (Package Cache)");
+                onOutput("  ⛔ 已略過「軟體安裝套件快取 (Package Cache)」：此目錄是 MSI / Visual Studio 修復、變更與解除安裝所需的安裝承載資料，並非暫存檔，刪除會導致已安裝程式無法修復。");
             }
 
             // CBS Logs
             if (targetSet.Contains("CbsLogs"))
             {
+                ct.ThrowIfCancellationRequested();
+                currentStep++;
+                onProgress?.Invoke(currentStep, totalCategories, "系統元件維護紀錄 (CBS Logs)");
                 var cbsDir = Path.Combine(WinDir, "Logs", "CBS");
                 onOutput("▸ 正在清理系統元件維護紀錄 (CBS Logs)...");
                 var (f, b) = CleanDirectoryInternal(cbsDir, "CbsPersist_*.log", ct);
@@ -472,6 +703,8 @@ public class TempCleanService
                 freedBytes += b + b2;
                 onOutput($"  - 已清理 {f + f2} 個歷史維護記錄檔 ({FormatBytes(b + b2)})");
             }
+
+            ct.ThrowIfCancellationRequested();
 
             onOutput("\n══════════════════════════════════════════════════════════════");
             onOutput($"[{DateTime.Now:HH:mm:ss}] 🎉 磁碟清理完成！共釋放 {FormatBytes(freedBytes)} 磁碟空間 (清理 {deletedFiles:N0} 個檔案)");
@@ -484,25 +717,25 @@ public class TempCleanService
     /// <summary>
     /// Directly cleans temporary files (%TEMP%, Windows Temp, INetCache).
     /// </summary>
-    public Task<(int DeletedFiles, long FreedBytes, string FreedDisplay)> CleanTempFilesAsync(Action<string> onOutput, CancellationToken ct = default)
+    public Task<(int DeletedFiles, long FreedBytes, string FreedDisplay)> CleanTempFilesAsync(Action<string> onOutput, CancellationToken ct = default, Action<int, int, string>? onProgress = null)
     {
-        return CleanSelectedCategoriesAsync(new[] { "UserTemp", "SystemTemp" }, onOutput, ct);
+        return CleanSelectedCategoriesAsync(new[] { "UserTemp", "SystemTemp" }, onOutput, ct, onProgress);
     }
 
     /// <summary>
     /// Directly cleans Windows.old backup directories with administrative ownership release.
     /// </summary>
-    public Task<(int DeletedFiles, long FreedBytes, string FreedDisplay)> CleanWindowsOldAsync(Action<string> onOutput, CancellationToken ct = default)
+    public Task<(int DeletedFiles, long FreedBytes, string FreedDisplay)> CleanWindowsOldAsync(Action<string> onOutput, CancellationToken ct = default, Action<int, int, string>? onProgress = null)
     {
-        return CleanSelectedCategoriesAsync(new[] { "WindowsOld" }, onOutput, ct);
+        return CleanSelectedCategoriesAsync(new[] { "WindowsOld" }, onOutput, ct, onProgress);
     }
 
     /// <summary>
     /// Directly cleans browser, GPU shader, and common app caches.
     /// </summary>
-    public Task<(int DeletedFiles, long FreedBytes, string FreedDisplay)> CleanAppCacheAsync(Action<string> onOutput, CancellationToken ct = default)
+    public Task<(int DeletedFiles, long FreedBytes, string FreedDisplay)> CleanAppCacheAsync(Action<string> onOutput, CancellationToken ct = default, Action<int, int, string>? onProgress = null)
     {
-        return CleanSelectedCategoriesAsync(new[] { "AppCache" }, onOutput, ct);
+        return CleanSelectedCategoriesAsync(new[] { "AppCache" }, onOutput, ct, onProgress);
     }
 
     /// <summary>
@@ -510,10 +743,11 @@ public class TempCleanService
     /// </summary>
     public async Task<int> RunCleanmgrAutomatedAsync(Action<string> onOutput, CancellationToken ct = default)
     {
-        onOutput($"[{DateTime.Now:HH:mm:ss}] 啟動 Windows 原生磁碟清理工具 (cleanmgr.exe /autoclean)...");
-        var (output, _, exitCode) = await ProcessHelper.RunProcessAsync("cleanmgr.exe", "/autoclean");
-        if (!string.IsNullOrWhiteSpace(output)) onOutput(output.Trim());
-        onOutput($"[{DateTime.Now:HH:mm:ss}] Windows 磁碟清理工具執行結束 (結束代碼: {exitCode})。");
+        Action<string> safeOut = msg => { try { onOutput?.Invoke(msg); } catch { } };
+        safeOut($"[{DateTime.Now:HH:mm:ss}] 啟動 Windows 原生磁碟清理工具 (cleanmgr.exe /autoclean)...");
+        var (output, _, exitCode) = await ProcessHelper.RunProcessAsync("cleanmgr.exe", "/autoclean", cancellationToken: ct);
+        if (!string.IsNullOrWhiteSpace(output)) safeOut(output.Trim());
+        safeOut($"[{DateTime.Now:HH:mm:ss}] Windows 磁碟清理工具執行結束 (結束代碼: {exitCode})。");
         return exitCode;
     }
 
@@ -601,8 +835,8 @@ public class TempCleanService
             list.Add(Path.Combine(localApp, @"AMD\DxCache"));
             list.Add(Path.Combine(localApp, @"AMD\GLCache"));
 
-            list.Add(Path.Combine(localApp, @"Spotify\Storage"));
-            list.Add(Path.Combine(localApp, @"Packages\MSTeams_8wekyb3d8bbwe\LocalCache"));
+            // NOTE: Spotify\Storage (offline downloads) and Packages\*\LocalCache (MSIX app
+            // state) are application data, not caches. They are intentionally not listed here.
         }
 
         foreach (var roamingApp in roamingApps)
@@ -611,8 +845,7 @@ public class TempCleanService
             list.Add(Path.Combine(roamingApp, @"discord\Code Cache"));
             list.Add(Path.Combine(roamingApp, @"discord\GPUCache"));
             list.Add(Path.Combine(roamingApp, @"Microsoft\Teams\Cache"));
-            list.Add(Path.Combine(roamingApp, @"Code\Cache"));
-            list.Add(Path.Combine(roamingApp, @"Code\CachedData"));
+            // VS Code Cache/CachedData are application state (extension host data), not caches.
         }
 
         return list.Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase).ToList();

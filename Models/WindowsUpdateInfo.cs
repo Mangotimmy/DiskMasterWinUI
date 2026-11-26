@@ -19,4 +19,14 @@ public partial class WindowsUpdateInfo : ObservableObject
     [ObservableProperty] private string _catroot2Display = "0 B";
     [ObservableProperty] private string _lastCheckTime = "未記錄";
     [ObservableProperty] private string _statusBadge = "⏳ 偵測中";
+    [ObservableProperty] private string _trustedInstallerStartupType = "Unknown";
+    [ObservableProperty] private double _tiWorkerRamMb;
+    [ObservableProperty] private bool _isTiWorkerAbnormal;
+    [ObservableProperty] private int _failedUpdateCount;
+    [ObservableProperty] private bool _cbsCorruptionDetected;
+    [ObservableProperty] private string _lastCbsErrorSummary = "";
+
+    public string TiWorkerSummary => TiWorkerRamMb > 0
+        ? $"TiWorker: {TiWorkerRamMb:F0} MB · TrustedInstaller: {TrustedInstallerStartupType}"
+        : $"TrustedInstaller: {TrustedInstallerStartupType}";
 }

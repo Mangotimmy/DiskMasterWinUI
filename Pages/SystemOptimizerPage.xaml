@@ -2083,9 +2083,248 @@
 
                             <!-- Operation Feedback Notice -->
                             <InfoBar Severity="Informational"
-                                     IsOpen="{x:Bind ViewModel.NvmeOperationMessage, Mode=OneWay, Converter={StaticResource StringToVisibilityConverter}}"
+                                     IsOpen="{x:Bind ViewModel.HasNvmeOperationMessage, Mode=OneWay}"
                                      Title="操作執行反饋"
                                      Message="{x:Bind ViewModel.NvmeOperationMessage, Mode=OneWay}" />
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabViewItem>
+
+                <!-- ════ Tab 9: 全機流暢與記憶體減負 (PC Clean-Run & RAM Optimizer) ════ -->
+                <TabViewItem x:Name="TabCleanRun" Header="🧹 全機流暢與記憶體減負 (Clean-Run)" IsClosable="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" Margin="0,10,0,0">
+                        <StackPanel Spacing="16" HorizontalAlignment="Stretch" Margin="0,0,16,20">
+
+                            <!-- Hero Clean-Run Presets Card -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource AccentFillColorDefaultBrush}" BorderThickness="2"
+                                    CornerRadius="10" Padding="18">
+                                <StackPanel Spacing="12">
+                                    <Grid ColumnSpacing="14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon Grid.Column="0" Glyph="&#xE945;" FontSize="40" Foreground="{ThemeResource AccentFillColorDefaultBrush}" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                                            <TextBlock x:Name="CleanRunHeroTitle" Text="全機流暢清理與 RAM 減負中心 (PC Clean-Run &amp; RAM Optimizer)" FontWeight="Bold" FontSize="17" TextWrapping="Wrap" />
+                                            <TextBlock x:Name="CleanRunHeroSubtitle" Text="解決 16GB/低配電腦卡頓、分頁檔狂寫與背景吃滿記憶體問題：可逆式管理開機啟動項（自動揪出重複與高耗 WebView2/瀏覽器預啟動）、控制背景服務與瀏覽器常駐，並內建前景保護的自動記憶體守衛。"
+                                                       Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Content="🔄 重新掃描" Command="{x:Bind ViewModel.RefreshCleanRunDataCommand}" VerticalAlignment="Center" />
+                                    </Grid>
+
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button Grid.Column="0" HorizontalAlignment="Stretch" Style="{StaticResource AccentButtonStyle}" Padding="12,10"
+                                                Command="{x:Bind ViewModel.ApplyCleanRunPresetSafeCommand}"
+                                                IsEnabled="{x:Bind ViewModel.IsCleanRunLoading, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="🛡️ 安全日常省資源 (推薦)" FontWeight="Bold" />
+                                                <TextBlock Text="修復 TrustedInstaller、關 Edge/Chrome 背景常駐、開 85% 自動守衛" FontSize="10" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Column="1" HorizontalAlignment="Stretch" Padding="12,10"
+                                                Command="{x:Bind ViewModel.ApplyCleanRunPreset16GbCommand}"
+                                                IsEnabled="{x:Bind ViewModel.IsCleanRunLoading, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="🚀 16GB 低延遲順跑方案" FontWeight="Bold" />
+                                                <TextBlock Text="加上停用 SysMain/DiagTrack/小工具、WSearch 手動、80% 守衛+Standby 清理" FontSize="10" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Column="2" HorizontalAlignment="Stretch" Padding="12,10"
+                                                Command="{x:Bind ViewModel.RestoreCleanRunDefaultsCommand}"
+                                                IsEnabled="{x:Bind ViewModel.IsCleanRunLoading, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="♻️ 還原 Windows 系統預設" FontWeight="Bold" />
+                                                <TextBlock Text="全部服務、瀏覽器原則與自動記憶體守衛安全還原為原廠設定" FontSize="10" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+
+                                    <TextBlock Text="{x:Bind ViewModel.CleanRunStatusMessage, Mode=OneWay}"
+                                               FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AccentFillColorDefaultBrush}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Auto RAM Guard Card -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="2">
+                                            <TextBlock Text="🛡️ 自動記憶體守衛 (Auto RAM Guard — 0ms 原生監控 + 前景視窗保護)" FontWeight="Bold" FontSize="15" />
+                                            <TextBlock Text="{x:Bind ViewModel.AutoRamGuardLastSummary, Mode=OneWay}"
+                                                       Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="🧹 立即安全釋放記憶體" Style="{StaticResource AccentButtonStyle}"
+                                                Command="{x:Bind ViewModel.ReleaseMemoryNowCommand}"
+                                                IsEnabled="{x:Bind ViewModel.IsCleanRunLoading, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}"
+                                                VerticalAlignment="Center" />
+                                        <ToggleSwitch Grid.Column="2" IsOn="{x:Bind ViewModel.AutoRamGuardEnabled, Mode=TwoWay}"
+                                                      OnContent="自動守衛 ON" OffContent="手動模式" VerticalAlignment="Center" />
+                                    </Grid>
+
+                                    <Grid ColumnSpacing="16" RowSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
+                                            <TextBlock Text="觸發釋放的 RAM 使用率門檻 (70% ~ 95%)" FontSize="12" FontWeight="SemiBold" />
+                                            <Slider Minimum="70" Maximum="95" StepFrequency="1"
+                                                    Value="{x:Bind ViewModel.AutoRamGuardThresholdPercent, Mode=TwoWay}" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4">
+                                            <TextBlock Text="冷卻間隔 (分鐘，避免頻繁修剪影響效能)" FontSize="12" FontWeight="SemiBold" />
+                                            <Slider Minimum="2" Maximum="60" StepFrequency="1"
+                                                    Value="{x:Bind ViewModel.AutoRamGuardCooldownMinutes, Mode=TwoWay}" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="1" Grid.Column="0" Spacing="6">
+                                            <CheckBox Content="保護目前前景使用中程式／遊戲（絕不修剪前景視窗）"
+                                                      IsChecked="{x:Bind ViewModel.AutoRamGuardExcludeForeground, Mode=TwoWay}" />
+                                            <CheckBox Content="同步清理 Standby List 待命快取（需系統管理員權限）"
+                                                      IsChecked="{x:Bind ViewModel.AutoRamGuardPurgeStandbyList, Mode=TwoWay}" />
+                                        </StackPanel>
+
+                                        <TextBox Grid.Row="1" Grid.Column="1"
+                                                 Header="自訂保護白名單 (以逗號分隔行程名稱，不修剪)"
+                                                 PlaceholderText="obs64,audiodg,voicemeeter,dwm"
+                                                 Text="{x:Bind ViewModel.AutoRamGuardWhitelistCsv, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Reversible Startup Manager Card -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="10">
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="2">
+                                            <TextBlock Text="🚀 開機自動啟動管理 (原生 StartupApproved 可逆式停用，不刪除原鍵值)" FontWeight="Bold" FontSize="15" />
+                                            <TextBlock Text="{x:Bind ViewModel.StartupSummaryBadge, Mode=OneWay}"
+                                                       Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="⚡ 一鍵停用重複與瀏覽器預啟動項"
+                                                Command="{x:Bind ViewModel.DisableDuplicateAndBrowserStartupsCommand}"
+                                                IsEnabled="{x:Bind ViewModel.IsCleanRunLoading, Mode=OneWay, Converter={StaticResource InvertBoolConverter}}" />
+                                    </Grid>
+
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0" PlaceholderText="🔍 搜尋啟動項名稱、路徑或來源 (例如 Discord, Edge, GoogleDrive)..."
+                                                 Text="{x:Bind ViewModel.StartupSearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <CheckBox Grid.Column="1" Content="僅顯示高耗／重複警示項目"
+                                                  IsChecked="{x:Bind ViewModel.ShowOnlyProblemStartupEntries, Mode=TwoWay}"
+                                                  VerticalAlignment="Center" />
+                                    </Grid>
+
+                                    <ListView ItemsSource="{x:Bind ViewModel.FilteredStartupEntries, Mode=OneWay}"
+                                              MaxHeight="300" SelectionMode="None" HorizontalAlignment="Stretch">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                <Setter Property="MinHeight" Value="48" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="models:StartupEntryItem">
+                                                <Grid Padding="8,6" ColumnSpacing="12" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                                            <TextBlock Text="{x:Bind Name}" FontWeight="SemiBold" FontSize="13" />
+                                                            <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,1">
+                                                                <TextBlock Text="{x:Bind SourceDisplay}" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                            </Border>
+                                                            <Border Background="#28F59E0B" BorderBrush="#80F59E0B" BorderThickness="1" CornerRadius="4" Padding="6,1"
+                                                                    Visibility="{x:Bind HasWarning, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                                <TextBlock Text="{x:Bind WarningBadge}" FontSize="10" FontWeight="SemiBold" Foreground="#F59E0B" />
+                                                            </Border>
+                                                        </StackPanel>
+                                                        <TextBlock Text="{x:Bind Command}" FontSize="10" FontFamily="Consolas"
+                                                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+                                                    <ToggleSwitch Grid.Column="1" IsOn="{x:Bind IsEnabled, Mode=OneWay}"
+                                                                  Toggled="StartupEntry_Toggled"
+                                                                  OnContent="開機啟動" OffContent="已停用" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Background Services & Browser Bloat Tamer Card -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                    CornerRadius="8" Padding="16">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="🧰 背景服務與瀏覽器常駐減負開關 (全部可隨時一鍵還原)" FontWeight="Bold" FontSize="15" />
+                                    <ListView ItemsSource="{x:Bind ViewModel.BackgroundBloatTweaks, Mode=OneWay}"
+                                              SelectionMode="None" HorizontalAlignment="Stretch">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                <Setter Property="MinHeight" Value="54" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate x:DataType="models:BackgroundBloatTweakItem">
+                                                <Grid Padding="8,6" ColumnSpacing="14" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                                            <TextBlock Text="{x:Bind Title}" FontWeight="SemiBold" FontSize="13" TextWrapping="Wrap" />
+                                                            <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="6,1">
+                                                                <TextBlock Text="{x:Bind CurrentStateDisplay, Mode=OneWay}" FontSize="10" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                            </Border>
+                                                        </StackPanel>
+                                                        <TextBlock Text="{x:Bind Description}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                                        <TextBlock Text="{x:Bind SafeNote}" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                    </StackPanel>
+                                                    <ToggleSwitch Grid.Column="1" IsOn="{x:Bind IsOptimized, Mode=OneWay}"
+                                                                  Toggled="BloatTweak_Toggled"
+                                                                  OnContent="已減負" OffContent="系統預設" VerticalAlignment="Center" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                                </StackPanel>
+                            </Border>
 
                         </StackPanel>
                     </ScrollViewer>

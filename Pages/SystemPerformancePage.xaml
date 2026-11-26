@@ -288,6 +288,130 @@
                                 </Border>
                             </Grid>
 
+                            <!-- 2.5. RAM Pressure & Lag Doctor (Commit / Pagefile / WebView2 Owners / Top RAM Hogs) -->
+                            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="#40F59E0B" BorderThickness="1.2"
+                                    CornerRadius="10" Padding="16">
+                                <StackPanel Spacing="12">
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="🩺 RAM 壓力與卡頓元兇診斷 (RAM Pressure &amp; Lag Doctor)" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" />
+                                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="5" Padding="8,2" VerticalAlignment="Center">
+                                                    <TextBlock Text="{x:Bind ViewModel.RamPressure.SeverityBadge, Mode=OneWay}" FontSize="11" FontWeight="SemiBold" />
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock Text="{x:Bind ViewModel.RamPressure.SummaryText, Mode=OneWay}"
+                                                       FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <ProgressRing Grid.Column="1" IsActive="{x:Bind ViewModel.IsAnalyzingRamPressure, Mode=OneWay}" Width="18" Height="18" />
+                                        <Button Grid.Column="2" Content="🔍 重新診斷" Command="{x:Bind ViewModel.RefreshRamPressureCommand}" Padding="10,5" />
+                                        <Button Grid.Column="3" Content="🧹 立即安全釋放記憶體" Style="{StaticResource AccentButtonStyle}"
+                                                Command="{x:Bind ViewModel.ReleaseRamSafelyCommand}" Padding="12,5" />
+                                    </Grid>
+
+                                    <!-- Commit / Pagefile / Kernel Pool Metrics Strip -->
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10,8">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="虛擬提交總量 (Commit Charge)" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                <TextBlock Text="{x:Bind ViewModel.RamPressure.CommitDisplay, Mode=OneWay}" FontSize="12" FontWeight="Bold" />
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10,8">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="分頁檔負擔 (pagefile.sys)" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                <TextBlock Text="{x:Bind ViewModel.RamPressure.PagefileDisplay, Mode=OneWay}" FontSize="12" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Grid.Column="2" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="6" Padding="10,8">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="核心記憶體集區與分頁交換率" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                                <TextBlock Text="{x:Bind ViewModel.RamPressure.KernelPoolDisplay, Mode=OneWay}" FontSize="12" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+
+                                    <!-- Findings & WebView2 Owners -->
+                                    <Grid ColumnSpacing="14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="3*" />
+                                            <ColumnDefinition Width="2*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Top Memory-Hog Process Groups with EcoQoS Toggle -->
+                                        <StackPanel Grid.Column="0" Spacing="6">
+                                            <TextBlock Text="🔥 吃記憶體元兇排行 (依程式群組 Private Memory 排序)" FontWeight="SemiBold" FontSize="12" />
+                                            <ListView ItemsSource="{x:Bind ViewModel.RamPressure.TopProcessGroups, Mode=OneWay}"
+                                                      MaxHeight="210" SelectionMode="None" HorizontalAlignment="Stretch">
+                                                <ListView.ItemContainerStyle>
+                                                    <Style TargetType="ListViewItem">
+                                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                        <Setter Property="MinHeight" Value="34" />
+                                                    </Style>
+                                                </ListView.ItemContainerStyle>
+                                                <ListView.ItemTemplate>
+                                                    <DataTemplate x:DataType="models:ProcessGroupMemoryItem">
+                                                        <Grid Padding="4,3" ColumnSpacing="8">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Grid.Column="0" Text="{x:Bind DisplayHeader}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                            <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="5,1" VerticalAlignment="Center">
+                                                                <TextBlock Text="{x:Bind CategoryBadge}" FontSize="10" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                            </Border>
+                                                            <TextBlock Grid.Column="2" Text="{x:Bind DisplayMemory}" FontSize="11" FontFamily="Consolas" VerticalAlignment="Center" />
+                                                            <Button Grid.Column="3" Content="{x:Bind EcoButtonLabel, Mode=OneWay}"
+                                                                    Click="ProcessGroupEcoQos_Click"
+                                                                    IsEnabled="{x:Bind IsSystemProtected, Converter={StaticResource InvertBoolConverter}}"
+                                                                    Padding="8,2" FontSize="10" VerticalAlignment="Center" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ListView.ItemTemplate>
+                                            </ListView>
+                                        </StackPanel>
+
+                                        <!-- Diagnostic Findings & WebView2 Owner Breakdown -->
+                                        <StackPanel Grid.Column="1" Spacing="8">
+                                            <TextBlock Text="📋 卡頓診斷建議" FontWeight="SemiBold" FontSize="12" />
+                                            <ItemsControl ItemsSource="{x:Bind ViewModel.RamPressure.DiagnosticFindings, Mode=OneWay}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="x:String">
+                                                        <TextBlock Text="{x:Bind}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,4" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <StackPanel Spacing="4" Visibility="{x:Bind ViewModel.HasWebView2Owners, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                <TextBlock Text="🌐 WebView2 來源程式歸屬 (揪出隱藏分身)" FontWeight="SemiBold" FontSize="12" />
+                                                <ItemsControl ItemsSource="{x:Bind ViewModel.RamPressure.WebView2Owners, Mode=OneWay}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="models:WebView2OwnerItem">
+                                                            <TextBlock Text="{x:Bind DisplaySummary}" FontSize="11" FontFamily="Consolas"
+                                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" Margin="0,1" />
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
                             <!-- 3. Physical Disk Auto-Detection & Task Manager Selector -->
                             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
