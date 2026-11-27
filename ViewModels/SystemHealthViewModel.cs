@@ -135,8 +135,10 @@ public partial class SystemHealthViewModel : ObservableObject
         if (_isInitialized) return;
         _isInitialized = true;
 
-        await RefreshWindowsUpdateStatusAsync();
-        await ScanTempCategoriesAsync();
+        await Task.WhenAll(
+            RefreshWindowsUpdateStatusAsync(),
+            ScanTempCategoriesAsync(),
+            RefreshQuarantineVaultAsync());
     }
 
     [RelayCommand]
@@ -1101,6 +1103,7 @@ public partial class SystemHealthViewModel : ObservableObject
 
             await ScanTempCategoriesAsync();
             await RefreshWindowsUpdateStatusAsync();
+            await RefreshQuarantineVaultAsync();
         }
         catch (OperationCanceledException)
         {

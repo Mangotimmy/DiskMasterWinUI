@@ -21,21 +21,24 @@ public class TempCleanService
     /// <summary>
     /// Categories that are always disposable: caches and logs that Windows, browsers and
     /// applications rebuild automatically. Only these are pre-selected.
+    /// Prefetch is intentionally excluded: deleting Prefetch slows down Windows app launches for minimal space gain.
     /// </summary>
     private static readonly HashSet<string> SafeCategoryIds = new(StringComparer.OrdinalIgnoreCase)
     {
-        "UserTemp", "SystemTemp", "AppCache", "Prefetch", "WerReports", "DeliveryOpt", "ThumbCache"
+        "UserTemp", "SystemTemp", "AppCache", "WerReports", "DeliveryOpt", "ThumbCache"
     };
 
     /// <summary>
     /// Categories that are never purged automatically because the data cannot be regenerated
-    /// or because removing it breaks installed software.
+    /// or because removing it degrades performance / breaks installed software.
     /// </summary>
     private static string RiskTextFor(string id) => id switch
     {
-        "PackageCache" => "永久刪除後，所有 MSI / Visual Studio 安裝的程式將無法「修復 / 變更 / 解除安裝」。僅在你能重新下載安裝檔時才勾選。",
+        "PackageCache" => "永久刪除後，所有 MSI / Visual Studio 安裝的程式將無法「修復 / 變更 / 解除安裝」。此目錄已強制鎖定禁止刪除。",
         "WindowsOld" => "刪除後將永久失去回復到前一個 Windows 版本的機會，無法復原。",
-        "SetupFiles" => "刪除後無法回復最近的 Windows 功能更新，且需重新下載升級檔案。",
+        "SetupFiles" => "刪除後無法回復最近的 Windows 功能更新，且需重新下載升級檔案（已自動排除 Windows\\Panther 保護系統狀態）。",
+        "Prefetch" => "刪除 Prefetch 只會釋放少量空間，反而會讓 Windows 與常用程式啟動變慢，一般不建議清理。",
+        "MemoryDumps" => "BSOD 藍屏除錯傾印檔案，若近期發生當機請保留供分析。",
         "CbsLogs" => "系統元件維護 (DISM / 更新失敗) 的排錯紀錄，刪除後無法診斷更新錯誤。",
         "DefenderCache" => "Defender 病毒碼歷史備份，刪除後下一次更新需重新下載完整定義檔。",
         _ => ""
@@ -299,7 +302,8 @@ public class TempCleanService
                     else if (cat.Id == "SetupFiles")
                     {
                         var root = Path.GetPathRoot(WinDir) ?? @"C:\";
-                        string[] setupDirs = { "$WINDOWS.~BT", "$WINDOWS.~WS", "Windows\\Panther" };
+                        // Windows\Panther is intentionally protected (holds OOBE / unattend / upgrade state).
+                        string[] setupDirs = { "$WINDOWS.~BT", "$WINDOWS.~WS" };
                         foreach (var sub in setupDirs)
                         {
                             var target = Path.Combine(root, sub);
@@ -359,12 +363,24 @@ public class TempCleanService
             var onProgress = safeProg;
             int deletedFiles = 0;
             long freedBytes = 0;
+            int totalAgeSkipped = 0;
+            int totalPathBlocked = 0;
             var targetSet = new HashSet<string>(categoryIds, StringComparer.OrdinalIgnoreCase);
             int totalCategories = targetSet.Count;
             int currentStep = 0;
 
+            var settings = SettingsService.Instance.Current;
+            bool useQuarantine = settings.EnableQuarantineBackup;
+            int minAgeHours = settings.EnableTempFileAgeGuard ? Math.Clamp(settings.TempFileMinAgeHours, 1, 168) : 0;
+
+            var quarantineService = new FileQuarantineService();
+            using var quarantineSession = useQuarantine
+                ? quarantineService.BeginSession($"系統清理 ({string.Join(", ", targetSet.Take(3))}{(targetSet.Count > 3 ? "..." : "")})")
+                : null;
+
             onOutput("══════════════════════════════════════════════════════════════");
             onOutput($"[{DateTime.Now:HH:mm:ss}] 啟動系統暫存與磁碟清理引擎");
+            onOutput($"🛡️ 安全防護狀態：路徑硬封鎖=ON ｜ 隔離還原庫={(useQuarantine ? "ON (7天/2GB)" : "OFF")} ｜ 新檔時間保護={(minAgeHours > 0 ? $"ON (保留最近 {minAgeHours} 小時)" : "OFF")}");
             onOutput("══════════════════════════════════════════════════════════════");
 
             // User Temp
@@ -374,12 +390,14 @@ public class TempCleanService
                 currentStep++;
                 onProgress?.Invoke(currentStep, totalCategories, "使用者暫存目錄 (%TEMP%)");
                 onOutput("▸ 正在清理使用者暫存目錄 (%TEMP%)...");
-                var (f, b) = CleanDirectoryInternal(UserTemp, "*.*", ct);
+                var (f, b, sk1, blk1) = CleanDirectoryProtected(UserTemp, "*.*", "UserTemp", minAgeHours, quarantineSession, ct);
                 var inetCache = Path.Combine(LocalAppData, @"Microsoft\Windows\INetCache");
-                var (f2, b2) = CleanDirectoryInternal(inetCache, "*.*", ct);
+                var (f2, b2, sk2, blk2) = CleanDirectoryProtected(inetCache, "*.*", "UserTemp", minAgeHours, quarantineSession, ct);
                 deletedFiles += f + f2;
                 freedBytes += b + b2;
-                onOutput($"  - 已清理 {f + f2:N0} 個使用者暫存檔案 ({FormatBytes(b + b2)})");
+                totalAgeSkipped += sk1 + sk2;
+                totalPathBlocked += blk1 + blk2;
+                onOutput($"  - 已清理 {f + f2:N0} 個使用者暫存檔案 ({FormatBytes(b + b2)}){(sk1 + sk2 > 0 ? $"｜已保護 {sk1 + sk2:N0} 個 {minAgeHours}h 內近期檔案" : "")}");
             }
 
             // System Temp
@@ -390,10 +408,12 @@ public class TempCleanService
                 onProgress?.Invoke(currentStep, totalCategories, "系統暫存目錄 (Windows Temp)");
                 var sysTemp = Path.Combine(WinDir, "Temp");
                 onOutput("▸ 正在清理系統暫存目錄 (C:\\Windows\\Temp)...");
-                var (f, b) = CleanDirectoryInternal(sysTemp, "*.*", ct);
+                var (f, b, sk, blk) = CleanDirectoryProtected(sysTemp, "*.*", "SystemTemp", minAgeHours, quarantineSession, ct);
                 deletedFiles += f;
                 freedBytes += b;
-                onOutput($"  - 已清理 {f:N0} 個系統暫存檔 ({FormatBytes(b)})");
+                totalAgeSkipped += sk;
+                totalPathBlocked += blk;
+                onOutput($"  - 已清理 {f:N0} 個系統暫存檔 ({FormatBytes(b)}){(sk > 0 ? $"｜已保護 {sk:N0} 個近期系統暫存" : "")}");
             }
 
             // App Cache
@@ -402,7 +422,7 @@ public class TempCleanService
                 ct.ThrowIfCancellationRequested();
                 currentStep++;
                 onProgress?.Invoke(currentStep, totalCategories, "應用程式與瀏覽器快取 (App Cache)");
-                onOutput("▸ 正在清理應用程式與瀏覽器快取 (App Cache: Edge/Chrome/Firefox/GPU Shader)...");
+                onOutput("▸ 正在清理目前使用者的應用程式與瀏覽器快取 (Edge/Chrome/Firefox/GPU Shader)...");
                 int af = 0;
                 long ab = 0;
                 var cacheDirs = GetAppCacheDirectories();
@@ -422,9 +442,11 @@ public class TempCleanService
                         continue;
                     }
 
-                    var (f, b) = CleanDirectoryInternal(dir, "*.*", ct);
+                    var (f, b, sk, blk) = CleanDirectoryProtected(dir, "*.*", "AppCache", minAgeHours: 0, quarantineSession, ct);
                     af += f;
                     ab += b;
+                    totalAgeSkipped += sk;
+                    totalPathBlocked += blk;
                 }
                 if (skipped.Count > 0)
                 {
@@ -575,8 +597,9 @@ public class TempCleanService
                 currentStep++;
                 onProgress?.Invoke(currentStep, totalCategories, "系統記憶體與損毀傾印 (Memory Dumps)");
                 onOutput("▸ 正在清理系統記憶體與損毀傾印 (Dumps)...");
+                bool fullDumpDeleted = false;
                 var fullDump = Path.Combine(WinDir, "MEMORY.DMP");
-                if (File.Exists(fullDump))
+                if (File.Exists(fullDump) && SafePathGuard.IsSafeToClean(fullDump, out _))
                 {
                     try
                     {
@@ -584,17 +607,18 @@ public class TempCleanService
                         File.Delete(fullDump);
                         deletedFiles++;
                         freedBytes += len;
+                        fullDumpDeleted = true;
                     }
                     catch { }
                 }
 
                 var miniDir = Path.Combine(WinDir, "Minidump");
-                var (f1, b1) = CleanDirectoryInternal(miniDir, "*.dmp", ct);
+                var (f1, b1, _, _) = CleanDirectoryProtected(miniDir, "*.dmp", "MemoryDumps", minAgeHours, quarantineSession, ct);
                 var crashDir = Path.Combine(LocalAppData, "CrashDumps");
-                var (f2, b2) = CleanDirectoryInternal(crashDir, "*.*", ct);
+                var (f2, b2, _, _) = CleanDirectoryProtected(crashDir, "*.*", "MemoryDumps", minAgeHours, quarantineSession, ct);
                 deletedFiles += f1 + f2;
                 freedBytes += b1 + b2;
-                onOutput($"  - 已清理 {f1 + f2 + (File.Exists(fullDump) ? 0 : 1)} 個傾印檔案 ({FormatBytes(b1 + b2)})");
+                onOutput($"  - 已清理 {f1 + f2 + (fullDumpDeleted ? 1 : 0)} 個傾印檔案 ({FormatBytes(b1 + b2)})");
             }
 
             // WER Logs
@@ -605,9 +629,11 @@ public class TempCleanService
                 onProgress?.Invoke(currentStep, totalCategories, "Windows 錯誤回報紀錄 (WER Reports)");
                 var werDir = Path.Combine(ProgramData, "Microsoft", "Windows", "WER");
                 onOutput("▸ 正在清理 Windows 錯誤回報紀錄 (WER)...");
-                var (f, b) = CleanDirectoryInternal(werDir, "*.*", ct);
+                var (f, b, sk, blk) = CleanDirectoryProtected(werDir, "*.*", "WerReports", minAgeHours, quarantineSession, ct);
                 deletedFiles += f;
                 freedBytes += b;
+                totalAgeSkipped += sk;
+                totalPathBlocked += blk;
                 onOutput($"  - 已清理 {f} 個錯誤回報項目 ({FormatBytes(b)})");
             }
 
@@ -619,21 +645,21 @@ public class TempCleanService
                 onProgress?.Invoke(currentStep, totalCategories, "傳遞最佳化快取 (Delivery Optimization)");
                 var doDir = Path.Combine(WinDir, "SoftwareDistribution", "DeliveryOptimization", "Cache");
                 onOutput("▸ 正在清理傳遞最佳化快取 (Delivery Optimization)...");
-                var (f, b) = CleanDirectoryInternal(doDir, "*.*", ct);
+                var (f, b, _, _) = CleanDirectoryProtected(doDir, "*.*", "DeliveryOpt", 0, quarantineSession, ct);
                 deletedFiles += f;
                 freedBytes += b;
                 onOutput($"  - 已清理 {f} 個傳遞暫存區塊 ({FormatBytes(b)})");
             }
 
-            // Setup Files ($WINDOWS.~BT)
+            // Setup Files ($WINDOWS.~BT / $WINDOWS.~WS; Windows\Panther is permanently protected)
             if (targetSet.Contains("SetupFiles"))
             {
                 ct.ThrowIfCancellationRequested();
                 currentStep++;
                 onProgress?.Invoke(currentStep, totalCategories, "Windows 安裝與升級殘留 ($WINDOWS.~BT)");
                 var root = Path.GetPathRoot(WinDir) ?? @"C:\";
-                string[] setupDirs = { "$WINDOWS.~BT", "$WINDOWS.~WS", "Windows\\Panther" };
-                onOutput("▸ 正在清理 Windows 安裝與版本升級殘留暫存...");
+                string[] setupDirs = { "$WINDOWS.~BT", "$WINDOWS.~WS" };
+                onOutput("▸ 正在清理 Windows 安裝與版本升級殘留暫存 (已自動保護 Windows\\Panther)...");
                 int sf = 0;
                 long sb = 0;
                 foreach (var dir in setupDirs)
@@ -657,7 +683,7 @@ public class TempCleanService
                 onProgress?.Invoke(currentStep, totalCategories, "檔案總管縮圖快取 (Thumbnail Cache)");
                 var thumbDir = Path.Combine(LocalAppData, "Microsoft", "Windows", "Explorer");
                 onOutput("▸ 正在清理檔案總管縮圖快取 (thumbcache_*.db)...");
-                var (f, b) = CleanDirectoryInternal(thumbDir, "thumbcache_*.db", ct);
+                var (f, b, _, _) = CleanDirectoryProtected(thumbDir, "thumbcache_*.db", "ThumbCache", 0, quarantineSession, ct);
                 deletedFiles += f;
                 freedBytes += b;
                 onOutput($"  - 已清理 {f} 個縮圖資料庫檔案 ({FormatBytes(b)})");
@@ -705,9 +731,18 @@ public class TempCleanService
             }
 
             ct.ThrowIfCancellationRequested();
+            quarantineSession?.Commit();
 
             onOutput("\n══════════════════════════════════════════════════════════════");
             onOutput($"[{DateTime.Now:HH:mm:ss}] 🎉 磁碟清理完成！共釋放 {FormatBytes(freedBytes)} 磁碟空間 (清理 {deletedFiles:N0} 個檔案)");
+            if (quarantineSession != null && quarantineSession.QuarantinedFileCount > 0)
+            {
+                onOutput($"🛡️ 安全隔離還原庫已備份 {quarantineSession.QuarantinedFileCount:N0} 個檔案 ({FormatBytes(quarantineSession.QuarantinedBytes)})，隨時可於上方還原庫一鍵還原。");
+            }
+            if (totalAgeSkipped > 0 || totalPathBlocked > 0)
+            {
+                onOutput($"🛡️ 防護略過統計：24h 新檔保護 {totalAgeSkipped:N0} 檔 ｜ 受保護路徑攔截 {totalPathBlocked:N0} 檔。");
+            }
             onOutput("══════════════════════════════════════════════════════════════");
 
             return (deletedFiles, freedBytes, FormatBytes(freedBytes));
@@ -773,29 +808,8 @@ public class TempCleanService
         AddIfValid(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), false);
         AddIfValid(Environment.GetEnvironmentVariable("APPDATA"), true);
         AddIfValid(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), true);
-
-        // Also inspect profiles under C:\Users\*
-        try
-        {
-            var usersDir = Path.Combine(Path.GetPathRoot(WinDir) ?? @"C:\", "Users");
-            if (Directory.Exists(usersDir))
-            {
-                foreach (var userDir in Directory.EnumerateDirectories(usersDir))
-                {
-                    var name = Path.GetFileName(userDir);
-                    if (name.Equals("Public", StringComparison.OrdinalIgnoreCase) ||
-                        name.Equals("Default", StringComparison.OrdinalIgnoreCase) ||
-                        name.Equals("All Users", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    var uLocal = Path.Combine(userDir, @"AppData\Local");
-                    if (Directory.Exists(uLocal)) localApps.Add(uLocal);
-                    var uRoaming = Path.Combine(userDir, @"AppData\Roaming");
-                    if (Directory.Exists(uRoaming)) roamingApps.Add(uRoaming);
-                }
-            }
-        }
-        catch { }
+        // Deliberately scoped to the current logged-in user profile only:
+        // never silently modify other Windows user accounts under C:\Users\*.
 
         foreach (var localApp in localApps)
         {
@@ -915,11 +929,25 @@ public class TempCleanService
         return (total, count);
     }
 
-    private static (int DeletedCount, long FreedBytes) CleanDirectoryInternal(string folderPath, string searchPattern, CancellationToken ct)
+    private static (int DeletedCount, long FreedBytes, int AgeSkipped, int PathBlocked) CleanDirectoryProtected(
+        string folderPath,
+        string searchPattern,
+        string categoryId,
+        int minAgeHours,
+        FileQuarantineService.QuarantineSessionWriter? quarantineSession,
+        CancellationToken ct)
     {
         int deleted = 0;
         long bytes = 0;
-        if (!Directory.Exists(folderPath)) return (0, 0);
+        int ageSkipped = 0;
+        int pathBlocked = 0;
+
+        if (!Directory.Exists(folderPath)) return (0, 0, 0, 0);
+        if (!SafePathGuard.IsSafeToClean(folderPath, out var folderBlockReason))
+        {
+            Journal($"[SafePathGuard] BLOCKED folder {folderPath}: {folderBlockReason}");
+            return (0, 0, 0, 1);
+        }
 
         try
         {
@@ -929,20 +957,40 @@ public class TempCleanService
                 if (ct.IsCancellationRequested) break;
                 try
                 {
+                    if (!SafePathGuard.IsSafeToClean(file.FullName, out _))
+                    {
+                        pathBlocked++;
+                        continue;
+                    }
+
+                    if (minAgeHours > 0 && SafePathGuard.IsProtectedByAgeGuard(file, minAgeHours))
+                    {
+                        ageSkipped++;
+                        continue;
+                    }
+
                     var len = file.Length;
-                    file.Delete();
-                    bytes += len;
-                    deleted++;
+                    if (quarantineSession != null && quarantineSession.TryQuarantineFile(file, categoryId))
+                    {
+                        bytes += len;
+                        deleted++;
+                    }
+                    else
+                    {
+                        file.Delete();
+                        bytes += len;
+                        deleted++;
+                    }
                 }
                 catch { /* Locked file in use by active process: safely skip */ }
             }
 
-            // Try removing empty subdirectories
             foreach (var sub in dir.EnumerateDirectories("*", SafeEnumOptions))
             {
                 if (ct.IsCancellationRequested) break;
                 try
                 {
+                    if (!SafePathGuard.IsSafeToClean(sub.FullName, out _)) continue;
                     if (!sub.EnumerateFileSystemInfos().Any())
                     {
                         sub.Delete();
@@ -953,7 +1001,13 @@ public class TempCleanService
         }
         catch { }
 
-        return (deleted, bytes);
+        return (deleted, bytes, ageSkipped, pathBlocked);
+    }
+
+    private static (int DeletedCount, long FreedBytes) CleanDirectoryInternal(string folderPath, string searchPattern, CancellationToken ct)
+    {
+        var (d, b, _, _) = CleanDirectoryProtected(folderPath, searchPattern, "Direct", minAgeHours: 0, quarantineSession: null, ct);
+        return (d, b);
     }
 
     private static string FormatBytes(long bytes)

@@ -543,8 +543,74 @@
 
                 </TabView>
 
+                <!-- ═══ Modern Categorized Left NavigationView (Default) wrapping the Multi-Directional Docking Workspace ═══ -->
+                <NavigationView x:Name="SidebarNav" Grid.Row="3"
+                                PaneDisplayMode="Left"
+                                IsPaneOpen="True"
+                                OpenPaneLength="208"
+                                CompactPaneLength="48"
+                                IsBackButtonVisible="Collapsed"
+                                IsSettingsVisible="False"
+                                SelectionChanged="SidebarNav_SelectionChanged">
+                    <NavigationView.MenuItems>
+                        <NavigationViewItemHeader Content="首頁與快速維護" />
+                        <NavigationViewItem x:Name="NavStarter" Content="入門精靈" Tag="Starter">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE735;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem x:Name="NavEasyMode" Content="簡易模式" Tag="EasyMode">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xEDA2;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+
+                        <NavigationViewItemHeader Content="磁碟與映像部署" />
+                        <NavigationViewItem x:Name="NavDiskTools" Content="磁碟工具" Tag="DiskTools">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE90F;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem x:Name="NavWimDeploy" Content="系統部署" Tag="WimDeploy">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE896;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem x:Name="NavBootManager" Content="引導管理" Tag="BootManager">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE7C3;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem x:Name="NavRecovery" Content="檔案復原" Tag="Recovery">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE777;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem x:Name="NavAdvancedMode" Content="進階腳本" Tag="AdvancedMode">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE756;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+
+                        <NavigationViewItemHeader Content="系統修復與安全清理" />
+                        <NavigationViewItem x:Name="NavSystemHealth" Content="系統修復與清理" Tag="SystemHealth">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE9D9;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+
+                        <NavigationViewItemHeader Content="效能與深度最佳化" />
+                        <NavigationViewItem x:Name="NavSystemPerformance" Content="效能與 RAM 診斷" Tag="SystemPerformance">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE9D2;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem x:Name="NavOptimizer" Content="最佳化與減負" Tag="SystemOptimizer">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE945;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+
+                        <NavigationViewItemHeader Content="網路與系統權限" />
+                        <NavigationViewItem x:Name="NavNetworkTools" Content="網路工具" Tag="NetworkTools">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE774;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem x:Name="NavNtfsPermissions" Content="權限管理" Tag="NtfsPermissions">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE72E;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                        <NavigationViewItem x:Name="NavGroupPolicy" Content="群組原則" Tag="GroupPolicy">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE8D7;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                    </NavigationView.MenuItems>
+
+                    <NavigationView.FooterMenuItems>
+                        <NavigationViewItem x:Name="NavSettings" Content="設定" Tag="Settings">
+                            <NavigationViewItem.Icon><FontIcon Glyph="&#xE713;" /></NavigationViewItem.Icon>
+                        </NavigationViewItem>
+                    </NavigationView.FooterMenuItems>
+
                 <!-- Multi-Directional Docking Container Grid (Main Viewport, Right Dock, Bottom Dock) -->
-                <Grid Grid.Row="3" x:Name="DockContainerGrid"
+                <Grid x:Name="DockContainerGrid"
                       AllowDrop="True"
                       DragOver="DockContainerGrid_DragOver"
                       Drop="DockContainerGrid_Drop">
@@ -693,6 +759,7 @@
                         </Grid>
                     </Border>
                 </Grid>
+                </NavigationView>
 
                 <!-- Unified Bottom Status Bar with % and ETA -->
                 <controls:StatusBarControl Grid.Row="4" />

@@ -24,6 +24,29 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _shellEnableAddToPath = true;
     [ObservableProperty] private string _shellStatusSummary = "尚未檢測右鍵選單狀態";
 
+    // ── Main Window Navigation Layout Style ──
+    public string[] NavigationLayoutOptions { get; } =
+    [
+        "📂 左側分類側邊欄 (推薦 / 可收合)",
+        "🗂️ 經典頂部多頁籤 (Top Tabs)"
+    ];
+
+    [ObservableProperty] private string _selectedNavigationLayout = "📂 左側分類側邊欄 (推薦 / 可收合)";
+
+    partial void OnSelectedNavigationLayoutChanged(string value)
+    {
+        if (_isLoadingSettings) return;
+        var targetMode = value.Contains("Top Tabs", StringComparison.OrdinalIgnoreCase) ? "TopTabs" : "Sidebar";
+        if (!string.Equals(SettingsService.Instance.Current.NavigationLayoutMode, targetMode, StringComparison.OrdinalIgnoreCase))
+        {
+            SettingsService.Instance.Current.NavigationLayoutMode = targetMode;
+            SettingsService.Instance.Save();
+            StatusMessage = targetMode == "Sidebar"
+                ? "✅ 已切換為左側分類側邊欄導覽"
+                : "✅ 已切換為經典頂部多頁籤導覽";
+        }
+    }
+
     // ── Background memory ──
     [ObservableProperty] private bool _backgroundMemorySaver = true;
 
@@ -210,6 +233,9 @@ public partial class SettingsViewModel : ObservableObject
             var s = SettingsService.Instance.Current;
             SelectedTheme = s.Theme;
             SelectedScale = s.ScalePercent;
+            SelectedNavigationLayout = string.Equals(s.NavigationLayoutMode, "TopTabs", StringComparison.OrdinalIgnoreCase)
+                ? NavigationLayoutOptions[1]
+                : NavigationLayoutOptions[0];
 
             SelectedLanguage = s.Language switch
             {

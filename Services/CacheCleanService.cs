@@ -92,11 +92,18 @@ public class CacheCleanService
                     try { Directory.Delete(tmpDir, true); } catch { }
                 }
 
+                var minAgeHours = SettingsService.Instance.Current.EnableTempFileAgeGuard
+                    ? Math.Clamp(SettingsService.Instance.Current.TempFileMinAgeHours, 1, 168)
+                    : 0;
+
                 foreach (var file in Directory.EnumerateFiles(targetDir, "*.part", SearchOption.TopDirectoryOnly))
                 {
                     try
                     {
+                        if (!SafePathGuard.IsSafeToClean(file, out _)) continue;
                         var fi = new FileInfo(file);
+                        // Never delete active recent .part downloads within the file-age guard window
+                        if (minAgeHours > 0 && SafePathGuard.IsProtectedByAgeGuard(fi, minAgeHours)) continue;
                         freedBytes += fi.Length;
                         File.Delete(file);
                         deletedFiles++;
@@ -165,9 +172,9 @@ public class CacheCleanService
     public async Task<(string Summary, long FreedBytes)> PerformSystemDeepCleanupAsync(Action<string> onOutput, CancellationToken ct = default)
     {
         var tempService = new TempCleanService();
-        // Deliberately excludes Windows.old / $WINDOWS.~BT: those destroy the rollback image and
-        // the last feature-update payload, so they are only reachable through explicit actions.
-        var allCats = new[] { "UserTemp", "SystemTemp", "AppCache", "Prefetch", "MemoryDumps", "WerReports", "DeliveryOpt", "ThumbCache" };
+        // Strictly aligned with TempCleanService.SafeCategoryIds:
+        // excludes Windows.old / $WINDOWS.~BT, Prefetch (slows app launch), and MemoryDumps (BSOD diagnostics).
+        var allCats = new[] { "UserTemp", "SystemTemp", "AppCache", "WerReports", "DeliveryOpt", "ThumbCache" };
         var (tFiles, tBytes, _) = await tempService.CleanSelectedCategoriesAsync(allCats, onOutput, ct);
         var (dFiles, dBytes, _) = await CleanDownloadCacheAsync();
         var scriptCount = await CleanDiskPartTempFilesAsync();

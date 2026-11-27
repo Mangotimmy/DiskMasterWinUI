@@ -132,6 +132,18 @@ public class AppSettings
     // ── Windows Update Repair Preferences ──
     public bool WuRepairPromptReboot { get; set; } = true;
     public bool WuRepairBackupSoftwareDist { get; set; } = true;
+
+    // ── Multi-Layer File Protection & Quarantine Restore Vault (ON by default) ──
+    public bool EnableQuarantineBackup { get; set; } = true;
+    public int QuarantineRetentionDays { get; set; } = 7;
+    public int QuarantineMaxSizeMb { get; set; } = 2048;
+    public bool EnableTempFileAgeGuard { get; set; } = true;
+    public int TempFileMinAgeHours { get; set; } = 24;
+    public bool AutoBackupDriversBeforeDelete { get; set; } = true;
+    public bool CreateRestorePointBeforeRiskyClean { get; set; } = false;
+
+    // ── Main Window Navigation Layout ("Sidebar" default vs "TopTabs" classic) ──
+    public string NavigationLayoutMode { get; set; } = "Sidebar";
 }
 
 public class SettingsService

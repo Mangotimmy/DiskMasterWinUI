@@ -75,6 +75,22 @@ public sealed partial class SystemHealthPage : Page
         }
     }
 
+    private async void RestoreQuarantineSession_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is DiskMasterWinUI.Models.QuarantineSessionItem item)
+        {
+            await ViewModel.RestoreQuarantineSessionCommand.ExecuteAsync(item);
+        }
+    }
+
+    private async void DeleteQuarantineSession_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        if (sender is Button btn && btn.DataContext is DiskMasterWinUI.Models.QuarantineSessionItem item)
+        {
+            await ViewModel.DeleteQuarantineSessionCommand.ExecuteAsync(item);
+        }
+    }
+
     private void FeatureToggle_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         if (sender is Button btn && btn.DataContext is DiskMasterWinUI.Models.WindowsFeatureItem item)

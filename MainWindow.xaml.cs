@@ -238,6 +238,7 @@ public sealed partial class MainWindow : Window
 
         PopulateWorkspaceCombo();
         ApplyWorkspacePreset(SettingsService.Instance.Current.WorkspacePreset);
+        ApplyNavigationLayoutMode();
         ApplyCustomFont();
         LocalizationService.Instance.ApplyLanguagePreference(SettingsService.Instance.Current.Language);
         ApplyLanguage();
@@ -558,7 +559,12 @@ public sealed partial class MainWindow : Window
         bool isDark = true;
         try
         {
-            isDark = (App.Current.RequestedTheme == ApplicationTheme.Dark);
+            isDark = settings.Theme switch
+            {
+                "Light" => false,
+                "Dark" => true,
+                _ => NormalView.ActualTheme == ElementTheme.Dark
+            };
         }
         catch { }
 
@@ -797,6 +803,8 @@ public sealed partial class MainWindow : Window
     {
         var s = SettingsService.Instance.Current;
         return string.Join("|",
+            s.Theme ?? "System",
+            s.NavigationLayoutMode ?? "Sidebar",
             s.BackgroundImagePath ?? "",
             s.BackgroundOpacity,
             s.BackgroundBlur,
@@ -827,6 +835,8 @@ public sealed partial class MainWindow : Window
 
     private void ScheduleVisualSettingsApply()
     {
+        ApplyNavigationLayoutMode();
+
         bool changed =
             !string.Equals(ComputeBackgroundSignature(), _lastBackgroundSignature, StringComparison.Ordinal) ||
             !string.Equals(ComputeFontSignature(), _lastFontSignature, StringComparison.Ordinal) ||
@@ -2677,6 +2687,8 @@ public sealed partial class MainWindow : Window
                 MainTabs.SelectedItem = tabItem;
             }
 
+            SyncSidebarSelection(tag);
+
             var page = GetOrCreatePageForTag(tag);
 
             if (tag == _currentNavigatedTag && ReferenceEquals(ContentFrame.Content, page)) return;
@@ -2708,6 +2720,56 @@ public sealed partial class MainWindow : Window
         finally
         {
             _isNavigating = false;
+        }
+    }
+
+    private void ApplyNavigationLayoutMode()
+    {
+        try
+        {
+            bool useTopTabs = string.Equals(SettingsService.Instance.Current.NavigationLayoutMode, "TopTabs", StringComparison.OrdinalIgnoreCase);
+            if (SidebarNav != null)
+            {
+                SidebarNav.IsPaneVisible = !useTopTabs;
+            }
+            if (MainTabs != null)
+            {
+                MainTabs.Visibility = useTopTabs ? Visibility.Visible : Visibility.Collapsed;
+            }
+            if (CommandToolbarHint != null)
+            {
+                CommandToolbarHint.Text = useTopTabs
+                    ? "分頁列可拖曳排序；右鍵分頁可浮動、停靠、隱藏"
+                    : "左側分類導覽可一鍵收合；於設定頁可隨時切換回頂部多頁籤";
+            }
+        }
+        catch { }
+    }
+
+    private void SyncSidebarSelection(string tag)
+    {
+        if (SidebarNav == null) return;
+        var navItem = SidebarNav.MenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == tag)
+            ?? SidebarNav.FooterMenuItems.OfType<NavigationViewItem>().FirstOrDefault(i => i.Tag?.ToString() == tag);
+        if (navItem != null && !ReferenceEquals(SidebarNav.SelectedItem, navItem))
+        {
+            SidebarNav.SelectedItem = navItem;
+        }
+    }
+
+    private void SidebarNav_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
+    {
+        if (_isNavigating || _isApplyingWorkspacePreset) return;
+        try
+        {
+            if (args.SelectedItem is NavigationViewItem item && item.Tag is string tag && !string.IsNullOrWhiteSpace(tag))
+            {
+                RequestNavigation(tag);
+            }
+        }
+        catch (Exception ex)
+        {
+            GlobalExceptionHandler.ReportException(ex, "SidebarNav_SelectionChanged");
         }
     }
 

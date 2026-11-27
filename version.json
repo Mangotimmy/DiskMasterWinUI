@@ -1,18 +1,18 @@
 {
-  "version": "1.6.7",
-  "tag_name": "v1.6.7",
-  "name": "DiskMaster Pro v1.6.7 Flagship",
-  "published_at": "2026-11-26T23:07:47Z",
+  "version": "1.6.8",
+  "tag_name": "v1.6.8",
+  "name": "DiskMaster Pro v1.6.8 Flagship",
+  "published_at": "2026-11-27T00:08:10Z",
   "release_notes": "1. 升級至 v1.5.9 旗艦版架構。\n5. 優化多螢幕高 DPI 浮動視窗位置計算與標籤拖拽分離 (Chrome Tab Tear-Out)。",
   "assets": [
     {
       "name": "DiskMaster_Setup.exe",
-      "browser_download_url": "https://github.com/Mangotimmy/DiskMasterWinUI/releases/download/v1.6.7/DiskMaster_Setup.exe",
+      "browser_download_url": "https://github.com/Mangotimmy/DiskMasterWinUI/releases/download/v1.6.8/DiskMaster_Setup.exe",
       "size": 94121984
     },
     {
       "name": "DiskMaster_x64.zip",
-      "browser_download_url": "https://github.com/Mangotimmy/DiskMasterWinUI/releases/download/v1.6.7/DiskMaster_x64.zip",
+      "browser_download_url": "https://github.com/Mangotimmy/DiskMasterWinUI/releases/download/v1.6.8/DiskMaster_x64.zip",
       "size": 75497472
     }
   ]

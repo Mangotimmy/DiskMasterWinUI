@@ -40,13 +40,33 @@ public class DriverService
             {
                 inf = $"\"{inf}\"";
             }
+
+            // Safety protection: auto-backup the OEM driver package into the Quarantine Vault before removal
+            string backupNote = "";
+            if (SettingsService.Instance.Current.AutoBackupDriversBeforeDelete)
+            {
+                try
+                {
+                    var quarantine = new FileQuarantineService();
+                    var safeTag = inf.Replace("\"", "").Replace(".inf", "", StringComparison.OrdinalIgnoreCase);
+                    var backupDir = Path.Combine(quarantine.DriverBackupsRootPath, $"{DateTime.Now:yyyyMMdd_HHmmss}_{safeTag}");
+                    Directory.CreateDirectory(backupDir);
+                    var (_, _, expCode) = await ProcessHelper.RunProcessAsync("pnputil.exe", $"/export-driver {inf} \"{backupDir}\"");
+                    if (expCode == 0)
+                    {
+                        backupNote = $" [已自動備份至 {backupDir}]";
+                    }
+                }
+                catch { }
+            }
+
             var forceArg = force ? " /force" : "";
             var (output, err, code) = await ProcessHelper.RunProcessAsync("pnputil.exe", $"/delete-driver {inf} /uninstall{forceArg}");
             if (code == 0 || code == 3010)
             {
                 var msg = string.IsNullOrWhiteSpace(output) ? "Driver package uninstalled successfully." : output.Trim();
                 if (code == 3010) msg += " (Reboot required)";
-                return msg;
+                return msg + backupNote;
             }
             return string.IsNullOrWhiteSpace(err) ? (string.IsNullOrWhiteSpace(output) ? $"Exit code: {code}" : output.Trim()) : err.Trim();
         }

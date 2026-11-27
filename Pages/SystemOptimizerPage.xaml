@@ -2291,17 +2291,11 @@
                                     CornerRadius="8" Padding="16">
                                 <StackPanel Spacing="10">
                                     <TextBlock Text="🧰 背景服務與瀏覽器常駐減負開關 (全部可隨時一鍵還原)" FontWeight="Bold" FontSize="15" />
-                                    <ListView ItemsSource="{x:Bind ViewModel.BackgroundBloatTweaks, Mode=OneWay}"
-                                              SelectionMode="None" HorizontalAlignment="Stretch">
-                                        <ListView.ItemContainerStyle>
-                                            <Style TargetType="ListViewItem">
-                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                                <Setter Property="MinHeight" Value="54" />
-                                            </Style>
-                                        </ListView.ItemContainerStyle>
-                                        <ListView.ItemTemplate>
+                                    <ItemsControl ItemsSource="{x:Bind ViewModel.BackgroundBloatTweaks, Mode=OneWay}"
+                                                  HorizontalAlignment="Stretch">
+                                        <ItemsControl.ItemTemplate>
                                             <DataTemplate x:DataType="models:BackgroundBloatTweakItem">
-                                                <Grid Padding="8,6" ColumnSpacing="14" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                <Grid Padding="8,8" ColumnSpacing="14" BorderThickness="0,0,0,1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*" />
                                                         <ColumnDefinition Width="Auto" />
@@ -2321,8 +2315,8 @@
                                                                   OnContent="已減負" OffContent="系統預設" VerticalAlignment="Center" />
                                                 </Grid>
                                             </DataTemplate>
-                                        </ListView.ItemTemplate>
-                                    </ListView>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
                                 </StackPanel>
                             </Border>
 

@@ -90,20 +90,29 @@
                 </StackPanel>
             </Border>
 
-            <!-- 0.2 Adobe Workspace Layout Presets -->
+            <!-- 0.2 Adobe Workspace Layout Presets & Navigation Layout Style -->
             <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                     CornerRadius="8" Padding="16">
                 <StackPanel Spacing="12">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <FontIcon Glyph="&#xE737;" FontSize="18" Foreground="{ThemeResource AccentFillColorDefaultBrush}" />
-                        <TextBlock x:Name="WorkspaceCardTitle" Text="🗂️ 工作區佈局預設" Style="{StaticResource SubtitleTextBlockStyle}" VerticalAlignment="Center" />
+                        <TextBlock x:Name="WorkspaceCardTitle" Text="🗂️ 導覽風格與工作區佈局預設" Style="{StaticResource SubtitleTextBlockStyle}" VerticalAlignment="Center" />
                     </StackPanel>
-                    <TextBlock x:Name="WorkspaceCardDesc" Text="依據目前工作情境一鍵切換分頁優先級與工作區，提供如專業軟體般的佈局體驗。"
-                               Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <ComboBox x:Name="WorkspacePresetBox" Header="工作區佈局預設檔" HorizontalAlignment="Stretch"
-                              ItemsSource="{x:Bind ViewModel.WorkspacePresetOptions, Mode=OneWay}"
-                              SelectedItem="{x:Bind ViewModel.SelectedWorkspacePreset, Mode=TwoWay}" />
+                    <TextBlock x:Name="WorkspaceCardDesc" Text="預設採用現代化左側分類導覽列（可收合節省筆電空間），亦可隨時切換回經典頂部多頁籤；並可套用工作區預設檔。"
+                               Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                    <Grid ColumnSpacing="14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ComboBox Grid.Column="0" x:Name="NavigationLayoutBox" Header="主視窗導覽列風格 (即時切換)" HorizontalAlignment="Stretch"
+                                  ItemsSource="{x:Bind ViewModel.NavigationLayoutOptions}"
+                                  SelectedItem="{x:Bind ViewModel.SelectedNavigationLayout, Mode=TwoWay}" />
+                        <ComboBox Grid.Column="1" x:Name="WorkspacePresetBox" Header="工作區佈局預設檔" HorizontalAlignment="Stretch"
+                                  ItemsSource="{x:Bind ViewModel.WorkspacePresetOptions, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.SelectedWorkspacePreset, Mode=TwoWay}" />
+                    </Grid>
                 </StackPanel>
             </Border>
 

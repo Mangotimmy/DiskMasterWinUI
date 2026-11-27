@@ -422,13 +422,21 @@ public class OneDriveService
                 UseShellExecute = true
             });
 
-            // Clean corrupted personal settings cache
+            // Clean corrupted personal settings cache (with Quarantine snapshot first)
             var settingsDir = Path.Combine(LocalAppData, "Microsoft", "OneDrive", "settings", "Personal");
             if (Directory.Exists(settingsDir))
             {
                 try
                 {
-                    foreach (var f in Directory.GetFiles(settingsDir, "*.dat")) File.Delete(f);
+                    var q = new FileQuarantineService();
+                    using var session = SettingsService.Instance.Current.EnableQuarantineBackup
+                        ? q.BeginSession("OneDrive 個人設定重設備份")
+                        : null;
+                    foreach (var f in Directory.GetFiles(settingsDir, "*.dat"))
+                    {
+                        session?.TrySnapshotCopyFile(f, "OneDriveSettings");
+                        File.Delete(f);
+                    }
                 }
                 catch { }
             }
@@ -496,6 +504,12 @@ public class OneDriveService
                 {
                     try
                     {
+                        // Guard C:\OneDriveTemp: skip if non-empty user files exist so unsynced data is never lost
+                        if (dir.Equals(@"C:\OneDriveTemp", StringComparison.OrdinalIgnoreCase) &&
+                            Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories).Any())
+                        {
+                            continue;
+                        }
                         Directory.Delete(dir, true);
                         cleanedCount++;
                     }
